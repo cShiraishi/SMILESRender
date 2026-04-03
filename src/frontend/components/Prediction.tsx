@@ -31,7 +31,7 @@ const predictionImageStyles: React.CSSProperties = {
   maxWidth: '350px',
 };
 
-function Prediction(props: { smiles: string }) {
+function Prediction(props: { smiles: string; onDataLoaded?: (data: any[]) => void }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isError, setIsError] = useState<boolean>(false);
   const [fields, setFields] = useState<
@@ -57,11 +57,12 @@ function Prediction(props: { smiles: string }) {
         return response.text();
       })
       .then((predictResponse) => {
+        // Blindagem contra scripts de redirecionamento do StopTox
+        const cleanHtml = predictResponse.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                                         .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
+
         const parser = new DOMParser();
-        const importedDoc = parser.parseFromString(
-          predictResponse,
-          'text/html'
-        );
+        const importedDoc = parser.parseFromString(cleanHtml, 'text/html');
         const elements = importedDoc.querySelectorAll('#tablePreview');
 
         const values: any[] = [];
@@ -94,6 +95,18 @@ function Prediction(props: { smiles: string }) {
         setFields(values);
 
         setIsLoading(false);
+
+        // Callback para exportação
+        if (props.onDataLoaded) {
+            props.onDataLoaded(values.map(p => ({
+                SMILES: props.smiles,
+                Tool: "StopTox",
+                Category: "Toxicity",
+                Property: p.head[0] || "Prediction",
+                Value: p.data[0] || "-",
+                Unit: "-"
+            })));
+        }
       })
       .catch((err) => {
         console.log('Error here:', err);

@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l src/**/*.py src/**/*.tsx src/**/*.ts)",
+      "Bash(xargs wc:*)",
+      "Bash(ls .env*)",
+      "Bash(npm --version)",
+      "Bash(npm install:*)",
+      "Bash(bun:*)",
+      "Bash(where python:*)",
+      "Bash(where python3:*)",
+      "Bash(ls /c/Python*)",
+      "Read(//c/Users/ruiab/AppData/Local/Programs/Python/**)",
+      "Bash(/c/Users/ruiab/AppData/Local/Programs/Python/Python312/python.exe -m pip install -r requirements.txt)",
+      "Bash(/c/Users/ruiab/AppData/Local/Programs/Python/Python312/python.exe src/main.py)",
+      "Bash(curl -s http://localhost:3000/ping)",
+      "Bash(pkill -f \"python.*main.py\")",
+      "Bash(curl:*)",
+      "Bash(taskkill //F //IM python.exe)",
+      "Bash(find C:\\\\Users\\\\ruiab\\\\Documents\\\\SmileRender\\\\src\\\\frontend\\\\components:*)",
+      "Bash(find C:\\\\Users\\\\ruiab\\\\Documents\\\\SmileRender\\\\src\\\\frontend:*)",
+      "Bash(grep -i \"script\\\\|src\\\\|href\" echo \"---\")",
+      "Bash(git push:*)",
+      "Bash(git remote:*)",
+      "Bash(/c/Users/ruiab/AppData/Local/Programs/Python/Python312/python.exe:*)",
+      "Bash(python -c ':*)",
+      "Bash(python -m pytest --co -q)",
+      "Bash(ls venv/Scripts/python*)",
+      "Bash(ls .venv/Scripts/python*)",
+      "Bash(.venv/Scripts/python -c ':*)",
+      "Bash(ls *.py)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('scripts',{}\\)\\)\")"
+    ]
+  }
+}

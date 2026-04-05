@@ -1,0 +1,77 @@
+﻿================================================================================
+SmileRender - FDA-Approved Drug Benchmark Test
+================================================================================
+Test started at: 2026-04-03 19:46:27
+Server: http://localhost:3000
+Number of compounds: 5
+Number of tools: 5
+Total predictions: 25
+
+[OK] Server is responding
+
+--- Aspirin (CC(=O)Oc1ccccc1C(=O)O) ---
+  [OK] StopTox         |  16.93s |  1255.7 KB | OK
+  [OK] SwissADME       |   5.81s |    62.0 KB | OK
+  [OK] StopLight       |   3.00s |   290.4 KB | OK
+  [!!] pkCSM           |   4.84s |     0.1 KB | EMPTY
+  [OK] ADMETlab 3.0    |   5.24s |   159.5 KB | OK
+  Total for Aspirin: 35.82s
+
+--- Ibuprofen (CC(C)Cc1ccc(cc1)C(C)C(=O)O) ---
+  [OK] StopTox         |  16.17s |   843.0 KB | OK
+  [OK] SwissADME       |   5.30s |    61.8 KB | OK
+  [OK] StopLight       |   2.97s |   288.9 KB | OK
+  [!!] pkCSM           |   4.83s |     0.1 KB | EMPTY
+  [OK] ADMETlab 3.0    |   4.60s |   120.7 KB | OK
+  Total for Ibuprofen: 33.88s
+
+--- Caffeine (Cn1c(=O)c2c(ncn2C)n(c1=O)C) ---
+  [OK] StopTox         |  21.96s |  1754.2 KB | OK
+  [OK] SwissADME       |   5.19s |    61.9 KB | OK
+  [OK] StopLight       |   2.98s |   291.9 KB | OK
+  [!!] pkCSM           |   4.79s |     0.1 KB | EMPTY
+  [OK] ADMETlab 3.0    |   8.38s |   137.3 KB | OK
+  Total for Caffeine: 43.30s
+
+--- Metformin (CN(C)C(=N)NC(=N)N) ---
+  [OK] StopTox         |  15.20s |  1127.0 KB | OK
+  [OK] SwissADME       |   5.24s |    62.1 KB | OK
+  [OK] StopLight       |   2.97s |   289.5 KB | OK
+  [!!] pkCSM           |   4.83s |     0.1 KB | EMPTY
+  [OK] ADMETlab 3.0    |   4.47s |   159.0 KB | OK
+  Total for Metformin: 32.71s
+
+--- Paracetamol (CC(=O)Nc1ccc(O)cc1) ---
+  [OK] StopTox         |  18.82s |  1005.0 KB | OK
+  [OK] SwissADME       |   4.54s |    62.0 KB | OK
+  [OK] StopLight       |   2.97s |   288.7 KB | OK
+  [!!] pkCSM           |   4.79s |     0.1 KB | EMPTY
+  [OK] ADMETlab 3.0    |   4.92s |   249.7 KB | OK
+  Total for Paracetamol: 36.04s
+
+================================================================================
+SUMMARY
+================================================================================
+Total elapsed time: 181.74 seconds (3.0 minutes)
+Average per compound: 36.35 seconds
+
+Success rate: 20/25 (80.0%)
+
+Response times (seconds):
+Drug            |  StopTox |  SwissADME |  StopLight |    pkCSM |   ADMETlab |    Total
+-------------------------------------------------------------------------------------
+Aspirin         |    16.93 |       5.81 |       3.00 |     4.84 |       5.24 |    35.82
+Ibuprofen       |    16.17 |       5.30 |       2.97 |     4.83 |       4.60 |    33.87
+Caffeine        |    21.96 |       5.19 |       2.98 |     4.79 |       8.38 |    43.30
+Metformin       |    15.20 |       5.24 |       2.97 |     4.83 |       4.47 |    32.71
+Paracetamol     |    18.82 |       4.54 |       2.97 |     4.79 |       4.92 |    36.04
+
+Average response time per tool:
+  StopTox        : 17.82s
+  SwissADME      : 5.22s
+  StopLight      : 2.98s
+  pkCSM          : 4.82s
+  ADMETlab 3.0   : 5.52s
+
+Test completed at: 2026-04-03 19:49:31
+================================================================================

@@ -545,34 +545,159 @@ def calc_descriptors():
             if mol is None:
                 results.append({"smiles": smi, "error": "Invalid SMILES"})
                 continue
+
+            mw   = Descriptors.MolWt(mol)
+            logp = Crippen.MolLogP(mol)
+            hbd  = Lipinski.NumHDonors(mol)
+            hba  = Lipinski.NumHAcceptors(mol)
+            tpsa = rdMolDescriptors.CalcTPSA(mol)
+            rotb = rdMolDescriptors.CalcNumRotatableBonds(mol)
+
             results.append({
                 "smiles": smi,
-                "MolecularWeight":      round(Descriptors.MolWt(mol), 3),
-                "ExactMolWt":           round(Descriptors.ExactMolWt(mol), 5),
-                "LogP":                 round(Crippen.MolLogP(mol), 3),
-                "TPSA":                 round(rdMolDescriptors.CalcTPSA(mol), 2),
-                "HBD":                  Lipinski.NumHDonors(mol),
-                "HBA":                  Lipinski.NumHAcceptors(mol),
-                "RotatableBonds":       rdMolDescriptors.CalcNumRotatableBonds(mol),
-                "AromaticRings":        rdMolDescriptors.CalcNumAromaticRings(mol),
-                "HeavyAtoms":           mol.GetNumHeavyAtoms(),
-                "Rings":                rdMolDescriptors.CalcNumRings(mol),
-                "FractionCSP3":         round(rdMolDescriptors.CalcFractionCSP3(mol), 4),
-                "NHOH":                 Lipinski.NHOHCount(mol),
-                "NO":                   Lipinski.NOCount(mol),
-                "NumHeteroatoms":       rdMolDescriptors.CalcNumHeteroatoms(mol),
-                "QED":                  round(QED.qed(mol), 4),
-                "LipinskiViolations":   sum([
-                    Descriptors.MolWt(mol) > 500,
-                    Crippen.MolLogP(mol) > 5,
-                    Lipinski.NumHDonors(mol) > 5,
-                    Lipinski.NumHAcceptors(mol) > 10,
-                ]),
+                # --- Constitutional ---
+                "MolecularWeight":          round(mw, 3),
+                "ExactMolWt":               round(Descriptors.ExactMolWt(mol), 5),
+                "HeavyAtoms":               mol.GetNumHeavyAtoms(),
+                "NumHeteroatoms":           rdMolDescriptors.CalcNumHeteroatoms(mol),
+                "NHOH":                     Lipinski.NHOHCount(mol),
+                "NO":                       Lipinski.NOCount(mol),
+                "FractionCSP3":             round(rdMolDescriptors.CalcFractionCSP3(mol), 4),
+                "MolMR":                    round(Crippen.MolMR(mol), 3),
+                "LabuteASA":                round(rdMolDescriptors.CalcLabuteASA(mol), 3),
+                # --- Drug-likeness ---
+                "LogP":                     round(logp, 3),
+                "TPSA":                     round(tpsa, 2),
+                "HBD":                      hbd,
+                "HBA":                      hba,
+                "RotatableBonds":           rotb,
+                "QED":                      round(QED.qed(mol), 4),
+                "LipinskiViolations":       int(sum([mw > 500, logp > 5, hbd > 5, hba > 10])),
+                "VerberViolations":         int(sum([rotb > 10, tpsa > 140])),
+                "EganViolations":           int(sum([logp > 5.88, tpsa > 131.6])),
+                # --- Topological ---
+                "BalabanJ":                 round(Descriptors.BalabanJ(mol), 4),
+                "BertzCT":                  round(Descriptors.BertzCT(mol), 3),
+                "HallKierAlpha":            round(Descriptors.HallKierAlpha(mol), 4),
+                "Kappa1":                   round(rdMolDescriptors.CalcKappa1(mol), 4),
+                "Kappa2":                   round(rdMolDescriptors.CalcKappa2(mol), 4),
+                "Kappa3":                   round(rdMolDescriptors.CalcKappa3(mol), 4),
+                "Chi0n":                    round(rdMolDescriptors.CalcChi0n(mol), 4),
+                "Chi1n":                    round(rdMolDescriptors.CalcChi1n(mol), 4),
+                "Chi2n":                    round(rdMolDescriptors.CalcChi2n(mol), 4),
+                "Chi3n":                    round(rdMolDescriptors.CalcChi3n(mol), 4),
+                "Chi4n":                    round(rdMolDescriptors.CalcChi4n(mol), 4),
+                "Ipc":                      round(Descriptors.Ipc(mol), 4),
+                # --- Electronic / VSA ---
+                "MaxEStateIndex":           round(Descriptors.MaxEStateIndex(mol), 4),
+                "MinEStateIndex":           round(Descriptors.MinEStateIndex(mol), 4),
+                "MaxAbsEStateIndex":        round(Descriptors.MaxAbsEStateIndex(mol), 4),
+                "MinAbsEStateIndex":        round(Descriptors.MinAbsEStateIndex(mol), 4),
+                "PEOE_VSA1":               round(Descriptors.PEOE_VSA1(mol), 3),
+                "PEOE_VSA2":               round(Descriptors.PEOE_VSA2(mol), 3),
+                "SMR_VSA1":                round(Descriptors.SMR_VSA1(mol), 3),
+                "SMR_VSA2":                round(Descriptors.SMR_VSA2(mol), 3),
+                "SlogP_VSA1":              round(Descriptors.SlogP_VSA1(mol), 3),
+                "SlogP_VSA2":              round(Descriptors.SlogP_VSA2(mol), 3),
+                # --- Ring & Fragment ---
+                "Rings":                    rdMolDescriptors.CalcNumRings(mol),
+                "AromaticRings":            rdMolDescriptors.CalcNumAromaticRings(mol),
+                "AliphaticRings":           rdMolDescriptors.CalcNumAliphaticRings(mol),
+                "AromaticCarbocycles":      rdMolDescriptors.CalcNumAromaticCarbocycles(mol),
+                "AromaticHeterocycles":     rdMolDescriptors.CalcNumAromaticHeterocycles(mol),
+                "SaturatedCarbocycles":     rdMolDescriptors.CalcNumSaturatedCarbocycles(mol),
+                "SaturatedHeterocycles":    rdMolDescriptors.CalcNumSaturatedHeterocycles(mol),
+                "AliphaticCarbocycles":     rdMolDescriptors.CalcNumAliphaticCarbocycles(mol),
+                "AliphaticHeterocycles":    rdMolDescriptors.CalcNumAliphaticHeterocycles(mol),
             })
+
+            # --- Optional fingerprints ---
+            fps_requested = body.get("fingerprints", [])
+            entry = results[-1]
+            if "rdkit" in fps_requested:
+                fp = Chem.RDKFingerprint(mol, fpSize=1024)
+                bits = fp.ToBitString()
+                entry["fp_rdkit_bits"] = bits
+                entry["fp_rdkit_onbits"] = bits.count("1")
+            if "morgan" in fps_requested:
+                from rdkit.Chem import AllChem
+                fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=2048)
+                bits = fp.ToBitString()
+                entry["fp_morgan_bits"] = bits
+                entry["fp_morgan_onbits"] = bits.count("1")
+            if "maccs" in fps_requested:
+                from rdkit.Chem.MACCSkeys import GenMACCSKeys
+                fp = GenMACCSKeys(mol)
+                bits = fp.ToBitString()
+                entry["fp_maccs_bits"] = bits
+                entry["fp_maccs_onbits"] = bits.count("1")
+            if "atompair" in fps_requested:
+                fp = rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(mol, nBits=2048)
+                bits = fp.ToBitString()
+                entry["fp_atompair_bits"] = bits
+                entry["fp_atompair_onbits"] = bits.count("1")
+
         return jsonify(results)
     except Exception as err:
         print(f"Descriptors Error: {err}")
         return jsonify({"error": str(err)}), 500
+
+
+@app.route("/descriptors/excel", methods=["POST"])
+def descriptors_excel():
+    """Export descriptor results (already computed) as .xlsx"""
+    try:
+        import pandas as pd
+        import io
+        data = request.get_json()
+        if not data or not isinstance(data, list):
+            return "No data provided", 400
+
+        # fp_bit_keys  = full bit-vector columns (fp_X_bits)  → separate sheets
+        # phys_keys    = everything else except "error"       → Descriptors sheet
+        #                (includes fp_X_onbits scalar counts)
+        fp_bit_keys = [k for k in data[0].keys() if k.startswith("fp_") and k.endswith("_bits")]
+        phys_keys   = [k for k in data[0].keys()
+                       if k != "error" and not (k.startswith("fp_") and k.endswith("_bits"))]
+
+        # --- Sheet 1: Physicochemical descriptors (wide format) ---
+        df_phys = pd.DataFrame([{k: r.get(k, "") for k in phys_keys} for r in data if not r.get("error")])
+
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df_phys.to_excel(writer, index=False, sheet_name="Descriptors")
+
+            # --- Sheet 2+: One sheet per fingerprint type ---
+            for fp_key in fp_bit_keys:
+                fp_name = fp_key.replace("fp_", "").replace("_bits", "").upper()
+                rows_fp = []
+                for r in data:
+                    if r.get("error"):
+                        continue
+                    bits = r.get(fp_key, "")
+                    row = {"SMILES": r.get("smiles", "")}
+                    for i, b in enumerate(bits):
+                        row[f"b{i}"] = int(b)
+                    rows_fp.append(row)
+                if rows_fp:
+                    pd.DataFrame(rows_fp).to_excel(writer, index=False, sheet_name=f"FP_{fp_name[:25]}")
+
+            # Auto-width for Descriptors sheet
+            ws = writer.sheets["Descriptors"]
+            for col in ws.columns:
+                max_len = max((len(str(c.value or "")) for c in col), default=0)
+                ws.column_dimensions[col[0].column_letter].width = min(max_len + 2, 40)
+
+        output.seek(0)
+        return send_file(
+            output,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True,
+            download_name=f"descriptors_qsar.xlsx"
+        )
+    except Exception as err:
+        print(f"Descriptors Excel Error: {err}")
+        return str(err), 500
 
 
 @app.route("/similarity", methods=["POST"])

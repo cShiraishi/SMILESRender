@@ -39,6 +39,8 @@ function PKCSM(props: { smiles: string; onDataLoaded?: (data: any[]) => void }) 
   const pollInterval = useRef<any>(null);
   const resultUrl = useRef<string>("");
   const smilesHash = useRef<string>("");
+  const pollCount = useRef<number>(0);
+  const MAX_POLLS = 20; // 60 s max (20 × 3 s)
 
   const stopPolling = () => {
     if (pollInterval.current) {
@@ -48,6 +50,14 @@ function PKCSM(props: { smiles: string; onDataLoaded?: (data: any[]) => void }) 
   };
 
   const fetchResults = async () => {
+    pollCount.current += 1;
+    if (pollCount.current > MAX_POLLS) {
+      stopPolling();
+      setIsLoading(false);
+      setStatus("Tempo esgotado");
+      if (props.onDataLoaded) props.onDataLoaded([]);
+      return;
+    }
     try {
       const response = await fetch('/predict/pkcsm/fetch', {
         method: 'POST',
@@ -126,6 +136,7 @@ function PKCSM(props: { smiles: string; onDataLoaded?: (data: any[]) => void }) 
     setIsLoading(true);
     setIsError(false);
     setResults([]);
+    pollCount.current = 0;
     setStatus("Conectando ao pkCSM...");
 
     // 1. Inicializar a predição e pegar a URL única
@@ -151,6 +162,7 @@ function PKCSM(props: { smiles: string; onDataLoaded?: (data: any[]) => void }) 
         console.error("pkCSM Init Error:", err);
         setIsError(true);
         setIsLoading(false);
+        if (props.onDataLoaded) props.onDataLoaded([]);
       });
 
     return () => stopPolling();

@@ -1,89 +1,65 @@
 import React, { useEffect, useState } from 'react';
-
-const smilesCardStyle: React.CSSProperties = {
-  margin: '20px',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  width: '320px',
-  maxWidth: '90%',
-};
-
-const imageStyle: React.CSSProperties = {
-  boxShadow: '2px 4px 10px #333',
-  width: '300px',
-  maxWidth: '100%',
-  borderRadius: '10px',
-};
-
-const loadingStype: React.CSSProperties = {
-  boxShadow: '2px 4px 10px #333',
-  maxWidth: '100%',
-  borderRadius: '10px',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  width: '300px',
-  height: '300px',
-  background: '#fff',
-};
-
-const labelStyle: React.CSSProperties = {
-  textAlign: 'center',
-  marginTop: '15px',
-  width: '100%',
-  maxWidth: '100%',
-  fontWeight: 'bold',
-  overflowWrap: 'break-word',
-};
+import { colors, font, radius, shadow } from '../styles/themes';
 
 function SmilesCard(props: { smiles: string; name?: string }) {
-  const [isloading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [smileImage, setSmileImage] = useState(new Blob());
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    const url = `/render/base64/${encodeURIComponent(window.btoa(props.smiles))}`;
-
-    fetch(url)
-      .then((response) => response.blob())
-      .then((image) => setSmileImage(image))
-      .then(() => setIsLoading(false))
-      .catch((error) => {
-        console.error('Fetch Molecule error:', error);
-        setError(true);
-      });
+    fetch(`/render/base64/${encodeURIComponent(window.btoa(props.smiles))}`)
+      .then(r => r.blob())
+      .then(img => { setSmileImage(img); setIsLoading(false); })
+      .catch(() => { setError(true); setIsLoading(false); });
   }, []);
 
-  if (isloading)
-    return (
-      <div style={smilesCardStyle}>
-        <div style={loadingStype}>
-          <p>Loading...</p>
-        </div>
+  const label = props.name || props.smiles;
 
-        <p style={labelStyle}>{props.smiles}</p>
-      </div>
-    );
-  else
-    return (
-      <div style={smilesCardStyle}>
-        {error ? (
-          <div style={loadingStype}>
-            <p>Could not fetch image</p>
-          </div>
-        ) : (
-          <img
-            src={URL.createObjectURL(smileImage)}
-            alt={props.smiles}
-            style={imageStyle}
-          />
+  return (
+    <div style={{
+      backgroundColor: colors.surface,
+      border: `1px solid ${colors.border}`,
+      borderRadius: radius.md,
+      boxShadow: shadow.sm,
+      padding: '16px',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      width: '260px',
+      margin: '10px',
+      fontFamily: font,
+    }}>
+      <div style={{
+        width: '220px', height: '220px',
+        backgroundColor: colors.bg,
+        borderRadius: radius.sm,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        overflow: 'hidden',
+        marginBottom: '10px',
+      }}>
+        {isLoading && (
+          <span style={{ fontSize: '12px', color: colors.textMuted }}>Loading…</span>
         )}
-
-        <p style={labelStyle}>{props.name || props.smiles}</p>
+        {error && (
+          <span style={{ fontSize: '12px', color: colors.danger }}>Invalid SMILES</span>
+        )}
+        {!isLoading && !error && (
+          <img src={URL.createObjectURL(smileImage)} alt={props.smiles} style={{ maxWidth: '100%', maxHeight: '100%' }} />
+        )}
       </div>
-    );
+      <p style={{
+        fontSize: '11px',
+        color: colors.textMuted,
+        textAlign: 'center',
+        overflowWrap: 'break-word',
+        width: '100%',
+        margin: 0,
+        fontFamily: 'monospace',
+      }}>
+        {label}
+      </p>
+    </div>
+  );
 }
 
 export default SmilesCard;

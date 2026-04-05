@@ -1,4 +1,10 @@
 services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: smiles-render-redis
+    ports:
+      - 6379:6379
+
   smiles-render-web:
     build: .
     container_name: smiles-render-web
@@ -6,4 +12,18 @@ services:
       - .env
     ports:
       - 3000:3000
-    network_mode: "host"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+
+  celery-worker:
+    build: .
+    container_name: smiles-render-worker
+    command: celery -A tasks worker --loglevel=info --pool=solo
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379/0

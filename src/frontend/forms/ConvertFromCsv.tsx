@@ -191,7 +191,7 @@ function ConvertFromCsv() {
                       cursor: 'pointer',
                     }}
                   >
-                    Select a CSV file
+                    Select a CSV file (max 20 SMILES)
                   </label>
                 </p>
                 <input

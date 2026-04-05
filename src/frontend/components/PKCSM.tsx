@@ -38,6 +38,7 @@ function PKCSM(props: { smiles: string; onDataLoaded?: (data: any[]) => void }) 
   const [status, setStatus] = useState<string>("Iniciando predição...");
   const pollInterval = useRef<any>(null);
   const resultUrl = useRef<string>("");
+  const smilesHash = useRef<string>("");
 
   const stopPolling = () => {
     if (pollInterval.current) {
@@ -51,7 +52,7 @@ function PKCSM(props: { smiles: string; onDataLoaded?: (data: any[]) => void }) 
       const response = await fetch('/predict/pkcsm/fetch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: resultUrl.current })
+        body: JSON.stringify({ url: resultUrl.current, smiles_hash: smilesHash.current })
       });
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -136,6 +137,7 @@ function PKCSM(props: { smiles: string; onDataLoaded?: (data: any[]) => void }) 
       .then(data => {
         if (data.result_url) {
           resultUrl.current = data.result_url;
+          smilesHash.current = data.smiles_hash || "";
           setStatus("Predição iniciada. Aguardando resultados...");
           
           // 2. Começar a poll os resultados

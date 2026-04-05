@@ -3,6 +3,7 @@ import { useState } from 'react';
 import Section from '../components/Section';
 import SmilesCard from '../components/SmilesCard';
 import { downloadBlob } from '../tools/helpers';
+import { colors, font, radius } from '../styles/themes';
 
 const defaultSmiles = [
   'CCCCCCCC',
@@ -11,13 +12,9 @@ const defaultSmiles = [
   'OC[C@@H](O1)[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)1',
 ];
 
-const smilesImageStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'row',
-  flexWrap: 'wrap',
-  justifyContent: 'center',
-  alignContent: 'center',
-  width: '100%',
+const btnBase: React.CSSProperties = {
+  fontFamily: font, fontSize: '13px', fontWeight: 500,
+  padding: '8px 18px', borderRadius: radius.sm, cursor: 'pointer',
 };
 
 function DirectInput() {
@@ -25,59 +22,56 @@ function DirectInput() {
   const [smilesToRender, setSmilesToRender] = useState([] as string[]);
   const [error, setError] = useState(false);
 
-  function loadSmiles() {
-    setSmilesToRender(smiles);
-  }
+  const loadSmiles = () => setSmilesToRender(smiles);
 
-  function downloadSmiles() {
+  const downloadSmiles = () => {
     fetch('/render', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ format: 'png', smiles }),
     })
-      .then((response) => response.blob())
-      .then((blob) => downloadBlob({ name: 'smiles.zip', blob }))
-      .finally(() => setError(false))
-      .catch((error) => {
-        console.error('Could not download smiles zip:', error);
-        setError(true);
-      });
-  }
+      .then(r => r.blob())
+      .then(blob => downloadBlob({ name: 'smiles.zip', blob }))
+      .catch(() => setError(true));
+  };
 
   return (
-    <Section title="Direct input">
+    <Section title="Direct Input">
       <>
-        <div>
-          <p style={{ marginBottom: '10px' }}>
-            <label> Enter your smiles : </label>
+        <label style={{ fontSize: '12px', fontWeight: 600, color: colors.textMuted, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+          SMILES — one per line (max 20)
+        </label>
+        <textarea
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            padding: '10px 12px',
+            fontFamily: 'monospace', fontSize: '13px',
+            border: `1px solid ${colors.border}`,
+            borderRadius: radius.sm,
+            backgroundColor: colors.bg,
+            color: colors.text,
+            resize: 'vertical',
+          }}
+          defaultValue={defaultSmiles.join('\n')}
+          rows={6}
+          onChange={e => setSmiles(e.target.value.split('\n'))}
+        />
+        {error && (
+          <p style={{ fontSize: '12px', color: colors.danger, margin: '8px 0 0' }}>
+            <i className="bi bi-exclamation-triangle" style={{ marginRight: '4px' }}></i>
+            Could not download. Check SMILES and try again.
           </p>
-          <textarea
-            style={{
-              width: '100%',
-            }}
-            defaultValue={defaultSmiles.join('\n')}
-            rows={6}
-            onChange={(event) => {
-              setSmiles(event.target.value.split('\n'));
-            }}
-          ></textarea>
-        </div>
-        <div style={{ padding: '10px 0px 10px 0px' }}>
-          {error ? (
-            <p style={{ color: 'red', padding: '10px' }}>
-              Could not download the smiles! Check the smiles input and try
-              again.
-            </p>
-          ) : null}
-          <button style={{ marginRight: '10px' }} onClick={loadSmiles}>
+        )}
+        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+          <button onClick={loadSmiles} style={{ ...btnBase, backgroundColor: colors.blue, color: '#fff', border: 'none' }}>
             Render
           </button>
-          <button onClick={downloadSmiles}>Download</button>
+          <button onClick={downloadSmiles} style={{ ...btnBase, backgroundColor: colors.surface, color: colors.textMuted, border: `1px solid ${colors.border}` }}>
+            <i className="bi bi-download" style={{ marginRight: '6px' }}></i>Download ZIP
+          </button>
         </div>
-        <div style={smilesImageStyle}>
-          {[...new Set(smilesToRender)].map((smiles) => (
-            <SmilesCard key={smiles} smiles={smiles} />
-          ))}
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', marginTop: '20px' }}>
+          {[...new Set(smilesToRender)].map(s => <SmilesCard key={s} smiles={s} />)}
         </div>
       </>
     </Section>

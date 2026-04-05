@@ -49,70 +49,67 @@ function Prediction(props: { smiles: string; onDataLoaded?: (data: any[]) => voi
   useEffect(() => {
     setIsLoading(true);
 
-    fetch(`/predict/base64/${encodeURIComponent(window.btoa(props.smiles))}}`)
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.text();
-      })
-      .then((predictResponse) => {
-        // Blindagem contra scripts de redirecionamento do StopTox
-        const cleanHtml = predictResponse.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-                                         .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
+    const worker = new Worker(new URL('../workers/prediction.worker.ts', import.meta.url));
+    
+    worker.onmessage = (e) => {
+        const { html, status, error } = e.data;
+        
+        if (status === 'success') {
+            const parser = new DOMParser();
+            const importedDoc = parser.parseFromString(html, 'text/html');
+            const elements = importedDoc.querySelectorAll('#tablePreview');
 
-        const parser = new DOMParser();
-        const importedDoc = parser.parseFromString(cleanHtml, 'text/html');
-        const elements = importedDoc.querySelectorAll('#tablePreview');
+            const values: any[] = [];
+            for (const value of elements) {
+                const head = value.querySelector('thead')!.querySelector('tr')!;
+                const body = value.querySelector('tbody')!.querySelector('tr')!;
 
-        const values: any[] = [];
+                const headIndexes: string[] = [];
+                const bodyValues: string[] = [];
 
-        for (const value of elements) {
-          const head = value.querySelector('thead')!.querySelector('tr')!;
-          const body = value.querySelector('tbody')!.querySelector('tr')!;
+                for (const node of head.childNodes as unknown as any[])
+                    if (node.innerText) headIndexes.push(node.innerText.trim());
 
-          const headIndexes: string[] = [];
-          const bodyValues: string[] = [];
+                for (const node of body.childNodes as unknown as any[]) {
+                    const value = node.textContent.trim();
+                    if (value) {
+                        bodyValues.push(value.split('\n')[0].trim());
+                    } else if (node.querySelector && node.querySelector('img')) {
+                        bodyValues.push(node.querySelector('img').src);
+                    }
+                }
 
-          for (const node of head.childNodes as unknown as any[])
-            if (node.innerText) headIndexes.push(node.innerText.trim());
-
-          for (const node of body.childNodes as unknown as any[]) {
-            const value = node.textContent.trim();
-            if (value) {
-              bodyValues.push(value.split('\n')[0].trim());
-            } else if (node.querySelector && node.querySelector('img')) {
-              bodyValues.push(node.querySelector('img').src);
+                values.push({
+                    head: headIndexes,
+                    data: bodyValues,
+                });
             }
-          }
 
-          values.push({
-            head: headIndexes,
-            data: bodyValues,
-          });
+            setFields(values);
+            setIsLoading(false);
+
+            if (props.onDataLoaded) {
+                props.onDataLoaded(values.map(p => ({
+                    SMILES: props.smiles,
+                    Tool: "StopTox",
+                    Category: "Toxicity",
+                    Property: p.head[0] || "Prediction",
+                    Value: p.data[0] || "-",
+                    Unit: "-"
+                })));
+            }
+        } else {
+            console.error('Worker Error:', error);
+            setIsError(true);
         }
+        
+        worker.terminate();
+    };
 
-        setFields(values);
+    worker.postMessage({ smiles: props.smiles, type: 'FETCH_PREDICTION' });
 
-        setIsLoading(false);
-
-        // Callback para exportação
-        if (props.onDataLoaded) {
-            props.onDataLoaded(values.map(p => ({
-                SMILES: props.smiles,
-                Tool: "StopTox",
-                Category: "Toxicity",
-                Property: p.head[0] || "Prediction",
-                Value: p.data[0] || "-",
-                Unit: "-"
-            })));
-        }
-      })
-      .catch((err) => {
-        console.log('Error here:', err);
-        setIsError(true);
-      });
-  }, []);
+    return () => worker.terminate();
+  }, [props.smiles]);
 
   const renderContent = () => {
     if (isLoading && !isError) {

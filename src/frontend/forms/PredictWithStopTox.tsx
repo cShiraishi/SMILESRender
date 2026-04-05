@@ -1,11 +1,11 @@
 import React from 'react';
 import { useState } from 'react';
-import Section from '../components/Section';
 import Prediction from '../components/Prediction';
 import SwissADME from '../components/SwissADME';
 import StopLight from '../components/StopLight';
 import PKCSM from '../components/PKCSM';
 import ADMETlab from '../components/ADMETlab';
+import ToolErrorBoundary from '../components/ToolErrorBoundary';
 
 const defaultSmiles = [
   'CCCCCCCC',
@@ -79,7 +79,7 @@ function PredictWithStopTox() {
   const isReady = percentage === 100;
 
   return (
-  <Section title="Predict SMILES (Multi-Tool: StopTox, SwissADME & StopLight)">
+  <div style={{ width: '95%', maxWidth: '1200px' }}>
     <>
       {/* Tab navigation */}
       <div style={{ display: 'flex', marginBottom: '20px', gap: '10px' }}>
@@ -114,7 +114,7 @@ function PredictWithStopTox() {
       {activeTab === 'input' && (
         <div>
           <p style={{ marginBottom: '10px' }}>
-            <label> SMILES to 2D Molecule : </label>
+            <label> SMILES to 2D Molecule (max 20) : </label>
           </p>
           <textarea
             style={{ width: '100%' }}
@@ -170,20 +170,30 @@ function PredictWithStopTox() {
               <div key={smiles} style={{ width: '100%', marginBottom: '50px', borderBottom: '3px solid #eee', paddingBottom: '30px' }}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'center' }}>
                   <div style={{ flex: '1', minWidth: '350px' }}>
-                    <Prediction smiles={smiles} onDataLoaded={(data) => updateResults(smiles, 'StopTox', data)} />
+                    <ToolErrorBoundary toolName="StopTox">
+                      <Prediction smiles={smiles} onDataLoaded={(data) => updateResults(smiles, 'StopTox', data)} />
+                    </ToolErrorBoundary>
                   </div>
                   <div style={{ flex: '1', minWidth: '350px' }}>
-                    <SwissADME smiles={smiles} onDataLoaded={(data) => updateResults(smiles, 'SwissADME', data)} />
+                    <ToolErrorBoundary toolName="SwissADME">
+                      <SwissADME smiles={smiles} onDataLoaded={(data) => updateResults(smiles, 'SwissADME', data)} />
+                    </ToolErrorBoundary>
                   </div>
                 </div>
                 <div style={{ marginTop: '20px', width: '100%' }}>
-                  <StopLight smiles={smiles} onDataLoaded={(data) => updateResults(smiles, 'StopLight', data)} />
+                  <ToolErrorBoundary toolName="StopLight">
+                    <StopLight smiles={smiles} onDataLoaded={(data) => updateResults(smiles, 'StopLight', data)} />
+                  </ToolErrorBoundary>
                 </div>
                 <div style={{ marginTop: '20px', width: '100%' }}>
-                  <PKCSM smiles={smiles} onDataLoaded={(data) => updateResults(smiles, 'PKCSM', data)} />
+                  <ToolErrorBoundary toolName="pkCSM">
+                    <PKCSM smiles={smiles} onDataLoaded={(data) => updateResults(smiles, 'PKCSM', data)} />
+                  </ToolErrorBoundary>
                 </div>
                 <div style={{ marginTop: '20px', width: '100%' }}>
-                  <ADMETlab smiles={smiles} onDataLoaded={(data) => updateResults(smiles, 'ADMETlab', data)} />
+                  <ToolErrorBoundary toolName="ADMETlab">
+                    <ADMETlab smiles={smiles} onDataLoaded={(data) => updateResults(smiles, 'ADMETlab', data)} />
+                  </ToolErrorBoundary>
                 </div>
               </div>
             ))}
@@ -191,7 +201,7 @@ function PredictWithStopTox() {
         </>
       )}
     </>
-  </Section>
+  </div>
 );
 }
 

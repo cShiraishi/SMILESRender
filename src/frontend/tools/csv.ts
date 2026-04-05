@@ -43,6 +43,7 @@ function splitCsvLine(line: string, delimiter: string): string[] {
     buffer = buffer + c;
   }
 
+  strings.push(buffer);
   return strings;
 }
 

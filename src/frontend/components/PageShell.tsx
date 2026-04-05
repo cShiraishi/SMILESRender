@@ -21,7 +21,7 @@ function PageShell({ icon, title, subtitle, accentColor = colors.blue, onBack, c
         boxShadow: shadow.sm,
       }}>
         <div style={{
-          maxWidth: '1280px',
+          maxWidth: '96%',
           margin: '0 auto',
           height: '56px',
           display: 'flex',
@@ -61,7 +61,7 @@ function PageShell({ icon, title, subtitle, accentColor = colors.blue, onBack, c
         </div>
       </div>
       {/* Content */}
-      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '32px' }}>
+      <div style={{ maxWidth: '96%', margin: '0 auto', padding: '32px' }}>
         {children}
       </div>
     </div>

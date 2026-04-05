@@ -17,10 +17,16 @@ const btnBase: React.CSSProperties = {
   padding: '8px 18px', borderRadius: radius.sm, cursor: 'pointer',
 };
 
-function DirectInput() {
-  const [smiles, setSmiles] = useState(defaultSmiles);
+function DirectInput({ initialSmiles }: { initialSmiles?: string }) {
+  const [smiles, setSmiles] = useState(initialSmiles ? initialSmiles.split('\n').map(s => s.trim()).filter(Boolean) : defaultSmiles);
   const [smilesToRender, setSmilesToRender] = useState([] as string[]);
   const [error, setError] = useState(false);
+
+  React.useEffect(() => {
+    if (initialSmiles) {
+      setSmiles(initialSmiles.split('\n').map(s => s.trim()).filter(Boolean));
+    }
+  }, [initialSmiles]);
 
   const loadSmiles = () => setSmilesToRender(smiles);
 
@@ -52,7 +58,7 @@ function DirectInput() {
             color: colors.text,
             resize: 'vertical',
           }}
-          defaultValue={defaultSmiles.join('\n')}
+          value={smiles.join('\n')}
           rows={6}
           onChange={e => setSmiles(e.target.value.split('\n'))}
         />

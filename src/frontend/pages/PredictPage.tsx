@@ -3,7 +3,7 @@ import PageShell from '../components/PageShell';
 import PredictWithStopTox from '../forms/PredictWithStopTox';
 import { colors } from '../styles/themes';
 
-function PredictPage({ onBack }: { onBack: () => void }) {
+function PredictPage({ onBack, initialSmiles }: { onBack: () => void; initialSmiles?: string }) {
   return (
     <PageShell
       icon="bi-activity"
@@ -12,7 +12,7 @@ function PredictPage({ onBack }: { onBack: () => void }) {
       accentColor={colors.teal}
       onBack={onBack}
     >
-      <PredictWithStopTox />
+      <PredictWithStopTox initialSmiles={initialSmiles} />
     </PageShell>
   );
 }

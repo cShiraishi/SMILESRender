@@ -79,6 +79,14 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/download-example")
+def download_example():
+    # Caminho absoluto baseado na localização do routes.py
+    base_dir = os.path.abspath(os.path.dirname(__file__))
+    file_path = os.path.join(base_dir, "static", "example_molecules.csv")
+    return send_file(file_path, as_attachment=True)
+
+
 @app.route("/render", methods=["POST"])
 def render_by_json():
     try:

@@ -20,10 +20,16 @@ const FIELDS: { key: keyof Result; label: string; mono?: boolean }[] = [
   { key: 'InChI',            label: 'InChI', mono: true },
 ];
 
-function IupacContent() {
-  const [input, setInput]     = useState('CC(=O)Oc1ccccc1C(=O)O\nCC12CCC3C(C1CCC2O)CCC4=CC(=O)CCC34C');
+function IupacContent({ initialSmiles }: { initialSmiles?: string }) {
+  const [input, setInput]     = useState(initialSmiles || 'CC(=O)Oc1ccccc1C(=O)O\nCC12CCC3C(C1CCC2O)CCC4=CC(=O)CCC34C');
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    if (initialSmiles) {
+      setInput(initialSmiles);
+    }
+  }, [initialSmiles]);
 
   const run = async () => {
     const list = [...new Set(input.split('\n').map(s => s.trim()).filter(Boolean))];
@@ -164,7 +170,7 @@ function IupacContent() {
   );
 }
 
-function IupacPage({ onBack }: { onBack: () => void }) {
+function IupacPage({ onBack, initialSmiles }: { onBack: () => void; initialSmiles?: string }) {
   return (
     <PageShell
       icon="bi-tag"
@@ -173,7 +179,7 @@ function IupacPage({ onBack }: { onBack: () => void }) {
       accentColor="#7c3aed"
       onBack={onBack}
     >
-      <IupacContent />
+      <IupacContent initialSmiles={initialSmiles} />
     </PageShell>
   );
 }

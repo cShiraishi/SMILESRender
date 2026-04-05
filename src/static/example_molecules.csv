@@ -1,0 +1,7 @@
+smiles,name
+CC(=O)Oc1ccccc1C(=O)O,Aspirin
+CN1C=NC2=C1C(=O)N(C(=O)N2C)C,Caffeine
+CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O,Ibuprofen
+CN1CCC23C4C1CC5=C2C(=C(C=C5)O)OC3[C@H](C=C4)O,Morphine
+c1ccc(cc1)C(=O)O,Benzoic Acid
+CC12CCC3C(C1CCC2O)CCC4=CC(=O)CCC34C,Testosterone

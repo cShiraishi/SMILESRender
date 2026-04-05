@@ -21,12 +21,18 @@ function bar(v: number) {
   );
 }
 
-function SimContent() {
-  const [ref,     setRef]     = useState('CC(=O)Oc1ccccc1C(=O)O');
+function SimContent({ initialSmiles }: { initialSmiles?: string }) {
+  const [ref,     setRef]     = useState(initialSmiles || 'CC(=O)Oc1ccccc1C(=O)O');
   const [input,   setInput]   = useState('CC(=O)Oc1ccccc1C(=O)O\nCc1ccc(cc1)S(=O)(=O)N\nCC12CCC3C(C1CCC2O)CCC4=CC(=O)CCC34C\nCN1C=NC2=C1C(=O)N(C(=O)N2C)C\nC1=CC=CC=C1');
   const [radius2, setRadius2] = useState(2);
   const [results, setResults] = useState<SimResult[]>([]);
   const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    if (initialSmiles) {
+      setRef(initialSmiles);
+    }
+  }, [initialSmiles]);
 
   const run = async () => {
     const list = [...new Set(input.split('\n').map(s => s.trim()).filter(Boolean))];
@@ -134,10 +140,10 @@ function SimContent() {
   );
 }
 
-function SimilarityPage({ onBack }: { onBack: () => void }) {
+function SimilarityPage({ onBack, initialSmiles }: { onBack: () => void; initialSmiles?: string }) {
   return (
     <PageShell icon="bi-intersect" title="Similarity Search" subtitle="Morgan fingerprint · Tanimoto coefficient · ranked results" accentColor={accentColor} onBack={onBack}>
-      <SimContent />
+      <SimContent initialSmiles={initialSmiles} />
     </PageShell>
   );
 }

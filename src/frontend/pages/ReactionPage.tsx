@@ -11,11 +11,17 @@ const EXAMPLES = [
   { label: 'Amide bond',          smarts: 'CC(=O)O.CN>>CC(=O)NC' },
 ];
 
-function ReactionContent() {
-  const [smarts, setSmarts]   = useState(EXAMPLES[0].smarts);
+function ReactionContent({ initialSmiles }: { initialSmiles?: string }) {
+  const [smarts, setSmarts]   = useState(initialSmiles || EXAMPLES[0].smarts);
   const [imgUrl, setImgUrl]   = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
+
+  React.useEffect(() => {
+    if (initialSmiles) {
+      setSmarts(initialSmiles);
+    }
+  }, [initialSmiles]);
 
   const run = async () => {
     if (!smarts.trim()) return;
@@ -118,10 +124,10 @@ function ReactionContent() {
   );
 }
 
-function ReactionPage({ onBack }: { onBack: () => void }) {
+function ReactionPage({ onBack, initialSmiles }: { onBack: () => void; initialSmiles?: string }) {
   return (
     <PageShell icon="bi-arrow-left-right" title="Reaction Visualizer" subtitle="Render chemical reactions from SMILES · supports multi-step · PNG export" accentColor={accentColor} onBack={onBack}>
-      <ReactionContent />
+      <ReactionContent initialSmiles={initialSmiles} />
     </PageShell>
   );
 }

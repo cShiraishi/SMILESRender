@@ -21,11 +21,17 @@ const smilesPredictionStyle: React.CSSProperties = {
   width: '100%',
 };
 
-function PredictWithStopTox() {
-  const [smiles, setSmiles] = useState(defaultSmiles);
+function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
+  const [smiles, setSmiles] = useState(initialSmiles ? initialSmiles.split('\n').map(s => s.trim()).filter(Boolean) : defaultSmiles);
   const [smilesToRender, setSmilesToRender] = useState([] as string[]);
   const [allResults, setAllResults] = useState<{[key: string]: any[]}>({});
   const [activeTab, setActiveTab] = useState<'input'|'results'>('input');
+
+  React.useEffect(() => {
+    if (initialSmiles) {
+      setSmiles(initialSmiles.split('\n').map(s => s.trim()).filter(Boolean));
+    }
+  }, [initialSmiles]);
 
   const updateResults = (smiles: string, tool: string, data: any[]) => {
     setAllResults(prev => ({
@@ -117,8 +123,8 @@ function PredictWithStopTox() {
             <label> SMILES to 2D Molecule (max 20) : </label>
           </p>
           <textarea
-            style={{ width: '100%' }}
-            defaultValue={defaultSmiles.join('\n')}
+            style={{ width: '100%', padding: '10px', fontSize: '14px', fontFamily: 'monospace' }}
+            value={smiles.join('\n')}
             rows={6}
             onChange={(e) => setSmiles(e.target.value.split('\n'))}
           />

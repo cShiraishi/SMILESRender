@@ -138,8 +138,8 @@ function isBold(col: ColDef) {
   return col.key === 'QED' || col.key === 'LipinskiViolations' || col.key === 'VerberViolations' || col.key === 'EganViolations';
 }
 
-function DescContent() {
-  const [input, setInput]       = useState('CC(=O)Oc1ccccc1C(=O)O\nCc1ccc(cc1)S(=O)(=O)N\nCC12CCC3C(C1CCC2O)CCC4=CC(=O)CCC34C');
+function DescContent({ initialSmiles }: { initialSmiles?: string }) {
+  const [input, setInput]       = useState(initialSmiles || 'CC(=O)Oc1ccccc1C(=O)O\nCc1ccc(cc1)S(=O)(=O)N\nCC12CCC3C(C1CCC2O)CCC4=CC(=O)CCC34C');
   const [results, setResults]   = useState<DescResult[]>([]);
   const [loading, setLoading]   = useState(false);
   const [view, setView]         = useState<'table' | 'cards'>('table');
@@ -148,6 +148,12 @@ function DescContent() {
   const [fpOpen, setFpOpen]     = useState(false);
   const [error, setError]       = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+
+  React.useEffect(() => {
+    if (initialSmiles) {
+      setInput(initialSmiles);
+    }
+  }, [initialSmiles]);
 
   const visibleCols = cat === 'all' ? ALL_COLS : ALL_COLS.filter(c => c.category === cat);
 
@@ -446,10 +452,10 @@ function DescContent() {
   );
 }
 
-function DescriptorsPage({ onBack }: { onBack: () => void }) {
+function DescriptorsPage({ onBack, initialSmiles }: { onBack: () => void; initialSmiles?: string }) {
   return (
     <PageShell icon="bi-grid-3x3" title="Molecular Descriptor Calculator" subtitle="50 RDKit descriptors · QSAR-ready · Lipinski · Veber · Egan · Topological · Electronic" accentColor={accentColor} onBack={onBack}>
-      <DescContent />
+      <DescContent initialSmiles={initialSmiles} />
     </PageShell>
   );
 }

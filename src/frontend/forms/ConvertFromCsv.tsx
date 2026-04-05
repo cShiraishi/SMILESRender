@@ -204,9 +204,33 @@ function ConvertFromCsv() {
                     display: 'none',
                   }}
                 />
+
+                <a 
+                  href="/download-example" 
+                  download 
+                  style={{ 
+                    marginLeft: '12px', 
+                    fontSize: '13px', 
+                    color: '#64748b', 
+                    textDecoration: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '4px',
+                    backgroundColor: '#f8fafc'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                >
+                  <i className="bi bi-file-earmark-spreadsheet" style={{ color: '#10b981' }} />
+                  Example CSV
+                </a>
+
                 {formFields.fileName && (
-                  <p style={{ marginLeft: '5px' }}>
-                    Selected: "{formFields.fileName}"
+                  <p style={{ marginLeft: '12px', fontSize: '13px', color: '#6366f1', fontWeight: 500 }}>
+                    <i className="bi bi-check-circle-fill" /> {formFields.fileName}
                   </p>
                 )}
               </div>

@@ -1,4 +1,4 @@
-# SmileRender: A Unified Web Platform for Molecular Visualization, ADMET Profiling, and Cheminformatics Analysis
+# SMILESRender: A Unified Web Platform for Molecular Visualization, ADMET Profiling, and Cheminformatics Analysis
 
 **Authors:** Gabriel Grechuk¹, Rui A. B. Shiraishi¹
 
@@ -7,7 +7,7 @@
 
 **Corresponding author:** [email@institution.edu]
 
-**Running title:** SmileRender — Molecular Intelligence Platform
+**Running title:** SMILESRender — Molecular Intelligence Platform
 
 ---
 
@@ -15,9 +15,9 @@
 
 **Motivation:** Drug discovery workflows routinely demand simultaneous assessment of molecular structure, physicochemical properties, ADMET (Absorption, Distribution, Metabolism, Excretion, and Toxicity) profiles, and chemical nomenclature. Researchers currently navigate multiple disconnected web services, increasing friction and reducing reproducibility. No single open-source tool consolidates 2D structure rendering, multi-engine ADMET prediction, descriptor calculation, chemical similarity search, and reaction visualization in a unified interface.
 
-**Results:** We present SmileRender, a web-based molecular intelligence platform that integrates six cheminformatics modules — structure rendering (RDKit), ADMET profiling (five prediction engines), descriptor calculation (16 physicochemical descriptors), chemical nomenclature (PubChem REST), molecular similarity search (Morgan/Tanimoto), and reaction visualization — into a single interface. Benchmarking against five FDA-approved drugs demonstrated a prediction success rate of 80% across 25 tool–molecule combinations, with a mean processing time of 36.35 seconds per compound. The platform is distributed as an open-source Docker container for local high-throughput deployment.
+**Results:** We present SMILESRender, a web-based molecular intelligence platform that integrates six cheminformatics modules — structure rendering (RDKit), ADMET profiling (five prediction engines), descriptor calculation (16 physicochemical descriptors), chemical nomenclature (PubChem REST), molecular similarity search (Morgan/Tanimoto), and reaction visualization — into a single interface. Benchmarking against five FDA-approved drugs demonstrated a prediction success rate of 80% across 25 tool–molecule combinations, with a mean processing time of 36.35 seconds per compound. The platform is distributed as an open-source Docker container for local high-throughput deployment.
 
-**Availability and implementation:** SmileRender is freely available at https://smiles-render.onrender.com. Source code and Docker deployment instructions are provided at https://github.com/rubithedev/smiles-render-web under the MIT license. Requires Python ≥ 3.12 and Node.js ≥ 18 or Bun ≥ 1.1.
+**Availability and implementation:** SMILESRender is freely available at https://smiles-render.onrender.com. Source code and Docker deployment instructions are provided at https://github.com/rubithedev/smiles-render-web under the MIT license. Requires Python ≥ 3.12 and Node.js ≥ 18 or Bun ≥ 1.1.
 
 **Keywords:** cheminformatics, ADMET prediction, molecular visualization, drug discovery, SMILES, RDKit, web application
 
@@ -31,7 +31,7 @@ Several web servers address individual aspects of this workflow. SwissADME (Dain
 
 Complementary cheminformatics tasks, such as 2D structure rendering, descriptor calculation, similarity-based virtual screening, IUPAC nomenclature retrieval, and reaction visualization, are similarly dispersed across multiple platforms. This fragmentation constitutes a significant bottleneck in modern computational medicinal chemistry workflows.
 
-Here we describe SmileRender, a unified open-source web platform that consolidates these capabilities into a single, professionally designed interface organized as a molecular intelligence hub. SmileRender eliminates manual data transfer between tools, standardizes output formats, and enables automated report generation, directly addressing reproducibility concerns in computational drug discovery.
+Here we describe SMILESRender, a unified open-source web platform that consolidates these capabilities into a single, professionally designed interface organized as a molecular intelligence hub. SMILESRender eliminates manual data transfer between tools, standardizes output formats, and enables automated report generation, directly addressing reproducibility concerns in computational drug discovery.
 
 ---
 
@@ -39,7 +39,7 @@ Here we describe SmileRender, a unified open-source web platform that consolidat
 
 ### 2.1. System Architecture
 
-SmileRender follows a three-tier architecture: a React 19 / TypeScript frontend served by a Flask 3.0 backend (Waitress WSGI server), with Redis-based caching for prediction results. The frontend is compiled via Bun and distributed as static assets. The full application stack is containerized using Docker Compose, including a Redis 7.4 instance and an optional Celery worker for asynchronous batch operations (Figure 1).
+SMILESRender follows a three-tier architecture: a React 19 / TypeScript frontend served by a Flask 3.0 backend (Waitress WSGI server), with Redis-based caching for prediction results. The frontend is compiled via Bun and distributed as static assets. The full application stack is containerized using Docker Compose, including a Redis 7.4 instance and an optional Celery worker for asynchronous batch operations (Figure 1).
 
 The backend exposes 17 REST API endpoints organized into four functional groups: rendering (`/render/*`), prediction (`/predict/*`), conversion (`/convert/*`), and analysis (`/descriptors`, `/similarity`, `/render/reaction`). A global threading semaphore (`Semaphore(2)`) governs concurrent access to computationally intensive operations, preventing server overload in multi-user deployments.
 
@@ -49,7 +49,7 @@ SMILES strings are converted to 2D structural images using RDKit 2024.3.6 (Landr
 
 ### 2.3. ADMET Prediction Suite
 
-SmileRender proxies requests to five established ADMET prediction servers, aggregating results in a unified interface. SMILES strings are transmitted as URL-safe Base64 tokens. Each integration is described below:
+SMILESRender proxies requests to five established ADMET prediction servers, aggregating results in a unified interface. SMILES strings are transmitted as URL-safe Base64 tokens. Each integration is described below:
 
 - **StopTox** (Borrel *et al.*, 2020): predicts acute toxicity across six endpoints (oral, inhalation, dermal LD₅₀; eye irritation; skin sensitization; aquatic toxicity) via GET requests to `stoptox.mml.unc.edu`.
 - **SwissADME** (Daina *et al.*, 2017): returns physicochemical descriptors, lipophilicity, water solubility, pharmacokinetics, and druglikeness scores via POST to `swissadme.ch`.
@@ -61,7 +61,7 @@ All prediction results are cached in Redis with a 24-hour TTL, keyed by MD5 hash
 
 ### 2.4. Molecular Descriptor and Fingerprint Engine (QSAR-Ready)
 
-SmileRender performs intensive local computation of over **50 physicochemical and topological descriptors** without external dependency, utilizing the RDKit engine. This module provides a comprehensive structural profile organized into five functional categories:
+SMILESRender performs intensive local computation of over **50 physicochemical and topological descriptors** without external dependency, utilizing the RDKit engine. This module provides a comprehensive structural profile organized into five functional categories:
 - **Constitutional and Drug-likeness:** Molecular Weight (exact/average), FractionCSP3, MolMR, Labute ASA, LogP (Crippen), TPSA, and violations for Lipinski, Veber, and Egan rules.
 - **Topological and Complexity:** Balaban J, BertzCT, HallKierAlpha, Kappa indices (1–3), and Chi connectivity indices (0n–4n).
 - **Electronic and VSA:** Max/Min EState indices and VSA-based descriptors (PEOE, SMR, SlogP).
@@ -83,26 +83,26 @@ Chemical reactions specified in reaction SMILES notation (reactants`>>`products)
 
 ### 2.8. Frontend Hub Architecture and Fault-Tolerant Orchestration
 
-The user interface follows a modular orchestration pattern within a single-page application (SPA). To manage the inherent volatility of external web service scraping, SmileRender implements a **Fault-Tolerant Engine Orchestration** strategy. Each computational module is wrapped in a high-order **ToolErrorBoundary**, ensuring that transient failures or protocol changes in a single upstream predictor do not cascade into a terminal application crash. This provides the researcher with a resilient environment where partial results (e.g., StopTox successfully completing while pkCSM is down) are preserved for final report aggregation.
+The user interface follows a modular orchestration pattern within a single-page application (SPA). To manage the inherent volatility of external web service scraping, SMILESRender implements a **Fault-Tolerant Engine Orchestration** strategy. Each computational module is wrapped in a high-order **ToolErrorBoundary**, ensuring that transient failures or protocol changes in a single upstream predictor do not cascade into a terminal application crash. This provides the researcher with a resilient environment where partial results (e.g., StopTox successfully completing while pkCSM is down) are preserved for final report aggregation.
 
 ### 2.9. Interactive Data Visualization and Batch Management
 
-SmileRender features an advanced **Dynamic CSV Highlighting Engine**. Upon library ingestion, the interface provides real-time visual mapping of user-selected columns (SMILES vs Molecule Names) using a semantic color system (e.g., `#cbdff2` for structural tokens and `#cbf2da` for identifiers). This minimizes configuration errors in high-throughput screening. For direct input, a high-performance monospace editor with responsive scaling handles up to 20 molecules with real-time validation against the platform's processing limits.
+SMILESRender features an advanced **Dynamic CSV Highlighting Engine**. Upon library ingestion, the interface provides real-time visual mapping of user-selected columns (SMILES vs Molecule Names) using a semantic color system (e.g., `#cbdff2` for structural tokens and `#cbf2da` for identifiers). This minimizes configuration errors in high-throughput screening. For direct input, a high-performance monospace editor with responsive scaling handles up to 20 molecules with real-time validation against the platform's processing limits.
 
 ### 2.10. High-Concurrency Backend and CPU-Aware Scaling
 
-The backend utilizes a multi-threaded **Waitress** WSGI server. By dynamically allocating threads based on `os.cpu_count()`, SmileRender ensures that simultaneous batch requests do not block individual exploratory queries. For high-volume virtual screening, the platform utilizes a **distributed task worker** (Celery) with a Redis broker, enabling non-blocking execution of batch rendering and report generation tasks.
+The backend utilizes a multi-threaded **Waitress** WSGI server. By dynamically allocating threads based on `os.cpu_count()`, SMILESRender ensures that simultaneous batch requests do not block individual exploratory queries. For high-volume virtual screening, the platform utilizes a **distributed task worker** (Celery) with a Redis broker, enabling non-blocking execution of batch rendering and report generation tasks.
 
 ### 2.11. QSAR-Ready Data Export and Report Consolidation
 
 Across-tool results are consolidated into a structured Excel workbook (`.xlsx`) via a non-blocking IO stream. The export engine generates a multi-sheet report tailored for computational chemists:
 1. **Physicochemical sheet:** A comparative matrix of all 50+ descriptors across the submitted batch.
 2. **Fingerprint specific sheets:** Dedicated binary matrices (one sheet per requested FP type) where columns represent individual bit positions (b0, b1, ..., bN), facilitating direct ingestion by QSAR training algorithms.
-This dual-track export ensures that SmileRender functions as a complete data pre-processing hub for drug discovery workflows.
+This dual-track export ensures that SMILESRender functions as a complete data pre-processing hub for drug discovery workflows.
 
 ### 2.12. Security Hardening and Deployment Architecture
 
-SmileRender implements a robust header management system via a Flask `after_request` hook, including a strict **Content Security Policy (CSP)** to mitigate cross-site scripting (XSS), `X-Frame-Options: DENY` against clickjacking, and `X-Content-Type-Options: nosniff`. For local high-throughput screening, the **Docker Compose** orchestration manages three distinct microservices (Web, Redis, Celery), providing a scalable infrastructure capable of processing thousands of molecules with persistent caching.
+SMILESRender implements a robust header management system via a Flask `after_request` hook, including a strict **Content Security Policy (CSP)** to mitigate cross-site scripting (XSS), `X-Frame-Options: DENY` against clickjacking, and `X-Content-Type-Options: nosniff`. For local high-throughput screening, the **Docker Compose** orchestration manages three distinct microservices (Web, Redis, Celery), providing a scalable infrastructure capable of processing thousands of molecules with persistent caching.
 
 ---
 
@@ -141,9 +141,9 @@ For large-scale screening campaigns (>100 compounds), local Docker deployment is
 
 ## 4. Discussion
 
-SmileRender addresses a critical gap in computational drug discovery tooling: the absence of a unified, open-source interface that consolidates molecular rendering, multi-engine ADMET prediction, descriptor calculation, similarity search, nomenclature conversion, and reaction visualization. By eliminating context-switching between multiple web services, the platform directly improves workflow efficiency and result reproducibility.
+SMILESRender addresses a critical gap in computational drug discovery tooling: the absence of a unified, open-source interface that consolidates molecular rendering, multi-engine ADMET prediction, descriptor calculation, similarity search, nomenclature conversion, and reaction visualization. By eliminating context-switching between multiple web services, the platform directly improves workflow efficiency and result reproducibility.
 
-The proxy-based ADMET integration approach — in which the SmileRender backend forwards requests to external servers and aggregates HTML/JSON responses — confers both advantages and limitations. The principal advantage is transparency: users interact with the original prediction engines without modification, ensuring that results are identical to those obtained directly. The principal limitation is dependency on the availability and interface stability of external servers; changes to HTML structure or authentication protocols in upstream services require corresponding updates to the parsing logic.
+The proxy-based ADMET integration approach — in which the SMILESRender backend forwards requests to external servers and aggregates HTML/JSON responses — confers both advantages and limitations. The principal advantage is transparency: users interact with the original prediction engines without modification, ensuring that results are identical to those obtained directly. The principal limitation is dependency on the availability and interface stability of external servers; changes to HTML structure or authentication protocols in upstream services require corresponding updates to the parsing logic.
 
 The 16-descriptor local calculator and similarity search module operate entirely offline using RDKit, providing a reliable computational core independent of external service availability. These modules are particularly suited for rapid pre-filtering of large compound libraries prior to multi-engine ADMET submission.
 
@@ -153,7 +153,7 @@ Future directions include: implementation of structure-based pharmacophore searc
 
 ## 5. Conclusions
 
-SmileRender provides a professionally designed, open-source molecular intelligence platform that unifies six cheminformatics modules in a single web interface. The platform demonstrated an 80% prediction success rate across diverse FDA-approved drugs and is freely deployable as a Docker container for high-throughput local use. By consolidating molecular visualization, ADMET profiling, descriptor analysis, similarity search, IUPAC nomenclature, and reaction rendering, SmileRender substantially reduces workflow fragmentation in computational medicinal chemistry.
+SMILESRender provides a professionally designed, open-source molecular intelligence platform that unifies six cheminformatics modules in a single web interface. The platform demonstrated an 80% prediction success rate across diverse FDA-approved drugs and is freely deployable as a Docker container for high-throughput local use. By consolidating molecular visualization, ADMET profiling, descriptor analysis, similarity search, IUPAC nomenclature, and reaction rendering, SMILESRender substantially reduces workflow fragmentation in computational medicinal chemistry.
 
 ---
 
@@ -189,8 +189,8 @@ Rogers, D. and Hahn, M. (2010) Extended-connectivity fingerprints. *Journal of C
 
 ## Figure Legends
 
-**Figure 1.** SmileRender system architecture. The React/TypeScript frontend communicates with a Flask backend through 17 REST endpoints. Prediction requests are proxied to five external ADMET services; results are cached in Redis (24 h TTL). Local computations (RDKit rendering, descriptor calculation, similarity search, reaction visualization) are performed server-side without external dependencies. The full stack is orchestrated via Docker Compose.
+**Figure 1.** SMILESRender system architecture. The React/TypeScript frontend communicates with a Flask backend through 17 REST endpoints. Prediction requests are proxied to five external ADMET services; results are cached in Redis (24 h TTL). Local computations (RDKit rendering, descriptor calculation, similarity search, reaction visualization) are performed server-side without external dependencies. The full stack is orchestrated via Docker Compose.
 
-**Figure 2.** SmileRender hub interface. The landing page presents six tools as interactive cards. (A) Structure Rendering — batch 2D image generation from SMILES. (B) ADMET Profiling — five-tool prediction with Excel export. (C) Descriptor Calculator — 16 RDKit descriptors with Lipinski and QED scoring. (D) Similarity Search — Morgan fingerprint Tanimoto ranking. (E) Chemical Nomenclature — PubChem IUPAC/InChI conversion. (F) Reaction Visualizer — reaction SMILES to annotated PNG.
+**Figure 2.** SMILESRender hub interface. The landing page presents six tools as interactive cards. (A) Structure Rendering — batch 2D image generation from SMILES. (B) ADMET Profiling — five-tool prediction with Excel export. (C) Descriptor Calculator — 16 RDKit descriptors with Lipinski and QED scoring. (D) Similarity Search — Morgan fingerprint Tanimoto ranking. (E) Chemical Nomenclature — PubChem IUPAC/InChI conversion. (F) Reaction Visualizer — reaction SMILES to annotated PNG.
 
 **Figure 3.** Benchmark validation. Mean response times (seconds) for five FDA-approved drugs (Aspirin, Ibuprofen, Caffeine, Metformin, Paracetamol) across four operational ADMET tools (StopTox, SwissADME, StopLight, ADMETlab 3.0). Bars represent means; error bars represent standard deviation across five compounds.

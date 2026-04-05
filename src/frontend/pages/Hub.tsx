@@ -1,217 +1,188 @@
-import React from 'react';
-import { colors, font, radius, shadow } from '../styles/themes';
+import React, { useState } from 'react';
+import { colors } from '../styles/themes';
+import AtomicBackground from '../components/AtomicBackground';
+import AppleDock from '../components/AppleDock';
+import DiscoverGrid from '../components/DiscoverGrid';
 
-const apps = [
-  {
-    id: 'renderer',
-    icon: 'bi-diagram-2',
-    title: 'Structure Rendering',
-    description: 'Generate high-quality 2D molecular structure images from SMILES notation. Supports direct input and high-throughput CSV batch processing.',
-    tags: ['RDKit', 'PNG/SVG', 'Batch CSV'],
-    color: colors.blue,
-  },
-  {
-    id: 'predict',
-    icon: 'bi-activity',
-    title: 'ADMET Profiling',
-    description: 'Comprehensive ADMET property prediction using 5 integrated engines: StopTox, SwissADME, StopLight, pkCSM and ADMETlab 3.0. Exports to Excel.',
-    tags: ['Toxicity', 'ADMET', 'Multi-Tool'],
-    color: colors.teal,
-  },
-  {
-    id: 'iupac',
-    icon: 'bi-tag',
-    title: 'Chemical Nomenclature',
-    description: 'Convert SMILES to IUPAC systematic names, InChI, InChIKey, molecular formula and molecular weight via PubChem REST API.',
-    tags: ['IUPAC', 'InChI', 'PubChem'],
-    color: '#7c3aed',
-  },
-  {
-    id: 'descriptors',
-    icon: 'bi-grid-3x3',
-    title: 'Descriptor Calculator',
-    description: 'Calculate 16 physicochemical descriptors including MW, LogP, TPSA, HBD/HBA, QED drug-likeness and Lipinski Ro5 violations.',
-    tags: ['RDKit', 'Lipinski', 'QED'],
-    color: '#0891b2',
-  },
-  {
-    id: 'similarity',
-    icon: 'bi-intersect',
-    title: 'Similarity Search',
-    description: 'Compute Morgan fingerprint Tanimoto similarity between a reference compound and a query library. Results ranked by score.',
-    tags: ['Morgan', 'Tanimoto', 'ECFP'],
-    color: '#d97706',
-  },
-  {
-    id: 'reaction',
-    icon: 'bi-arrow-left-right',
-    title: 'Reaction Visualizer',
-    description: 'Render chemical reactions from SMILES notation (R>>P format). Supports multi-reactant and multi-product reactions with PNG export.',
-    tags: ['Synthesis', 'RDKit', 'PNG'],
-    color: '#be185d',
-  },
+interface HubApp {
+  id: string;
+  icon: string;
+  title: string;
+  description: string;
+  tags: string[];
+  color: string;
+}
+
+const apps: HubApp[] = [
+  { id: 'library',    icon: 'bi-grid-1x2',    title: 'SMILES Library Dashboard', description: 'Advanced inventory analysis, chemical space visualization and library analytics.', tags: ['Inventory'], color: '#0ea5e9' },
+  { id: 'renderer',   icon: 'bi-box',         title: 'Structure Rendering',      description: 'High-fidelity 2D/3D molecular visualization with RDKit-driven precision.', tags: ['Visualization'], color: '#8b5cf6' },
+  { id: 'predict',    icon: 'bi-activity',    title: 'ADMET Profiling',         description: 'Multi-engine ADMET predictions: SwissADME, pkCSM and ADMETlab integration.', tags: ['ADMET'], color: '#10b981' },
+  { id: 'iupac',      icon: 'bi-tag',         title: 'Chemical Nomenclature',   description: 'Convert SMILES to IUPAC names and vice-versa using intelligent dictionaries.', tags: ['Naming'], color: '#f59e0b' },
+  { id: 'descriptors',icon: 'bi-list-ul',     title: 'Molecular Descriptors',   description: 'Generate 200+ physicochemical properties and QSAR fingerprints automatically.', tags: ['QSAR'], color: '#6366f1' },
+  { id: 'similarity', icon: 'bi-cpu',      title: 'Similarity Searching',    description: 'Structure-based searching across chemical libraries using Tanimoto distance.', tags: ['Search'], color: '#ef4444' },
+  { id: 'reaction',   icon: 'bi-diagram-3',   title: 'Reaction Prediction',     description: 'Predict organic reaction outcomes and mapping using chemical intelligence.', tags: ['Synthesis'], color: '#ec4899' },
 ];
 
-function Hub({ onNavigate }: { onNavigate: (id: string) => void }) {
+interface Props {
+  onNavigate: (id: string, smiles?: string) => void;
+}
+
+const Hub: React.FC<Props> = ({ onNavigate }) => {
+  const [heroSmiles, setHeroSmiles] = useState('');
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [activeAppColor, setActiveAppColor] = useState(colors.blue);
+
+  const stats = [
+    { label: 'Prediction Engines', value: '5' },
+    { label: 'Supported Formats', value: '13+' },
+    { label: 'Batch Size (SMILES)', value: '≤ 20' },
+    { label: 'Export Formats', value: 'XLSX · ZIP · PNG' },
+  ];
+
+  const handleNavigate = (id: string) => {
+    const app = apps.find(a => a.id === id);
+    if (app) setActiveAppColor(app.color);
+    
+    setIsTransitioning(true);
+    setTimeout(() => {
+      onNavigate(id, heroSmiles);
+    }, 600); // iOS style transition time
+  };
+
   return (
-    <div style={{ width: '100%', fontFamily: font, backgroundColor: colors.bg, minHeight: '100%' }}>
-
-      {/* Hero */}
+    <div style={{ 
+      position: 'relative', 
+      minHeight: '100vh',
+      backgroundColor: 'transparent', // Now shows the global background
+      overflowX: 'hidden'
+    }}>
+      {/* Transition Overlay (iOS Style Expansion) */}
       <div style={{
-        background: `linear-gradient(135deg, ${colors.navy} 0%, ${colors.navyLight} 100%)`,
-        padding: '60px 32px',
-        textAlign: 'center',
-        color: '#fff',
+        position: 'fixed', inset: 0,
+        backgroundColor: activeAppColor,
+        zIndex: isTransitioning ? 1000 : -1,
+        pointerEvents: 'none',
+        opacity: isTransitioning ? 1 : 0,
+        transition: 'opacity 0.6s cubic-bezier(0.645, 0.045, 0.355, 1)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <div style={{ maxWidth: '680px', margin: '0 auto' }}>
-          <img
-            src="static/logo.png"
-            alt="SmileRender"
-            style={{
-              height: '100px',
-              marginBottom: '24px',
-              filter: 'brightness(0) invert(1)',
-              display: 'block',
-              margin: '0 auto 24px',
-            }}
+        {isTransitioning && (
+          <div style={{ animation: 'pulseLogo 0.8s ease-out forwards' }}>
+            <img src="static/logo.png" alt="Logo" style={{ height: '80px', filter: 'brightness(0) invert(1)' }} />
+          </div>
+        )}
+      </div>
+
+      <style>{`
+        @keyframes pulseLogo {
+          0% { transform: scale(0.8); opacity: 0; }
+          100% { transform: scale(1.2); opacity: 1; }
+        }
+      `}</style>
+
+      {/* Main UI Layer */}
+      <div style={{ 
+        position: 'relative', 
+        zIndex: 1, 
+        opacity: isTransitioning ? 0 : 1,
+        transition: 'opacity 0.4s ease, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+        transform: isTransitioning ? 'scale(0.96) translateY(20px)' : 'scale(1) translateY(0)'
+      }}>
+        
+        {/* Hero Section */}
+        <div style={{ textAlign: 'center', padding: '120px 24px 60px' }}>
+          <div style={{ maxWidth: '96%', margin: '0 auto' }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
+              color: colors.blue, backgroundColor: `${colors.blue}12`,
+              padding: '6px 16px', borderRadius: '30px', marginBottom: '24px',
+              border: `1px solid ${colors.blue}20`
+            }}>
+               <i className="bi bi-stars" /> 2026 Scientific Edition — Now with QSAR Fingerprints
+            </div>
+
+            <h1 style={{
+              fontSize: 'clamp(40px, 6vw, 64px)', fontWeight: 600, color: colors.navy,
+              lineHeight: 1.1, letterSpacing: '-0.03em', marginBottom: '24px'
+            }}>
+              Molecular intelligence with <br/>
+              <span style={{ fontWeight: 900, color: '#f85a1a' }}>SMILES data</span>
+            </h1>
+
+            <p style={{ fontSize: '18px', color: colors.textMuted, lineHeight: 1.6, marginBottom: '48px', maxWidth: '800px', margin: '0 auto 48px' }}>
+              The API to profile, render, and rank chemical libraries at scale.
+              Integrated with 5 ADMET engines and QSAR descriptors.
+            </p>
+
+            <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{
+                backgroundColor: '#fff', borderRadius: '16px', border: `1px solid ${colors.border}`,
+                display: 'flex', alignItems: 'center', padding: '4px 4px 4px 16px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.04)'
+              }}>
+                <i className="bi bi-globe2" style={{ color: colors.textLight, fontSize: '18px' }} />
+                <textarea
+                  placeholder="Paste SMILES strings here..."
+                  value={heroSmiles}
+                  onChange={(e) => setHeroSmiles(e.target.value)}
+                  style={{
+                    flex: 1, border: 'none', background: 'none', resize: 'none',
+                    padding: '14px 16px', fontSize: '16px', color: colors.text, outline: 'none',
+                    maxHeight: '150px', height: '52px', fontFamily: 'monospace'
+                  }}
+                  onInput={(e) => {
+                    const el = e.target as HTMLTextAreaElement;
+                    el.style.height = '52px';
+                    el.style.height = (el.scrollHeight) + 'px';
+                  }}
+                />
+                <button 
+                  onClick={() => handleNavigate('predict')}
+                  style={{
+                    backgroundColor: colors.blue, color: '#fff', border: 'none', padding: '12px 14px',
+                    borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease'
+                  }}
+                >
+                  <i className="bi bi-arrow-right" style={{ fontSize: '20px' }}></i>
+                </button>
+              </div>
+
+              {/* Refactored Apple Dock */}
+              <AppleDock 
+                apps={apps.map(a => ({ id: a.id, icon: a.icon, label: a.title, color: a.color }))}
+                onNavigate={handleNavigate}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Info Strip */}
+        <div style={{ backgroundColor: '#fff', borderTop: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}`, padding: '24px 0' }}>
+          <div style={{ maxWidth: '1440px', margin: '0 auto', display: 'flex', justifyContent: 'center', gap: '80px', flexWrap: 'wrap' }}>
+            {stats.map(s => (
+              <div key={s.label} style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '20px', fontWeight: 800, color: colors.blue }}>{s.value}</div>
+                <div style={{ fontSize: '10px', color: colors.textLight, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Refactored Discover Grid */}
+        <div style={{ maxWidth: '96%', margin: '0 auto', padding: '48px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px', color: colors.textMuted }}>
+            <i className="bi bi-grid-fill" style={{ fontSize: '15px' }} />
+            <span style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Discover Tools Library</span>
+          </div>
+          <DiscoverGrid 
+            apps={apps}
+            onNavigate={handleNavigate}
           />
-          <div style={{
-            display: 'inline-block',
-            fontSize: '11px',
-            fontWeight: 600,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: '#7aa8d8',
-            backgroundColor: 'rgba(255,255,255,0.06)',
-            padding: '4px 14px',
-            borderRadius: '20px',
-            marginBottom: '18px',
-            border: '1px solid rgba(255,255,255,0.1)',
-          }}>
-            Molecular Intelligence Platform
-          </div>
-          <p style={{ fontSize: '15px', color: '#94a8c9', lineHeight: 1.7, margin: 0 }}>
-            A unified platform for pharmaceutical research — structure visualization,
-            ADMET profiling, and chemical nomenclature in a single interface.
-          </p>
         </div>
       </div>
-
-      {/* Stats bar */}
-      <div style={{
-        backgroundColor: colors.surface,
-        borderBottom: `1px solid ${colors.border}`,
-        padding: '16px 32px',
-      }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', gap: '48px', justifyContent: 'center' }}>
-          {[
-            { label: 'Prediction Engines', value: '5' },
-            { label: 'Supported Formats', value: '13+' },
-            { label: 'Batch Size (SMILES)', value: '≤ 20' },
-            { label: 'Export Formats', value: 'XLSX · ZIP · PNG' },
-          ].map(s => (
-            <div key={s.label} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: colors.blue }}>{s.value}</div>
-              <div style={{ fontSize: '11px', color: colors.textMuted, letterSpacing: '0.04em', marginTop: '2px' }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* App Cards */}
-      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '48px 32px' }}>
-        <h2 style={{ fontSize: '13px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: colors.textMuted, marginBottom: '20px' }}>
-          Available Tools
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-          {apps.map(app => (
-            <div
-              key={app.id}
-              onClick={() => onNavigate(app.id)}
-              style={{
-                backgroundColor: colors.surface,
-                border: `1px solid ${colors.border}`,
-                borderRadius: radius.lg,
-                padding: '28px',
-                cursor: 'pointer',
-                boxShadow: shadow.sm,
-                transition: 'box-shadow 0.2s, border-color 0.2s, transform 0.15s',
-                position: 'relative',
-                overflow: 'hidden',
-              }}
-              onMouseEnter={e => {
-                const el = e.currentTarget as HTMLElement;
-                el.style.boxShadow = shadow.lg;
-                el.style.borderColor = app.color;
-                el.style.transform = 'translateY(-2px)';
-              }}
-              onMouseLeave={e => {
-                const el = e.currentTarget as HTMLElement;
-                el.style.boxShadow = shadow.sm;
-                el.style.borderColor = colors.border;
-                el.style.transform = 'translateY(0)';
-              }}
-            >
-              <div style={{
-                width: '40px', height: '40px',
-                backgroundColor: `${app.color}14`,
-                borderRadius: radius.md,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                marginBottom: '16px',
-              }}>
-                <i className={`bi ${app.icon}`} style={{ fontSize: '18px', color: app.color }}></i>
-              </div>
-
-              <h3 style={{ fontSize: '15px', fontWeight: 600, color: colors.text, margin: '0 0 8px' }}>
-                {app.title}
-              </h3>
-              <p style={{ fontSize: '13px', color: colors.textMuted, lineHeight: '1.6', margin: '0 0 18px' }}>
-                {app.description}
-              </p>
-
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '20px' }}>
-                {app.tags.map(tag => (
-                  <span key={tag} style={{
-                    fontSize: '11px', fontWeight: 500,
-                    padding: '2px 8px', borderRadius: '20px',
-                    backgroundColor: `${app.color}12`,
-                    color: app.color,
-                    border: `1px solid ${app.color}25`,
-                  }}>
-                    {tag}
-                  </span>
-                ))}
-              </div>
-
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                fontSize: '13px', fontWeight: 600, color: app.color,
-              }}>
-                Open tool <i className="bi bi-arrow-right"></i>
-              </div>
-            </div>
-          ))}
-
-          {/* Coming soon card */}
-          <div style={{
-            backgroundColor: colors.bg,
-            border: `1px dashed ${colors.border}`,
-            borderRadius: radius.lg,
-            padding: '28px',
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            textAlign: 'center', gap: '8px',
-            minHeight: '220px',
-          }}>
-            <i className="bi bi-plus-circle" style={{ fontSize: '24px', color: colors.textLight }}></i>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: colors.textMuted }}>More tools coming soon</span>
-            <span style={{ fontSize: '12px', color: colors.textLight }}>More pharmaceutical tools in development</span>
-          </div>
-        </div>
-      </div>
-
     </div>
   );
-}
+};
 
 export default Hub;

@@ -19,7 +19,7 @@ function Footer() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <img src="static/logo.png" alt="" style={{ height: '20px', filter: 'brightness(0) invert(1)', opacity: 0.5 }} />
           <span style={{ fontSize: '12px', color: '#4a6a94' }}>
-            SmileRender © {new Date().getFullYear()} — Open-source cheminformatics platform
+            SMILESRender © {new Date().getFullYear()} — Open-source cheminformatics platform
           </span>
         </div>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>

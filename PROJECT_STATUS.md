@@ -1,6 +1,6 @@
-# SmileRender - Relatório de Desenvolvimento e Status
+# SMILESRender - Relatório de Desenvolvimento e Status
 
-Este documento resume o estado atual do desenvolvimento da plataforma **SmileRender**, consolidando as funcionalidades implementadas, os resultados dos testes de benchmark e as bases para a escala futura.
+Este documento resume o estado atual do desenvolvimento da plataforma **SMILESRender**, consolidando as funcionalidades implementadas, os resultados dos testes de benchmark e as bases para a escala futura.
 
 ## 1. Funcionalidades Implementadas
 
@@ -38,7 +38,7 @@ Foi realizado um teste de benchmark utilizando 5 fármacos aprovados pela FDA pa
 *   **Dockerização**: Ambiente totalmente isolado via `Dockerfile` e `docker-compose`, garantindo reprodutibilidade em qualquer sistema.
 
 ## 4. Plano de Escalonamento e Limites (Implementado)
-Foi estabelecido um rascunho de artigo científico ([Manuscript_SmileRender.md](file:///c:/Users/ruiab/Documents/SmileRender/Manuscript_SmileRender.md)) com as seguintes diretrizes:
+Foi estabelecido um rascunho de artigo científico ([Manuscript_SMILESRender.md](file:///c:/Users/ruiab/Documents/SMILESRender/Manuscript_SMILESRender.md)) com as seguintes diretrizes:
 1.  **Limite de 20 SMILES**: Restrição de processamento por batch na nuvem para manter a estabilidade.
 2.  **Fila de Concorrência**: Máximo de 2 processamentos pesados simultâneos por servidor.
 3.  **Uso Local Recomendado**: Para processamento massivo de milhares de moléculas, recomenda-se a execução local via Docker.

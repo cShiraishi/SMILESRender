@@ -4,7 +4,7 @@ import DirectInput from '../forms/DirectInput';
 import ConvertFromCsv from '../forms/ConvertFromCsv';
 import { colors } from '../styles/themes';
 
-function RendererPage({ onBack }: { onBack: () => void }) {
+function RendererPage({ onBack, initialSmiles }: { onBack: () => void; initialSmiles?: string }) {
   return (
     <PageShell
       icon="bi-diagram-2"
@@ -14,7 +14,7 @@ function RendererPage({ onBack }: { onBack: () => void }) {
       onBack={onBack}
     >
       <>
-        <DirectInput />
+        <DirectInput initialSmiles={initialSmiles} />
         <ConvertFromCsv />
       </>
     </PageShell>

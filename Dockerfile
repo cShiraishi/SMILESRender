@@ -2,7 +2,7 @@ FROM oven/bun:1.1.38-alpine AS frontend_build
 WORKDIR /frontend
 COPY ./src/frontend ./src/frontend
 COPY frontend-build.ts package.json bun.lockb .
-RUN bun install --frozen-lockfile && bun run build
+RUN bun install && bun run build
 
 FROM python:3.12.7 AS release
 WORKDIR /app

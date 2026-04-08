@@ -3,6 +3,7 @@ import { colors } from '../styles/themes';
 import AtomicBackground from '../components/AtomicBackground';
 import AppleDock from '../components/AppleDock';
 import DiscoverGrid from '../components/DiscoverGrid';
+import MoleculeDrawerModal from '../components/MoleculeDrawerModal';
 
 interface HubApp {
   id: string;
@@ -32,6 +33,7 @@ const Hub: React.FC<Props> = ({ onNavigate }) => {
   const [heroSmiles, setHeroSmiles] = useState('');
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [activeAppColor, setActiveAppColor] = useState(colors.blue);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const stats = [
     { label: 'Prediction Engines', value: '5' },
@@ -139,6 +141,17 @@ const Hub: React.FC<Props> = ({ onNavigate }) => {
                   }}
                 />
                 <button 
+                  onClick={() => setIsDrawerOpen(true)}
+                  title="Draw Molecule"
+                  style={{
+                    backgroundColor: 'transparent', color: colors.blue, border: 'none', padding: '12px',
+                    borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease',
+                    marginRight: '8px'
+                  }}
+                >
+                  <i className="bi bi-pencil-square" style={{ fontSize: '20px' }}></i>
+                </button>
+                <button 
                   onClick={() => handleNavigate('predict')}
                   style={{
                     backgroundColor: colors.blue, color: '#fff', border: 'none', padding: '12px 14px',
@@ -181,6 +194,14 @@ const Hub: React.FC<Props> = ({ onNavigate }) => {
             onNavigate={handleNavigate}
           />
         </div>
+
+        <MoleculeDrawerModal 
+          isOpen={isDrawerOpen} 
+          onClose={() => setIsDrawerOpen(false)}
+          onApply={(smi) => {
+            setHeroSmiles(prev => prev ? prev + '\n' + smi : smi);
+          }}
+        />
       </div>
     </div>
   );

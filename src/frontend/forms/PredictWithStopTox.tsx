@@ -6,6 +6,7 @@ import StopLight from '../components/StopLight';
 import PKCSM from '../components/PKCSM';
 import ADMETlab from '../components/ADMETlab';
 import ToolErrorBoundary from '../components/ToolErrorBoundary';
+import MoleculeDrawerModal from '../components/MoleculeDrawerModal';
 
 const defaultSmiles = [
   'CCCCCCCC',
@@ -26,6 +27,7 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
   const [smilesToRender, setSmilesToRender] = useState([] as string[]);
   const [allResults, setAllResults] = useState<{[key: string]: any[]}>({});
   const [activeTab, setActiveTab] = useState<'input'|'results'>('input');
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   React.useEffect(() => {
     if (initialSmiles) {
@@ -135,6 +137,16 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
             >
               🚀 Run All Predictions
             </button>
+            <button
+              style={{ 
+                backgroundColor: '#fff', color: '#007bff', border: '1px solid #007bff',
+                padding: '10px 20px', borderRadius: '5px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '8px'
+              }}
+              onClick={() => setIsDrawerOpen(true)}
+            >
+              <i className="bi bi-pencil-square"></i> Draw Structure
+            </button>
           </div>
         </div>
       )}
@@ -206,6 +218,18 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
           </div>
         </>
       )}
+    </>
+    <>
+      <MoleculeDrawerModal 
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        onApply={(smi) => {
+          setSmiles(prev => {
+            const current = prev.filter(Boolean);
+            return current.length > 0 ? [...current, smi] : [smi];
+          });
+        }}
+      />
     </>
   </div>
 );

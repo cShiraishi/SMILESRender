@@ -852,3 +852,21 @@ def predict_smiles_to_peptide():
     except Exception as err:
         print(f"PepLink Reverse Error: {err}")
         return jsonify({"error": str(err)}), 500
+@app.route("/export/grid", methods=["POST"])
+def export_grid():
+    """Generate a high-quality grid image of multiple molecules."""
+    try:
+        from converter import create_mols_grid
+        data = request.get_json()
+        smiles = data.get("smiles", [])
+        labels = data.get("labels", [])
+        mols_per_row = int(data.get("mols_per_row", 3))
+        
+        if not smiles:
+            return "No SMILES provided", 400
+            
+        buf = create_mols_grid(smiles, labels, mols_per_row)
+        return send_file(buf, mimetype="image/png", as_attachment=True, download_name="molecules_grid.png")
+    except Exception as err:
+        print(f"Grid Export Error: {err}")
+        return str(err), 500

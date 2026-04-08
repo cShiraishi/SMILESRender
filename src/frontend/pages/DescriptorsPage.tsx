@@ -148,6 +148,10 @@ function DescContent({ initialSmiles }: { initialSmiles?: string }) {
   const [fpOpen, setFpOpen]     = useState(false);
   const [error, setError]       = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [figureOpen, setFigureOpen] = useState(false);
+  const [figCols, setFigCols] = useState(3);
+  const [figSelected, setFigSelected] = useState<Set<string>>(new Set());
+
 
   React.useEffect(() => {
     if (initialSmiles) {
@@ -201,6 +205,33 @@ function DescContent({ initialSmiles }: { initialSmiles?: string }) {
       setError(e instanceof Error ? e.message : 'Request failed during chunk processing');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const downloadFigure = async () => {
+    if (figSelected.size === 0) return;
+    setLoading(true);
+    try {
+      const selectedSmiles = results.filter(r => figSelected.has(r.smiles)).map(r => r.smiles);
+      const res = await fetch('/export/grid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ smiles: selectedSmiles, mols_per_row: figCols }),
+      });
+      if (!res.ok) throw new Error('Failed to generate figure');
+      const blob = await res.json().catch(() => res.blob());
+      const url = window.URL.createObjectURL(blob as Blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'publication_figure.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      setError('Figure export failed');
+    } finally {
+      setLoading(false);
+      setFigureOpen(false);
     }
   };
 
@@ -302,11 +333,49 @@ function DescContent({ initialSmiles }: { initialSmiles?: string }) {
           <button onClick={run} disabled={loading} style={btnStyle(false, true)}>
             {loading ? 'Calculating…' : 'Calculate Descriptors'}
           </button>
-          {results.length > 0 && (
-            <button onClick={exportExcel} disabled={exporting} style={btnStyle(false, false)}>
-              {exporting ? 'Generating…' : `Export Excel (.xlsx)${activeFPs.length > 0 && resultHasFPs ? ` + ${activeFPs.length} FP sheet(s)` : ''}`}
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button
+            onClick={() => {
+              setFigSelected(new Set(results.map(r => r.smiles)));
+              setFigureOpen(true);
+            }}
+            disabled={loading || !results.length}
+            className="panel-btn"
+            style={{ 
+              background: 'linear-gradient(135deg, #4f46e5, #0891b2)', 
+              color: 'white', 
+              border: 'none',
+              padding: '0.6rem 1.2rem',
+              borderRadius: '12px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              cursor: results.length ? 'pointer' : 'not-allowed',
+              opacity: results.length ? 1 : 0.6,
+              boxShadow: '0 4px 12px rgba(8, 145, 178, 0.2)'
+            }}
+          >
+            <span style={{ fontSize: '1.2rem' }}>🖼️</span>
+            Publication Figure
+          </button>
+          <button
+            onClick={exportExcel}
+            disabled={exporting || !results.length}
+            className="panel-btn"
+            style={{
+              background: 'rgba(15, 23, 42, 0.8)',
+              color: 'white',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              padding: '0.6rem 1.2rem',
+              borderRadius: '12px',
+              cursor: results.length ? 'pointer' : 'not-allowed',
+              opacity: results.length ? 1 : 0.6
+            }}
+          >
+            {exporting ? 'Exporting...' : 'Export Excel'}
+          </button>
+        </div>
           {results.length > 0 && (
             <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
               <button onClick={() => setView('table')} style={btnStyle(view === 'table', false)}>Table</button>
@@ -455,6 +524,91 @@ function DescContent({ initialSmiles }: { initialSmiles?: string }) {
               )}
             </div>
           ))}
+        </div>
+      )}
+      {/* Figure Modal */}
+      {figureOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.8)', 
+          backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem'
+        }}>
+          <div style={{
+            background: 'white', 
+            width: '100%', maxWidth: '800px',
+            borderRadius: '24px', padding: '2rem',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+            maxHeight: '80vh', display: 'flex', flexDirection: 'column'
+          }}>
+            <h2 style={{ color: colors.text, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <span>🖼️</span> Publication Figure Generator
+            </h2>
+            
+            <div style={{ overflowY: 'auto', flex: 1, marginBottom: '2rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '1rem', padding: '0.5rem' }}>
+                {results.map((r, i) => (
+                  <div 
+                    key={i}
+                    onClick={() => {
+                      const next = new Set(figSelected);
+                      if (next.has(r.smiles)) next.delete(r.smiles);
+                      else next.add(r.smiles);
+                      setFigSelected(next);
+                    }}
+                    style={{
+                      padding: '1rem', background: '#f8fafc', borderRadius: '16px',
+                      border: `2px solid ${figSelected.has(r.smiles) ? '#0891b2' : 'transparent'}`,
+                      cursor: 'pointer', transition: 'all 0.2s',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center'
+                    }}
+                  >
+                    <img src={`/render/${btoa(r.smiles)}`} alt="mol" style={{ width: '80px', height: '80px', objectFit: 'contain' }} />
+                    <span style={{ fontSize: '0.75rem', marginTop: '0.5rem', color: colors.text, fontWeight: 500 }}>
+                      Compound {i+1}
+                    </span>
+                    <div style={{
+                      marginTop: '0.5rem', width: '20px', height: '20px', borderRadius: '50%',
+                      background: figSelected.has(r.smiles) ? '#0891b2' : '#e2e8f0',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      {figSelected.has(r.smiles) && <span style={{ color: 'white', fontSize: '0.7rem' }}>✓</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <label style={{ color: colors.text, fontSize: '0.9rem', fontWeight: 500 }}>Columns:</label>
+                <select 
+                  value={figCols} 
+                  onChange={e => setFigCols(Number(e.target.value))}
+                  style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                >
+                  {[2, 3, 4, 5, 6].map(v => <option key={v} value={v}>{v} Columns</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button onClick={() => setFigureOpen(false)} style={{ padding: '0.75rem 1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer' }}>
+                  Cancel
+                </button>
+                <button 
+                  onClick={downloadFigure} 
+                  disabled={figSelected.size === 0}
+                  style={{ 
+                    padding: '0.75rem 1.5rem', borderRadius: '12px', border: 'none', 
+                    background: '#0891b2', color: 'white', fontWeight: 600, 
+                    cursor: figSelected.size ? 'pointer' : 'not-allowed',
+                    opacity: figSelected.size ? 1 : 0.6
+                  }}
+                >
+                  Generate PNG Figure
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </>

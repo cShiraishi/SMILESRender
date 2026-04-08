@@ -83,3 +83,27 @@ def convert_many_smiles_and_zip(smiles: list[tuple[str, str, str]]) -> BytesIO:
     zip_file.seek(0)
 
     return zip_file
+def create_mols_grid(smiles_list: list[str], labels: list[str] = None, mols_per_row: int = 3, sub_img_size: tuple = (300, 300)) -> BytesIO:
+    mols = []
+    legends = []
+    for i, smi in enumerate(smiles_list):
+        mol = Chem.MolFromSmiles(smi)
+        if mol:
+            mols.append(mol)
+            if labels and i < len(labels):
+                legends.append(labels[i])
+            else:
+                legends.append(f"Compound {i+1}")
+    
+    img = Draw.MolsToGridImage(
+        mols, 
+        molsPerRow=mols_per_row, 
+        subImgSize=sub_img_size, 
+        legends=legends,
+        useSVG=False # For consistency with PNG export, but we can make it SVG if needed
+    )
+    
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return buf

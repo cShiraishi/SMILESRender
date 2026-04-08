@@ -14,6 +14,7 @@ import json
 import threading
 import hashlib
 import os
+from PepLink import aa_seqs_to_smiles, smiles_to_aa_seqs
 
 # Limite de concorrência: apenas 2 processamentos pesados por vez
 processing_semaphore = threading.Semaphore(2)
@@ -87,9 +88,17 @@ def download_example():
     return send_file(file_path, as_attachment=True)
 
 
-@app.route("/render", methods=["POST"])
+@app.route("/render", methods=["GET", "POST"])
 def render_by_json():
     try:
+        if request.method == "GET":
+            smiles = request.args.get("smiles")
+            format = request.args.get("format") or "png"
+            if not smiles:
+                return 'Missing "smiles" parameter', 400
+            image = convert_smiles(smiles, format.lower())
+            return send_file(image, f"image/{format}"), 200
+
         data = request.get_json()
         format: str = data["format"] if "format" in list(data) else "png"
         keep_duplicates: bool = (
@@ -789,3 +798,46 @@ def render_async():
         return jsonify({"task_id": task.id}), 202
     except Exception as err:
         return str(err), 500
+
+@app.route("/predict/peplink", methods=["POST"])
+def predict_peplink():
+    """Convert peptide sequence to SMILES using PepLink."""
+    try:
+        data = request.get_json()
+        sequence = data.get("sequence", "").strip().replace("-", "")
+        if not sequence:
+            return jsonify({"error": "No peptide sequence provided"}), 400
+            
+        # PepLink takes a sequence string
+        smiles = aa_seqs_to_smiles(sequence)
+        if not smiles:
+             return jsonify({"error": "Conversion failed"}), 500
+             
+        return jsonify({"smiles": smiles})
+        
+    except Exception as err:
+        print(f"PepLink Error: {err}")
+        return jsonify({"error": str(err)}), 500
+
+@app.route("/predict/smiles-to-peptide", methods=["POST"])
+def predict_smiles_to_peptide():
+    """Convert SMILES to peptide sequence using PepLink."""
+    try:
+        data = request.get_json()
+        smiles = data.get("smiles", "").strip()
+        if not smiles:
+            return jsonify({"error": "No SMILES provided"}), 400
+            
+        result = smiles_to_aa_seqs(smiles)
+        if result.sequence:
+            return jsonify({
+                "sequence": result.sequence,
+                "is_cyclic": result.is_cyclic,
+                "cyclization": result.cyclization
+            })
+        else:
+            return jsonify({"error": result.unsupported_reason or "Conversion failed"}), 422
+        
+    except Exception as err:
+        print(f"PepLink Reverse Error: {err}")
+        return jsonify({"error": str(err)}), 500

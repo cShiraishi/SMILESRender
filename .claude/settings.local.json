@@ -30,7 +30,10 @@
       "Bash(.venv/Scripts/python -c ':*)",
       "Bash(ls *.py)",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('scripts',{}\\)\\)\")",
-      "Bash(npx tsc:*)"
+      "Bash(ollama list:*)",
+      "Bash(ollama pull:*)",
+      "Bash(ollama show:*)",
+      "Bash(ollama run:*)"
     ]
   }
 }

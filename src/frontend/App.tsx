@@ -10,12 +10,13 @@ import DescriptorsPage from './pages/DescriptorsPage';
 import SimilarityPage from './pages/SimilarityPage';
 import ReactionPage from './pages/ReactionPage';
 import LibraryPage from './pages/LibraryPage';
+import PeptidePage from './pages/PeptidePage';
 
-type Page = 'hub' | 'renderer' | 'predict' | 'iupac' | 'descriptors' | 'similarity' | 'reaction' | 'library';
+type Page = 'hub' | 'renderer' | 'predict' | 'iupac' | 'descriptors' | 'similarity' | 'reaction' | 'library' | 'peptide';
 
 function getPageFromHash(): Page {
   const hash = window.location.hash.replace('#', '') as Page;
-  const valid: Page[] = ['renderer', 'predict', 'iupac', 'descriptors', 'similarity', 'reaction', 'library'];
+  const valid: Page[] = ['renderer', 'predict', 'iupac', 'descriptors', 'similarity', 'reaction', 'library', 'peptide'];
   return valid.includes(hash) ? hash : 'hub';
 }
 
@@ -50,6 +51,7 @@ function App() {
         {page === 'similarity'  && <SimilarityPage onBack={goBack} initialSmiles={sharedSmiles} />}
         {page === 'reaction'    && <ReactionPage onBack={goBack} initialSmiles={sharedSmiles} />}
         {page === 'library'     && <LibraryPage onBack={goBack} initialSmiles={sharedSmiles} />}
+        {page === 'peptide'     && <PeptidePage onBack={goBack} />}
       </main>
       <Footer />
     </div>

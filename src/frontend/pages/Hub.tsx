@@ -21,6 +21,7 @@ const apps: HubApp[] = [
   { id: 'descriptors',icon: 'bi-list-ul',     title: 'Molecular Descriptors',   description: 'Generate 200+ physicochemical properties and QSAR fingerprints automatically.', tags: ['QSAR'], color: '#6366f1' },
   { id: 'similarity', icon: 'bi-cpu',      title: 'Similarity Searching',    description: 'Structure-based searching across chemical libraries using Tanimoto distance.', tags: ['Search'], color: '#ef4444' },
   { id: 'reaction',   icon: 'bi-diagram-3',   title: 'Reaction Prediction',     description: 'Predict organic reaction outcomes and mapping using chemical intelligence.', tags: ['Synthesis'], color: '#ec4899' },
+  { id: 'peptide',    icon: 'bi-pentagon',    title: 'Peptide Engineering',    description: 'Convert amino acid sequences into chemical structures using PepLink.', tags: ['Peptides'], color: '#ec4899' },
 ];
 
 interface Props {

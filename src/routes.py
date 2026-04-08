@@ -41,8 +41,25 @@ def _cache_set(key: str, value: bytes, ttl: int = 86400):
         try: _redis.setex(key, ttl, value)
         except Exception: pass
 
-# Armazena openers pkCSM com cookies de sessão: smiles_hash -> opener
-_pkcsm_openers: dict = {}
+import time
+# Armazena openers pkCSM com cookies de sessão: smiles_hash -> {opener, time}
+_pkcsm_openers = {}
+
+def get_pkcsm_opener(hash_val):
+    entry = _pkcsm_openers.get(hash_val)
+    if entry and time.time() - entry['time'] < 1800:
+        return entry['opener']
+    if entry:
+        del _pkcsm_openers[hash_val]
+    return None
+
+def set_pkcsm_opener(hash_val, opener):
+    if len(_pkcsm_openers) > 500:
+        now = time.time()
+        to_del = [k for k, v in _pkcsm_openers.items() if now - v['time'] > 1800]
+        for k in to_del:
+            del _pkcsm_openers[k]
+    _pkcsm_openers[hash_val] = {'opener': opener, 'time': time.time()}
 
 
 from tasks import render_batch_task, predict_tool_task
@@ -250,10 +267,9 @@ def predict(smiles: str):
     cached = _cache_get(cache_key)
     if cached:
         return cached
-    with processing_semaphore:
-        result = urllib.request.urlopen(
-            f"https://stoptox.mml.unc.edu/predict?smiles={decoded_smiles}", timeout=120
-        ).read()
+    result = urllib.request.urlopen(
+        f"https://stoptox.mml.unc.edu/predict?smiles={decoded_smiles}", timeout=120
+    ).read()
     _cache_set(cache_key, result)
     return result
 
@@ -269,9 +285,8 @@ def predict_swissadme(smiles: str):
         return cached
     data = urllib.parse.urlencode({"smiles": decoded_smiles}).encode("utf-8")
     req = urllib.request.Request("https://www.swissadme.ch/index.php", data=data)
-    with processing_semaphore:
-        with urllib.request.urlopen(req, timeout=120) as response:
-            result = response.read()
+    with urllib.request.urlopen(req, timeout=120) as response:
+        result = response.read()
     _cache_set(cache_key, result)
     return result
 
@@ -318,9 +333,8 @@ def predict_stoplight(smiles: str):
             cached = _cache_get(cache_key)
             if cached:
                 return cached
-            with processing_semaphore:
-                with urllib.request.urlopen(req, timeout=120) as response:
-                    result = response.read()
+            with urllib.request.urlopen(req, timeout=120) as response:
+                result = response.read()
             _cache_set(cache_key, result)
             return result
     except Exception as err:
@@ -345,12 +359,11 @@ def predict_pkcsm_init(smiles: str):
             headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         )
 
-        with processing_semaphore:
-            with opener.open(req, timeout=60) as response:
-                final_url = response.geturl()
+        with opener.open(req, timeout=60) as response:
+            final_url = response.geturl()
 
         # Guardar opener para reutilizar cookies nos polls seguintes
-        _pkcsm_openers[smiles_hash] = opener
+        set_pkcsm_opener(smiles_hash, opener)
         return jsonify({"result_url": final_url, "smiles_hash": smiles_hash})
 
     except Exception as err:
@@ -402,9 +415,8 @@ def predict_admetlab(smiles: str):
             }
         )
         
-        with processing_semaphore:
-            with opener.open(req_post, timeout=60) as response:
-                result = response.read()
+        with opener.open(req_post, timeout=60) as response:
+            result = response.read()
         _cache_set(cache_key, result)
         return result
 
@@ -423,15 +435,14 @@ def predict_pkcsm_fetch():
             return "No URL provided", 400
 
         req = urllib.request.Request(target_url, headers={'User-Agent': 'Mozilla/5.0'})
-        opener = _pkcsm_openers.get(smiles_hash)
+        opener = get_pkcsm_opener(smiles_hash)
 
-        with processing_semaphore:
-            if opener:
-                with opener.open(req, timeout=60) as response:
-                    return response.read()
-            else:
-                with urllib.request.urlopen(req, timeout=60) as response:
-                    return response.read()
+        if opener:
+            with opener.open(req, timeout=60) as response:
+                return response.read()
+        else:
+            with urllib.request.urlopen(req, timeout=60) as response:
+                return response.read()
     except Exception as err:
         print(f"pkCSM Fetch Error: {err}")
         return f"Error fetching pkCSM results: {err}", 500

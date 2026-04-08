@@ -44,6 +44,9 @@ Bridging computational chemistry and structural biology, SMILESRender integrates
 Processing thousands of molecular structures simultaneously introduces severe memory overhead required by `RDKit`’s underlying C++ bindings. In resource-constrained environments (e.g., free-tier cloud containers capped at 512MB RAM), parallel processing leads to immediate Out-of-Memory (OOM) host terminations.
 To circumvent this, we engineered an asynchronous **chunk-streaming protocol** enforced strictly by the React frontend. Bulk requests arrays (e.g., *n*=1,000 SMILES) are programmatically segmented into throttled payload chunks (`k=20`). These chunks are iteratively dispatched, resolved by the Flask backend, and progressively appended to the graphical UI state. This architectural paradigm guarantees that the backend maintains a flat, near-constant memory footprint (≈300MB) regardless of the total library scale requested by the user.
 
+### 2.4. Scalable Networking and Session Management
+To maintain high availability under heavy traffic, SMILESRender utilizes a non-blocking networking strategy for its reverse-proxy modules. Unlike local computational tasks which are governed by a global CPU semaphore to prevent system exhaustion, external API calls to third-party ADMET oracles are executed independently. This ensures that latency-heavy network I/O does not bottleneck the internal RDKit computation pipelines. Furthermore, the platform implements a Time-To-Live (TTL) predicated cleanup logic for session-persistent objects (e.g., `pkCSM` cookie-handlers), automatically purging stale memory entries older than 30 minutes to ensure indefinite server uptime without progressive memory degradation.
+
 ## 3. Results and Application
 
 ### 3.1. High-Throughput Benchmarking and Exportation

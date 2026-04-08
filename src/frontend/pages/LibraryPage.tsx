@@ -192,33 +192,33 @@ function LibraryContent({ initialSmiles }: { initialSmiles?: string }) {
     fetchChunks();
   }, [initialSmiles]);
 
-  // ── Inline Chart.js plugin: drug-likeness reference threshold line ──────────
-  const thresholdPlugin = useMemo(() => ({
-    id: 'thresholdLine',
-    afterDraw(chart: any) {
-      const thr = PROP_THRESHOLDS[histProp];
-      if (!thr) return;
-      const { ctx, scales: { x, y } } = chart;
-      const xPx = x.getPixelForValue(thr.value);
-      if (xPx < x.left || xPx > x.right) return;
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(xPx, y.top);
-      ctx.lineTo(xPx, y.bottom);
-      ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 4]);
-      ctx.stroke();
-      ctx.fillStyle = '#ef4444';
-      ctx.font = 'bold 10px sans-serif';
-      ctx.fillText(thr.label, xPx + 4, y.top + 14);
-      ctx.restore();
-    },
-  }), [histProp]);
-
   // ── Build / rebuild Chart.js instance ──────────────────────────────────────
   useEffect(() => {
     let timer: any;
+
+    // Threshold reference line plugin (created inside effect so histProp is always fresh)
+    const thresholdPlugin = {
+      id: 'thresholdLine',
+      afterDraw(chart: any) {
+        const thr = PROP_THRESHOLDS[histProp];
+        if (!thr) return;
+        const { ctx, scales: { x, y } } = chart;
+        const xPx = x.getPixelForValue(thr.value);
+        if (xPx < x.left || xPx > x.right) return;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(xPx, y.top);
+        ctx.lineTo(xPx, y.bottom);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.stroke();
+        ctx.fillStyle = '#ef4444';
+        ctx.font = 'bold 10px sans-serif';
+        ctx.fillText(thr.label, xPx + 4, y.top + 14);
+        ctx.restore();
+      },
+    };
 
     const buildChart = () => {
       if (activeTab === 'correlation' || activeTab === 'filters') {
@@ -450,7 +450,7 @@ function LibraryContent({ initialSmiles }: { initialSmiles?: string }) {
       if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null; }
       if (timer) clearTimeout(timer);
     };
-  }, [data, activeTab, spaceMode, xProp, yProp, sizeProp, histProp, thresholdPlugin]);
+  }, [data, activeTab, spaceMode, xProp, yProp, sizeProp, histProp]);
 
   // ── Derived data ────────────────────────────────────────────────────────────
   const corrMatrix = useMemo(() => {

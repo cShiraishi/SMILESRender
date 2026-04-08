@@ -73,13 +73,13 @@ app = Flask(__name__)
 @app.after_request
 def set_security_headers(response):
     response.headers['Content-Security-Policy'] = (
-        "default-src 'self'; "
-        "script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net https://jsme-editor.github.io; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
-        "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; "
+        "default-src 'self' https://jsme-editor.github.io; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://jsme-editor.github.io; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://jsme-editor.github.io; "
+        "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; "
         "img-src 'self' data: blob: https://jsme-editor.github.io; "
         "connect-src 'self' https://jsme-editor.github.io; "
-        "frame-src 'none'; "
+        "frame-src 'self' https://jsme-editor.github.io; "
         "object-src 'none'; "
         "base-uri 'self';"
     )

@@ -108,24 +108,42 @@ function LibraryContent({ initialSmiles }: { initialSmiles?: string }) {
   // ── Fetch descriptors ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!initialSmiles) { setError('Please paste SMILES in the Hub to visualize data.'); return; }
-    setLoading(true); setError(null);
-    const smiles = initialSmiles.split('\n').map(s => s.trim()).filter(Boolean);
-    if (smiles.length === 0) { setError('SMILES list is empty.'); setLoading(false); return; }
+    
+    const fetchChunks = async () => {
+      setLoading(true); setError(null); setData([]);
+      const smiles = initialSmiles.split('\n').map(s => s.trim()).filter(Boolean);
+      if (smiles.length === 0) { setError('SMILES list is empty.'); setLoading(false); return; }
 
-    fetch('/descriptors', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ smiles }),
-    })
-      .then(r => { if (!r.ok) throw new Error('Backend server error.'); return r.json(); })
-      .then(res => {
-        if (res.error) throw new Error(res.error);
-        const clean = res.filter((m: any) => !m.error);
-        if (clean.length === 0) throw new Error('No valid structures in library.');
-        setData(clean);
+      const CHUNK_SIZE = 20;
+      const allClean: MolData[] = [];
+
+      try {
+        for (let i = 0; i < smiles.length; i += CHUNK_SIZE) {
+          const chunk = smiles.slice(i, i + CHUNK_SIZE);
+          const r = await fetch('/descriptors', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ smiles: chunk }),
+          });
+          
+          if (!r.ok) throw new Error('Backend server error.');
+          const res = await r.json();
+          if (res.error) throw new Error(res.error);
+          
+          const clean = res.filter((m: any) => !m.error);
+          allClean.push(...clean);
+          setData([...allClean]); // incremental update
+        }
+        
+        if (allClean.length === 0) throw new Error('No valid structures in library.');
+      } catch (err: any) {
+        setError(err.message || 'Error calculating properties.');
+      } finally {
         setLoading(false);
-      })
-      .catch(err => { setError(err.message || 'Error calculating properties.'); setLoading(false); });
+      }
+    };
+    
+    fetchChunks();
   }, [initialSmiles]);
 
   // ── Build / rebuild Chart.js instance ──────────────────────────────────────

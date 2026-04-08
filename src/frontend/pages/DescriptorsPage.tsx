@@ -177,19 +177,28 @@ function DescContent({ initialSmiles }: { initialSmiles?: string }) {
     if (!list.length) return;
     setLoading(true);
     setError(null);
+    setResults([]);
+
+    const CHUNK_SIZE = 20;
+    const allResults: DescResult[] = [];
+
     try {
-      const res = await fetch('/descriptors', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ smiles: list, fingerprints: [...selectedFPs] }),
-      });
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setResults(data);
-      } else {
-        setError(data.error ?? 'Server error');
+      for (let i = 0; i < list.length; i += CHUNK_SIZE) {
+        const chunk = list.slice(i, i + CHUNK_SIZE);
+        const res = await fetch('/descriptors', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ smiles: chunk, fingerprints: [...selectedFPs] }),
+        });
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          allResults.push(...data);
+          setResults([...allResults]);
+        } else {
+          throw new Error(data.error ?? 'Server error');
+        }
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Request failed');
+      setError(e instanceof Error ? e.message : 'Request failed during chunk processing');
     } finally {
       setLoading(false);
     }

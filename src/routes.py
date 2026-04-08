@@ -287,7 +287,13 @@ def predict_swissadme(smiles: str):
     if cached:
         return cached
     data = urllib.parse.urlencode({"smiles": decoded_smiles}).encode("utf-8")
-    req = urllib.request.Request("https://www.swissadme.ch/index.php", data=data)
+    req = urllib.request.Request(
+        "https://www.swissadme.ch/index.php", 
+        data=data,
+        headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+    )
     with urllib.request.urlopen(req, timeout=120) as response:
         result = response.read()
     _cache_set(cache_key, result)

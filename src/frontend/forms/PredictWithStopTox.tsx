@@ -46,8 +46,8 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
       const currentCount = Object.keys(allResults).length;
       
       if (currentCount < totalExpected) {
-          alert(`Aguarde a conclusão de todas as análises (${Math.floor((currentCount/totalExpected)*100)}%).`);
-          return;
+          const proceed = window.confirm(`Algumas análises ainda não terminaram ou podem ter falhado (${percentage}% concluído). Deseja exportar os dados parciais recebidos até agora?`);
+          if (!proceed) return;
       }
       
       try {
@@ -146,21 +146,21 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
             {smilesToRender.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <button
-                  disabled={!isReady}
                   style={{
                     backgroundColor: isReady ? '#28a745' : '#ffc107',
                     color: isReady ? 'white' : '#333',
                     border: 'none',
                     padding: '10px 20px',
                     borderRadius: '5px',
-                    cursor: isReady ? 'pointer' : 'not-allowed',
+                    cursor: 'pointer',
                     fontWeight: 'bold',
                     transition: 'all 0.3s ease',
-                    boxShadow: isReady ? '0 4px 15px rgba(40,167,69,0.3)' : 'none',
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
                   }}
                   onClick={handleExport}
+                  title="Clique para exportar os dados recebidos até agora."
                 >
-                  {isReady ? '✅ Export to Excel (Ready!)' : `⏳ Compiling Data (${percentage}%)`}
+                  {isReady ? '✅ Export to Excel (Ready!)' : `⏳ Exportar Dados Parciais (${percentage}%)`}
                 </button>
                 {!isReady && (
                   <div style={{ width: '100px', height: '8px', backgroundColor: '#eee', borderRadius: '4px', overflow: 'hidden' }}>

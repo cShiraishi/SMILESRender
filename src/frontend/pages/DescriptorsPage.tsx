@@ -183,7 +183,7 @@ function DescContent({ initialSmiles }: { initialSmiles?: string }) {
     setError(null);
     setResults([]);
 
-    const CHUNK_SIZE = 20;
+    const CHUNK_SIZE = 5;
     const allResults: DescResult[] = [];
 
     try {

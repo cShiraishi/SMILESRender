@@ -114,7 +114,7 @@ function LibraryContent({ initialSmiles }: { initialSmiles?: string }) {
       const smiles = initialSmiles.split('\n').map(s => s.trim()).filter(Boolean);
       if (smiles.length === 0) { setError('SMILES list is empty.'); setLoading(false); return; }
 
-      const CHUNK_SIZE = 20;
+      const CHUNK_SIZE = 5;
       const allClean: MolData[] = [];
 
       try {
@@ -619,8 +619,9 @@ function LibraryContent({ initialSmiles }: { initialSmiles?: string }) {
                           color: Math.abs(r) > 0.55 ? '#fff' : colors.text,
                           borderRadius: '6px',
                           cursor: 'default',
-                          title: `${CORR_LABELS[i]} vs ${CORR_LABELS[j]}: ${r.toFixed(3)}`,
-                        }}>
+                        }}
+                        title={`${CORR_LABELS[i]} vs ${CORR_LABELS[j]}: ${r.toFixed(3)}`}
+                      >
                           {r.toFixed(2)}
                         </td>
                       ))}

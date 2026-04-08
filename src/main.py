@@ -11,8 +11,9 @@ load_dotenv()
 def main():
     host = "0.0.0.0"
     port = int(getenv("PORT") or 3000)
-    print(f"smiles-render-web running at {host}:{port}")
-    serve(app, host=host, port=port, threads=os.cpu_count() or 1)
+    threads = int(getenv("THREADS") or 4)
+    print(f"smiles-render-web running at {host}:{port} with {threads} threads (Render Free Optimized)")
+    serve(app, host=host, port=port, threads=threads)
 
 
 if __name__ == "__main__":

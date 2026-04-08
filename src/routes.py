@@ -16,9 +16,10 @@ import hashlib
 import os
 from PepLink import aa_seqs_to_smiles, smiles_to_aa_seqs
 
-# Limite de concorrência: apenas 2 processamentos pesados por vez
-processing_semaphore = threading.Semaphore(2)
-MAX_SMILES = 20
+# Limite de concorrência: apenas 1 processamento pesado por vez (Otimizado para Render Free)
+processing_semaphore = threading.Semaphore(1)
+pkcsm_lock = threading.Lock()
+MAX_SMILES = 10
 
 # Redis cache (opcional — fallback silencioso se indisponível)
 try:
@@ -46,20 +47,22 @@ import time
 _pkcsm_openers = {}
 
 def get_pkcsm_opener(hash_val):
-    entry = _pkcsm_openers.get(hash_val)
-    if entry and time.time() - entry['time'] < 1800:
-        return entry['opener']
-    if entry:
-        del _pkcsm_openers[hash_val]
+    with pkcsm_lock:
+        entry = _pkcsm_openers.get(hash_val)
+        if entry and time.time() - entry['time'] < 1800:
+            return entry['opener']
+        if entry:
+            del _pkcsm_openers[hash_val]
     return None
 
 def set_pkcsm_opener(hash_val, opener):
-    if len(_pkcsm_openers) > 500:
-        now = time.time()
-        to_del = [k for k, v in _pkcsm_openers.items() if now - v['time'] > 1800]
-        for k in to_del:
-            del _pkcsm_openers[k]
-    _pkcsm_openers[hash_val] = {'opener': opener, 'time': time.time()}
+    with pkcsm_lock:
+        if len(_pkcsm_openers) > 500:
+            now = time.time()
+            to_del = [k for k, v in _pkcsm_openers.items() if now - v['time'] > 1800]
+            for k in to_del:
+                del _pkcsm_openers[k]
+        _pkcsm_openers[hash_val] = {'opener': opener, 'time': time.time()}
 
 
 from tasks import render_batch_task, predict_tool_task

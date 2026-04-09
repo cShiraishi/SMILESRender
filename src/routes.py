@@ -14,6 +14,7 @@ import json
 import threading
 import hashlib
 import os
+import subprocess
 from PepLink import aa_seqs_to_smiles, smiles_to_aa_seqs
 
 # Limite de concorrência: apenas 1 processamento pesado por vez (Otimizado para Render Free)
@@ -286,18 +287,69 @@ def predict_swissadme(smiles: str):
     cached = _cache_get(cache_key)
     if cached:
         return cached
-    data = urllib.parse.urlencode({"smiles": decoded_smiles}).encode("utf-8")
-    req = urllib.request.Request(
-        "https://www.swissadme.ch/index.php", 
-        data=data,
-        headers={
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-    )
-    with urllib.request.urlopen(req, timeout=120) as response:
-        result = response.read()
-    _cache_set(cache_key, result)
-    return result
+
+    ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+    headers = {
+        'User-Agent': ua,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Origin': 'https://www.swissadme.ch',
+        'Referer': 'https://www.swissadme.ch/index.php',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-User': '?1',
+    }
+
+    def solve_via_urllib():
+        cj = http.cookiejar.CookieJar()
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+        # Step 1: Get session
+        opener.open(urllib.request.Request("https://www.swissadme.ch/index.php", headers=headers), timeout=30)
+        # Step 2: Post
+        data = urllib.parse.urlencode({"smiles": decoded_smiles}).encode("utf-8")
+        req = urllib.request.Request("https://www.swissadme.ch/index.php", data=data, headers=headers, method="POST")
+        with opener.open(req, timeout=120) as resp:
+            content = resp.read()
+            if b"Molecular Weight" in content or b"/results/" in resp.geturl().encode():
+                return content
+        return None
+
+    def solve_via_curl():
+        try:
+            # Replicate the exact successful browser request via curl.exe/curl
+            cmd = [
+                "curl", "-s", "-L",
+                "-X", "POST", "https://www.swissadme.ch/index.php",
+                "-H", f"User-Agent: {ua}",
+                "-H", "Origin: https://www.swissadme.ch",
+                "-H", "Referer: https://www.swissadme.ch/index.php",
+                "-H", "Content-Type: application/x-www-form-urlencoded",
+                "--data-raw", urllib.parse.urlencode({"smiles": decoded_smiles})
+            ]
+            result = subprocess.run(cmd, capture_output=True, timeout=120)
+            if result.returncode == 0 and (b"Molecular Weight" in result.stdout):
+                return result.stdout
+        except Exception as e:
+            print(f"Curl Fallback Error: {e}")
+        return None
+
+    # Try urllib first
+    try:
+        result = solve_via_urllib()
+        if result:
+            _cache_set(cache_key, result)
+            return result
+    except Exception as e:
+        print(f"SwissADME urllib error: {e}")
+
+    # Fallback to curl
+    result = solve_via_curl()
+    if result:
+        _cache_set(cache_key, result)
+        return result
+
+    return "SwissADME prediction failed – possible bot block or service downtime.", 503
 
 
 @app.route("/predict/stoplight/base64/<string:smiles>", methods=["GET"])
@@ -646,6 +698,8 @@ def calc_descriptors():
                 "SaturatedHeterocycles":    rdMolDescriptors.CalcNumSaturatedHeterocycles(mol),
                 "AliphaticCarbocycles":     rdMolDescriptors.CalcNumAliphaticCarbocycles(mol),
                 "AliphaticHeterocycles":    rdMolDescriptors.CalcNumAliphaticHeterocycles(mol),
+                "NumAromaticAtoms":         sum(1 for atom in mol.GetAtoms() if atom.GetIsAromatic()),
+                "NumSaturatedRings":        rdMolDescriptors.CalcNumSaturatedRings(mol),
             })
 
             # --- Optional fingerprints ---
@@ -870,12 +924,14 @@ def export_grid():
         smiles = data.get("smiles", [])
         labels = data.get("labels", [])
         mols_per_row = int(data.get("mols_per_row", 3))
+        fmt = data.get("format", "PNG").upper()
         
         if not smiles:
             return "No SMILES provided", 400
             
-        buf = create_mols_grid(smiles, labels, mols_per_row)
-        return send_file(buf, mimetype="image/png", as_attachment=True, download_name="molecules_grid.png")
+        buf = create_mols_grid(smiles, labels, mols_per_row, format=fmt)
+        ext = "jpg" if fmt == "JPEG" else "png"
+        return send_file(buf, mimetype=f"image/{fmt.lower()}", as_attachment=True, download_name=f"molecules_grid.{ext}")
     except Exception as err:
         print(f"Grid Export Error: {err}")
         return str(err), 500

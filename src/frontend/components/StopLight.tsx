@@ -162,6 +162,8 @@ function StopLight(props: { smiles: string; onDataLoaded?: (data: any[]) => void
       .catch((err) => {
         console.error('StopLight Error:', err);
         setIsError(true);
+        setIsLoading(false);
+        if (props.onDataLoaded) props.onDataLoaded([]);
       });
   }, [props.smiles]);
 

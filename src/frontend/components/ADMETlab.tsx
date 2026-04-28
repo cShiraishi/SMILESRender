@@ -14,7 +14,7 @@ const tableStyle: React.CSSProperties = {
   width: '100%',
   borderCollapse: 'collapse',
   fontSize: '13px',
-  marginTop: '10px'
+  marginTop: '10px',
 };
 
 const thStyle: React.CSSProperties = {
@@ -22,13 +22,13 @@ const thStyle: React.CSSProperties = {
   border: '1px solid #dee2e6',
   padding: '6px',
   textAlign: 'left',
-  fontWeight: 'bold'
+  fontWeight: 'bold',
 };
 
 const tdStyle: React.CSSProperties = {
   border: '1px solid #dee2e6',
   padding: '6px',
-  textAlign: 'left'
+  textAlign: 'left',
 };
 
 function ADMETlab(props: { smiles: string; onDataLoaded?: (data: any[]) => void }) {
@@ -39,98 +39,56 @@ function ADMETlab(props: { smiles: string; onDataLoaded?: (data: any[]) => void 
   useEffect(() => {
     setIsLoading(true);
     setIsError(false);
+    setCategories([]);
 
-    fetch(`/predict/admetlab/base64/${encodeURIComponent(window.btoa(props.smiles))}`)
-      .then((response) => {
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.text();
-      })
-      .then((html) => {
-        // Sanitizar contra scripts
-        const cleanHtml = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-                              .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
+    const worker = new Worker(new URL('./admetlab.worker.js', import.meta.url));
+    const allCategories: { name: string; props: any[] }[] = [];
 
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(cleanHtml, 'text/html');
-        
-        const extractedCategories: any[] = [];
-        
-        // ADMETlab 3.0 uses '.sub-title' for section headers
-        const subTitles = doc.querySelectorAll('.sub-title');
-        
-        subTitles.forEach((titleElem) => {
-           let categoryName = titleElem.textContent?.trim() || "Propriedades";
-           
-           // Corrigir erro de digitação do site original para o usuário
-           if (categoryName === "ABSPORPTION") categoryName = "ABSORPTION";
+    worker.onmessage = (e) => {
+      const { status, category, error } = e.data;
 
-           const sectionProps: any[] = [];
-           
-           // A tabela geralmente está no próximo elemento ou dentro do mesmo container row
-           let container = titleElem.closest('.row, .card-body, .col-xl-4');
-           if (!container) container = titleElem.parentElement;
-
-           const tables = container ? container.querySelectorAll('table') : [];
-           tables.forEach(table => {
-              // Pegar apenas as tabelas que estão "perto" deste título para não repetir dados
-              const rows = table.querySelectorAll('tr');
-              rows.forEach(row => {
-                 const cells = row.querySelectorAll('td');
-                 if (cells.length >= 2) {
-                    const name = cells[0].textContent?.trim() || "";
-                    const value = cells[1].textContent?.trim() || "";
-                    
-                    if (name && value && name !== "Property" && name !== "Model") {
-                      sectionProps.push({ name, value });
-                    }
-                 }
-              });
-           });
-
-           if (sectionProps.length > 0) {
-              extractedCategories.push({ name: categoryName, props: sectionProps });
-           }
-        });
-
-        if (extractedCategories.length === 0) {
-           // Fallback se o seletor .sub-title falhar
-           const tables = doc.querySelectorAll('table');
-           tables.forEach((table, idx) => {
-              const props: any[] = [];
-              table.querySelectorAll('tr').forEach(row => {
-                 const cells = row.querySelectorAll('td');
-                 if (cells.length >= 2) {
-                    props.push({ name: cells[0].textContent?.trim(), value: cells[1].textContent?.trim() });
-                 }
-              });
-              if (props.length > 0) extractedCategories.push({ name: `Seção ${idx + 1}`, props });
-           });
-        }
-
-        setCategories(extractedCategories); // SEM LIMITE agora
+      if (status === 'chunk') {
+        allCategories.push(category);
+        // Update state on each chunk so the UI builds progressively
+        setCategories([...allCategories]);
+      } else if (status === 'done') {
         setIsLoading(false);
-        
-        // Finalizar exportação completa
         if (props.onDataLoaded) {
-           const allData: any[] = extractedCategories.flatMap(c => c.props.map(p => ({
-               SMILES: props.smiles,
-               Tool: "ADMETlab 3.0",
-               Category: c.name,
-               Property: p.name,
-               Value: p.value,
-               Unit: "-"
-           })));
-           props.onDataLoaded(allData);
+          if (allCategories.length === 0) {
+            // Worker finished but couldn't parse any data from the HTML
+            console.warn('ADMETlab: done but no categories parsed');
+            setIsError(true);
+            props.onDataLoaded([]);
+          } else {
+            const allData: any[] = allCategories.flatMap((c) =>
+              c.props.map((p) => ({
+                SMILES: props.smiles,
+                Tool: 'ADMETlab 3.0',
+                Category: c.name,
+                Property: p.name,
+                Value: p.value,
+                Unit: '-',
+              }))
+            );
+            props.onDataLoaded(allData);
+          }
         }
-      })
-      .catch((err) => {
-        console.error('ADMETlab Fetch Error:', err);
+        worker.terminate();
+      } else if (status === 'error') {
+        console.error('ADMETlab Worker Error:', error);
         setIsError(true);
         setIsLoading(false);
-      });
+        if (props.onDataLoaded) props.onDataLoaded([]);
+        worker.terminate();
+      }
+    };
+
+    worker.postMessage({ smiles: props.smiles, type: 'FETCH_ADMETLAB' });
+
+    return () => worker.terminate();
   }, [props.smiles]);
 
-  if (isLoading) {
+  if (isLoading && categories.length === 0 && !isError) {
     return (
       <div style={{ margin: '20px' }}>
         <p>Analisando (ADMETlab 3.0) para <strong>{props.smiles}</strong>...</p>
@@ -150,6 +108,7 @@ function ADMETlab(props: { smiles: string; onDataLoaded?: (data: any[]) => void 
     <div style={componentStyles}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #5a5aed', paddingBottom: '10px', marginBottom: '15px' }}>
         <h3 style={{ margin: 0, fontSize: '18px', color: '#5a5aed' }}>ADMETlab 3.0 Analysis</h3>
+        {isLoading && <span style={{ fontSize: '12px', color: '#999' }}>Carregando...</span>}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '15px' }}>

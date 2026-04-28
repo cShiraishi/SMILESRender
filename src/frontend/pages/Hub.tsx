@@ -17,7 +17,7 @@ interface HubApp {
 const apps: HubApp[] = [
   { id: 'library',    icon: 'bi-grid-1x2',    title: 'SMILES Library Dashboard', description: 'Advanced inventory analysis, chemical space visualization and library analytics.', tags: ['Inventory'], color: '#0ea5e9' },
   { id: 'renderer',   icon: 'bi-box',         title: 'Structure Rendering',      description: 'High-fidelity 2D/3D molecular visualization with RDKit-driven precision.', tags: ['Visualization'], color: '#8b5cf6' },
-  { id: 'predict',    icon: 'bi-activity',    title: 'ADMET Profiling',         description: 'Multi-engine ADMET predictions: SwissADME, pkCSM and ADMETlab integration.', tags: ['ADMET'], color: '#10b981' },
+  { id: 'predict',    icon: 'bi-activity',    title: 'ADMET Profiling',         description: 'Multi-engine ADMET predictions: StopTox, StopLight, pkCSM and ADMETlab 3.0.', tags: ['ADMET'], color: '#10b981' },
   { id: 'iupac',      icon: 'bi-tag',         title: 'Chemical Nomenclature',   description: 'Convert SMILES to IUPAC names and vice-versa using intelligent dictionaries.', tags: ['Naming'], color: '#f59e0b' },
   { id: 'descriptors',icon: 'bi-list-ul',     title: 'Molecular Descriptors',   description: 'Generate 200+ physicochemical properties and QSAR fingerprints automatically.', tags: ['QSAR'], color: '#6366f1' },
   { id: 'similarity', icon: 'bi-cpu',      title: 'Similarity Searching',    description: 'Structure-based searching across chemical libraries using Tanimoto distance.', tags: ['Search'], color: '#ef4444' },

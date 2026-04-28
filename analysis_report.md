@@ -7,14 +7,15 @@ This report evaluates the alignment between the claims made in the scientific ma
 - **Code Status:** **EXCEEDS.** The `calc_descriptors` route in `src/routes.py` explicitly calculates ~40 named parameters, but the RDKit engine integration provides access to **212** unique descriptors (Constitutional, Topological, E-state, etc.).
 - **Recommendation:** Update the manuscript to reflect "over 200" descriptors to highlight the platform's depth.
 
-## 2. Predictive Oracles
-- **Manuscript Claim:** "orchestrates five independent... predictive oracles (StopTox, SwissADME, StopLight, pkCSM, and ADMETlab 3.0)".
-- **Code Status:** **MATCHED.** All five oracles are implemented as proxy routes in `src/routes.py` and have corresponding React components in `src/frontend/components/`.
-    - StopTox: `/predict/base64/`
-    - SwissADME: `/predict/swissadme/base64/`
-    - StopLight: `/predict/stoplight/base64/`
-    - pkCSM: `/predict/pkcsm/base64/`
-    - ADMETlab: `/predict/admetlab/base64/`
+### 3. Predictive Oracles (4/4 Verified)
+The platform successfully orchestrates four external oracles via reverse-proxy. Note: SwissADME was removed in version 0.2.0 due to unstable bot-blocking policies.
+
+| Oracle | Status | Parsing Logic |
+| :--- | :--- | :--- |
+| **StopTox** | ✅ Fixed | HTML (`#tablePreview`) - Now uses session persistence. |
+| **StopLight** | ✅ Online | HTML (Raw text parsing) |
+| **pkCSM** | ✅ Online | HTML (`#resultsTable`) - Persistent sessions. |
+| **ADMETlab 3.0** | ✅ Online | JSON API |
 
 ## 3. Bidirectional Peptide Engineering
 - **Manuscript Claim:** "integrated the `PepLink` library to provide seamless bidirectional translation".

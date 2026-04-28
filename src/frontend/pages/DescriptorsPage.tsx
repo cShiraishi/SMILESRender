@@ -151,6 +151,7 @@ function DescContent({ initialSmiles }: { initialSmiles?: string }) {
   const [figureOpen, setFigureOpen] = useState(false);
   const [figCols, setFigCols] = useState(3);
   const [figSelected, setFigSelected] = useState<Set<string>>(new Set());
+  const [figFormat, setFigFormat] = useState<'PNG' | 'JPEG'>('PNG');
 
 
   React.useEffect(() => {
@@ -216,14 +217,18 @@ function DescContent({ initialSmiles }: { initialSmiles?: string }) {
       const res = await fetch('/export/grid', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ smiles: selectedSmiles, mols_per_row: figCols }),
+        body: JSON.stringify({ 
+          smiles: selectedSmiles, 
+          mols_per_row: figCols,
+          format: figFormat
+        }),
       });
       if (!res.ok) throw new Error('Failed to generate figure');
       const blob = await res.json().catch(() => res.blob());
       const url = window.URL.createObjectURL(blob as Blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'publication_figure.png';
+      a.download = `publication_figure.${figFormat === 'JPEG' ? 'jpg' : 'png'}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -589,6 +594,14 @@ function DescContent({ initialSmiles }: { initialSmiles?: string }) {
                 >
                   {[2, 3, 4, 5, 6].map(v => <option key={v} value={v}>{v} Columns</option>)}
                 </select>
+                <select 
+                  value={figFormat} 
+                  onChange={e => setFigFormat(e.target.value as any)}
+                  style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                >
+                  <option value="PNG">PNG (lossless)</option>
+                  <option value="JPEG">JPEG (photo)</option>
+                </select>
               </div>
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <button onClick={() => setFigureOpen(false)} style={{ padding: '0.75rem 1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer' }}>
@@ -604,7 +617,7 @@ function DescContent({ initialSmiles }: { initialSmiles?: string }) {
                     opacity: figSelected.size ? 1 : 0.6
                   }}
                 >
-                  Generate PNG Figure
+                  Generate {figFormat} Figure
                 </button>
               </div>
             </div>

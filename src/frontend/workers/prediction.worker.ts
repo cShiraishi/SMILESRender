@@ -9,7 +9,10 @@ self.onmessage = async (e) => {
   if (type === 'FETCH_PREDICTION') {
     try {
       const b64 = btoa(smiles);
-      const response = await fetch(`/predict/base64/${encodeURIComponent(b64)}`);
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 90_000);
+      const response = await fetch(`/predict/base64/${encodeURIComponent(b64)}`, { signal: ctrl.signal });
+      clearTimeout(t);
       if (!response.ok) throw new Error(`HTTP error ${response.status}`);
       
       const html = await response.text();

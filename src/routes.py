@@ -16,6 +16,7 @@ import hashlib
 import os
 import subprocess
 from PepLink import aa_seqs_to_smiles, smiles_to_aa_seqs
+from admet_interpreter import interpret, RISK_LABEL
 
 # Limite de concorrência: apenas 1 processamento pesado por vez (Otimizado para Render Free)
 processing_semaphore = threading.Semaphore(1)
@@ -68,6 +69,7 @@ def set_pkcsm_opener(hash_val, opener):
 
 from tasks import render_batch_task, predict_tool_task
 from celery.result import AsyncResult
+from admet_interpreter import interpret, RISK_LABEL, RISK_HEX
 
 app = Flask(__name__)
 
@@ -76,6 +78,7 @@ def set_security_headers(response):
     response.headers['Content-Security-Policy'] = (
         "default-src 'self' https://jsme-editor.github.io; "
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://jsme-editor.github.io; "
+        "worker-src 'self' blob:; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://jsme-editor.github.io; "
         "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; "
         "img-src 'self' data: blob: https://jsme-editor.github.io; "
@@ -87,7 +90,6 @@ def set_security_headers(response):
     response.headers['X-Frame-Options']        = 'DENY'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['Referrer-Policy']        = 'strict-origin-when-cross-origin'
-    response.headers['Permissions-Policy']     = 'geolocation=(), microphone=(), camera=()'
     return response
 
 
@@ -262,6 +264,199 @@ def render_base64_smiles(smiles: str):
         return f'Could not convert smiles: "{err}"', 412
 
 
+PROTOX_MODELS = {
+    'dili':     'Drug-Induced Liver Injury',
+    'neuro':    'Neurotoxicity',
+    'nephro':   'Nephrotoxicity',
+    'respi':    'Respiratory Toxicity',
+    'cardio':   'Cardiotoxicity',
+    'carcino':  'Carcinogenicity',
+    'immuno':   'Immunotoxicity',
+    'mutagen':  'Mutagenicity',
+    'cyto':     'Cytotoxicity',
+    'bbb':      'Blood-Brain Barrier Permeability',
+    'eco':      'Ecotoxicity',
+    'clinical': 'Clinical Toxicity',
+}
+
+@app.route("/predict/protox/base64/<string:smiles>", methods=["GET"])
+def predict_protox(smiles: str):
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import AllChem
+
+        decoded = b64decode(smiles.encode()).decode()
+        cache_key = f"smilerender:protox:{hashlib.md5(decoded.encode()).hexdigest()}"
+        cached = _cache_get(cache_key)
+        if cached:
+            return cached, 200, {'Content-Type': 'application/json'}
+
+        mol = Chem.MolFromSmiles(decoded)
+        if mol is None:
+            return jsonify({"error": "Invalid SMILES"}), 400
+        AllChem.Compute2DCoords(mol)
+        molblock = Chem.MolToMolBlock(mol)
+
+        ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        cj = http.cookiejar.CookieJar()
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+
+        # Step 1: submit mol to get server_id
+        params1 = urllib.parse.urlencode({'smilesString': molblock}).encode()
+        req1 = urllib.request.Request(
+            'https://tox.charite.de/protox3/index.php?site=compound_search_similarity',
+            data=params1,
+            headers={'User-Agent': ua, 'Content-Type': 'application/x-www-form-urlencoded'}
+        )
+        with opener.open(req1, timeout=20) as r:
+            html = r.read().decode('utf-8', errors='replace')
+
+        m = re.search(r"server_id='(\d+)'", html)
+        if not m:
+            return jsonify({"error": "ProTox did not return a server_id"}), 503
+        server_id = m.group(1)
+
+        # Step 2: run models
+        model_str = ' '.join(PROTOX_MODELS.keys())
+        params2 = urllib.parse.urlencode({
+            'models': model_str, 'sdfile': 'empty',
+            'mol': molblock, 'id': server_id,
+        }).encode()
+        req2 = urllib.request.Request(
+            'https://tox.charite.de/protox3/src/run_models.php',
+            data=params2,
+            headers={
+                'User-Agent': ua,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Referer': 'https://tox.charite.de/protox3/index.php?site=compound_search_similarity',
+            }
+        )
+        with opener.open(req2, timeout=40) as r:
+            raw = r.read().decode('utf-8', errors='replace')
+
+        raw_json = json.loads(raw)
+
+        # Normalise to {model_key: {label, active, probability}}
+        results = {}
+        for key, label in PROTOX_MODELS.items():
+            if key not in raw_json:
+                continue
+            pred = raw_json[key].get('Prediction', '0.0')
+            prob = float(raw_json[key].get('Probability', 0.0))
+            active = float(pred) > 0
+            results[key] = {'label': label, 'active': active, 'probability': round(prob, 4)}
+
+        out = json.dumps(results).encode()
+        _cache_set(cache_key, out)
+        return out, 200, {'Content-Type': 'application/json'}
+
+    except Exception as err:
+        print(f"ProTox Error: {err}")
+        return jsonify({"error": str(err)}), 500
+
+
+@app.route("/predict/rdkit-filters/base64/<string:smiles>", methods=["GET"])
+def rdkit_filters(smiles: str):
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import Descriptors, rdMolDescriptors, Crippen, Lipinski
+        from rdkit.Chem.FilterCatalog import FilterCatalog, FilterCatalogParams
+
+        decoded = b64decode(smiles.encode()).decode()
+        mol = Chem.MolFromSmiles(decoded)
+        if mol is None:
+            return jsonify({"error": "Invalid SMILES"}), 400
+
+        # ── Structural alert catalogs ──────────────────────────────────────────
+        pains_p = FilterCatalogParams()
+        pains_p.AddCatalog(FilterCatalogParams.FilterCatalogs.PAINS_A)
+        pains_p.AddCatalog(FilterCatalogParams.FilterCatalogs.PAINS_B)
+        pains_p.AddCatalog(FilterCatalogParams.FilterCatalogs.PAINS_C)
+        pains_matches = list(FilterCatalog(pains_p).GetMatches(mol))
+
+        brenk_p = FilterCatalogParams()
+        brenk_p.AddCatalog(FilterCatalogParams.FilterCatalogs.BRENK)
+        brenk_matches = list(FilterCatalog(brenk_p).GetMatches(mol))
+
+        nih_p = FilterCatalogParams()
+        nih_p.AddCatalog(FilterCatalogParams.FilterCatalogs.NIH)
+        nih_matches = list(FilterCatalog(nih_p).GetMatches(mol))
+
+        # ── Descriptors ────────────────────────────────────────────────────────
+        mw   = round(Descriptors.MolWt(mol), 2)
+        logp = round(Crippen.MolLogP(mol), 3)
+        mr   = round(Crippen.MolMR(mol), 3)
+        hbd  = Lipinski.NumHDonors(mol)
+        hba  = Lipinski.NumHAcceptors(mol)
+        tpsa = round(rdMolDescriptors.CalcTPSA(mol), 2)
+        rotb = rdMolDescriptors.CalcNumRotatableBonds(mol)
+        n_atoms = mol.GetNumHeavyAtoms()
+
+        # ESOL calculation (Delaney 2004)
+        # LogS = 0.16 - 0.63*LogP - 0.0062*MW + 0.066*RotB - 0.74*AP
+        aromatic_atoms = sum(1 for a in mol.GetAtoms() if a.GetIsAromatic())
+        ap = aromatic_atoms / n_atoms if n_atoms > 0 else 0
+        logs = 0.16 - (0.63 * logp) - (0.0062 * mw) + (0.066 * rotb) - (0.74 * ap)
+        sol_mgl = (10 ** logs) * mw * 1000 # Convert LogS (mol/L) to mg/L
+
+        def viol(cond, msg): return [msg] if cond else []
+
+        # Lipinski Ro5 (≤1 violation = pass)
+        lip_v = (viol(mw   > 500,  f"MW {mw} Da > 500")
+               + viol(logp > 5,    f"LogP {logp} > 5")
+               + viol(hbd  > 5,    f"HBD {hbd} > 5")
+               + viol(hba  > 10,   f"HBA {hba} > 10"))
+
+        # Ghose (all must pass)
+        ghose_v = (viol(not 160<=mw<=480,       f"MW {mw} not in [160–480]")
+                 + viol(not -0.4<=logp<=5.6,    f"LogP {logp} not in [-0.4–5.6]")
+                 + viol(not 40<=mr<=130,         f"MR {mr} not in [40–130]")
+                 + viol(not 20<=n_atoms<=70,     f"Atoms {n_atoms} not in [20–70]"))
+
+        # Veber (oral bioavailability)
+        veber_v = (viol(rotb > 10,  f"RotBonds {rotb} > 10")
+                 + viol(tpsa > 140, f"TPSA {tpsa} > 140 Å²"))
+
+        # Egan (passive intestinal absorption)
+        egan_v = (viol(logp > 5.88,  f"LogP {logp} > 5.88")
+                + viol(tpsa > 131.6, f"TPSA {tpsa} > 131.6 Å²"))
+
+        # Muegge (lead-like)
+        muegge_v = (viol(not 200<=mw<=600,     f"MW {mw} not in [200–600]")
+                  + viol(not -2<=logp<=5,       f"LogP {logp} not in [-2–5]")
+                  + viol(tpsa > 150,            f"TPSA {tpsa} > 150 Å²")
+                  + viol(rotb > 15,             f"RotBonds {rotb} > 15")
+                  + viol(hbd > 5,               f"HBD {hbd} > 5")
+                  + viol(hba > 10,              f"HBA {hba} > 10")
+                  + viol(n_atoms < 10,          f"Heavy atoms {n_atoms} < 10"))
+
+        return jsonify({
+            "smiles": decoded,
+            "pains":  {"pass": not pains_matches,
+                       "alerts": [m.GetDescription() for m in pains_matches]},
+            "brenk":  {"pass": not brenk_matches,
+                       "alerts": [m.GetDescription() for m in brenk_matches]},
+            "nih":    {"pass": not nih_matches,
+                       "alerts": [m.GetDescription() for m in nih_matches]},
+            "lipinski": {"pass": len(lip_v) <= 1, "violations": lip_v, "n": len(lip_v)},
+            "ghose":    {"pass": not ghose_v,      "violations": ghose_v},
+            "veber":    {"pass": not veber_v,      "violations": veber_v},
+            "egan":     {"pass": not egan_v,       "violations": egan_v},
+            "muegge":   {"pass": not muegge_v,     "violations": muegge_v},
+            "values": {"mw": mw, "logp": logp, "mr": mr, "hbd": hbd,
+                       "hba": hba, "tpsa": tpsa, "rotb": rotb, "n_atoms": n_atoms},
+            "esol": {
+                "logs": round(logs, 2),
+                "sol_mgl": round(sol_mgl, 2),
+                "category": "Insoluble" if logs < -6 else "Poorly" if logs < -4 else "Moderately" if logs < -2 else "Soluble"
+            }
+        })
+    except Exception as err:
+        print(f"RDKit Filters Error: {err}")
+        return jsonify({"error": str(err)}), 500
+
+
 @app.route("/predict/base64/<string:smiles>", methods=["GET"])
 def predict(smiles: str):
     if not smiles:
@@ -271,116 +466,55 @@ def predict(smiles: str):
     cached = _cache_get(cache_key)
     if cached:
         return cached
-    result = urllib.request.urlopen(
-        f"https://stoptox.mml.unc.edu/predict?smiles={decoded_smiles}", timeout=120
-    ).read()
-    _cache_set(cache_key, result)
-    return result
-
-
-@app.route("/predict/swissadme/base64/<string:smiles>", methods=["GET"])
-def predict_swissadme(smiles: str):
-    if not smiles:
-        return "No Smile to predict", 400
-    decoded_smiles = b64decode(smiles.encode("utf-8")).decode("utf-8")
-    cache_key = f"smilerender:swissadme:{hashlib.md5(decoded_smiles.encode()).hexdigest()}"
-    cached = _cache_get(cache_key)
-    if cached:
-        return cached
-
+    
+    # StopTox logic
     ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
     headers = {
         'User-Agent': ua,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Origin': 'https://www.swissadme.ch',
-        'Referer': 'https://www.swissadme.ch/index.php',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'same-origin',
-        'Sec-Fetch-User': '?1',
     }
-
-    def solve_via_urllib():
+    
+    try:
+        # Step 1: Visit homepage to get potential session cookies/set up environment
         cj = http.cookiejar.CookieJar()
         opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
-        # Step 1: Get session
-        opener.open(urllib.request.Request("https://www.swissadme.ch/index.php", headers=headers), timeout=30)
-        # Step 2: Post
-        data = urllib.parse.urlencode({"smiles": decoded_smiles}).encode("utf-8")
-        req = urllib.request.Request("https://www.swissadme.ch/index.php", data=data, headers=headers, method="POST")
-        with opener.open(req, timeout=120) as resp:
-            content = resp.read()
-            if b"Molecular Weight" in content or b"/results/" in resp.geturl().encode():
-                return content
-        return None
-
-    def solve_via_curl():
-        try:
-            # Replicate the exact successful browser request via curl.exe/curl
-            cmd = [
-                "curl", "-s", "-L",
-                "-X", "POST", "https://www.swissadme.ch/index.php",
-                "-H", f"User-Agent: {ua}",
-                "-H", "Origin: https://www.swissadme.ch",
-                "-H", "Referer: https://www.swissadme.ch/index.php",
-                "-H", "Content-Type: application/x-www-form-urlencoded",
-                "--data-raw", urllib.parse.urlencode({"smiles": decoded_smiles})
-            ]
-            result = subprocess.run(cmd, capture_output=True, timeout=120)
-            if result.returncode == 0 and (b"Molecular Weight" in result.stdout):
-                return result.stdout
-        except Exception as e:
-            print(f"Curl Fallback Error: {e}")
-        return None
-
-    # Try urllib first
-    try:
-        result = solve_via_urllib()
-        if result:
-            _cache_set(cache_key, result)
-            return result
+        opener.open(urllib.request.Request("https://stoptox.mml.unc.edu/", headers=headers), timeout=30)
+        
+        # Step 2: GET request for prediction
+        url = f"https://stoptox.mml.unc.edu/predict?smiles={urllib.parse.quote(decoded_smiles)}"
+        req = urllib.request.Request(url, headers=headers)
+        with opener.open(req, timeout=120) as response:
+            result = response.read()
+            if b"tablePreview" in result:
+                _cache_set(cache_key, result)
+                return result
     except Exception as e:
-        print(f"SwissADME urllib error: {e}")
+        print(f"StopTox Error: {e}")
 
-    # Fallback to curl
-    result = solve_via_curl()
-    if result:
-        _cache_set(cache_key, result)
-        return result
-
-    return "SwissADME prediction failed – possible bot block or service downtime.", 503
+    return "StopTox prediction failed – service might be down or SMILES incompatible.", 503
 
 
 @app.route("/predict/stoplight/base64/<string:smiles>", methods=["GET"])
 def predict_stoplight(smiles: str):
-    try:
-        if not smiles:
-            return f"No Smile to predict"
-        else:
-            decoded_smiles = b64decode(smiles.encode("utf-8")).decode("utf-8")
+    decoded_smiles = b64decode(smiles.encode("utf-8")).decode("utf-8")
+    cache_key = f"smilerender:stoplight:{hashlib.md5(decoded_smiles.encode()).hexdigest()}"
+    cached = _cache_get(cache_key)
+    if cached: return cached
 
+    for attempt in range(3):
+        try:
             # O StopLight agora exige JSON e um objeto 'options'
             payload = {
                 "smiles": decoded_smiles,
                 "options": {
-                    "ALogP": True,
-                    "FSP3": True,
-                    "HBA": True,
-                    "HBD": True,
-                    "Molecular Weight": True,
-                    "Num Heavy Atoms": True,
-                    "Num Saturated Quaternary Carbons": True,
-                    "Number of Rings": True,
-                    "Number of Rotatable Bonds": True,
-                    "Polar Surface Area": True,
-                    "Solubility in Water (mg/L)": True,
-                    "precision": "2"
+                    "ALogP": True, "FSP3": True, "HBA": True, "HBD": True,
+                    "Molecular Weight": True, "Num Heavy Atoms": True,
+                    "Num Saturated Quaternary Carbons": True, "Number of Rings": True,
+                    "Number of Rotatable Bonds": True, "Polar Surface Area": True,
+                    "Solubility in Water (mg/L)": True, "precision": "2"
                 }
             }
-            
             data = json.dumps(payload).encode("utf-8")
-            
             req = urllib.request.Request(
                 "https://stoplight.mml.unc.edu/smiles", 
                 data=data,
@@ -390,100 +524,50 @@ def predict_stoplight(smiles: str):
                 }
             )
 
-            cache_key = f"smilerender:stoplight:{hashlib.md5(decoded_smiles.encode()).hexdigest()}"
-            cached = _cache_get(cache_key)
-            if cached:
-                return cached
             with urllib.request.urlopen(req, timeout=120) as response:
                 result = response.read()
+                if not result: raise Exception("Empty result from StopLight")
+                
             _cache_set(cache_key, result)
             return result
-    except Exception as err:
-        print(f"StopLight Error: {err}")
-        return f"Error connecting to StopLight: {err}", 500
+        except Exception as err:
+            print(f"StopLight Attempt {attempt+1} Error: {err}")
+            if attempt < 2:
+                time.sleep(2)
+                continue
+            return f"Error connecting to StopLight after 3 attempts: {err}", 500
 
 @app.route("/predict/pkcsm/base64/<string:smiles>", methods=["GET"])
 def predict_pkcsm_init(smiles: str):
-    try:
-        decoded_smiles = b64decode(smiles.encode("utf-8")).decode("utf-8")
-        smiles_hash = hashlib.md5(decoded_smiles.encode()).hexdigest()
+    decoded_smiles = b64decode(smiles.encode("utf-8")).decode("utf-8")
+    smiles_hash = hashlib.md5(decoded_smiles.encode()).hexdigest()
 
-        # Usar CookieJar para manter sessão entre init e fetch
-        cj = http.cookiejar.CookieJar()
-        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+    for attempt in range(3):
+        try:
+            cj = http.cookiejar.CookieJar()
+            opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+            params = {"smiles_str": decoded_smiles, "pred_type": "adme"}
+            data = urllib.parse.urlencode(params).encode("utf-8")
+            req = urllib.request.Request(
+                "https://biosig.lab.uq.edu.au/pkcsm/admet_prediction",
+                data=data,
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            )
 
-        params = {"smiles_str": decoded_smiles, "pred_type": "adme"}
-        data = urllib.parse.urlencode(params).encode("utf-8")
-        req = urllib.request.Request(
-            "https://biosig.lab.uq.edu.au/pkcsm/admet_prediction",
-            data=data,
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-        )
+            with opener.open(req, timeout=300) as response:
+                final_url = response.geturl()
+            
+            set_pkcsm_opener(smiles_hash, opener)
+            return jsonify({"result_url": final_url, "smiles_hash": smiles_hash})
+        except Exception as err:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"!!! pkCSM FAILURE for {decoded_smiles} (Attempt {attempt+1}):\n{error_details}")
+            if attempt < 2:
+                time.sleep(3)
+                continue
+            return f"pkCSM failed after 3 attempts. Possible causes: Invalid SMILES or External Server Down. Error: {err}", 500
 
-        with opener.open(req, timeout=60) as response:
-            final_url = response.geturl()
-
-        # Guardar opener para reutilizar cookies nos polls seguintes
-        set_pkcsm_opener(smiles_hash, opener)
-        return jsonify({"result_url": final_url, "smiles_hash": smiles_hash})
-
-    except Exception as err:
-        print(f"pkCSM Init Error: {err}")
-        return f"Error starting pkCSM: {err}", 500
-
-@app.route("/predict/admetlab/base64/<string:smiles>", methods=["GET"])
-def predict_admetlab(smiles: str):
-    try:
-        decoded_smiles = b64decode(smiles.encode("utf-8")).decode("utf-8")
-        
-        cache_key = f"smilerender:admetlab:{hashlib.md5(decoded_smiles.encode()).hexdigest()}"
-        cached = _cache_get(cache_key)
-        if cached:
-            return cached
-
-        # 1. Obter a página inicial para pegar o CSRF token e cookie
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        req_init = urllib.request.Request("https://admetlab3.scbdd.com/server/evaluation", headers=headers)
-
-        cj = http.cookiejar.CookieJar()
-        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
-
-        csrf_token = ""
-        with opener.open(req_init, timeout=30) as response:
-            html_init = response.read().decode('utf-8')
-            match = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', html_init)
-            if match:
-                csrf_token = match.group(1)
-
-        if not csrf_token:
-             return "Could not find CSRF token", 500
-
-        # 2. Fazer o POST com o SMILES
-        params = {
-            "csrfmiddlewaretoken": csrf_token,
-            "smiles": decoded_smiles,
-            "method": "1"
-        }
-        data = urllib.parse.urlencode(params).encode("utf-8")
-        
-        req_post = urllib.request.Request(
-            "https://admetlab3.scbdd.com/server/evaluationCal",
-            data=data,
-            headers={
-                'User-Agent': 'Mozilla/5.0',
-                'Referer': 'https://admetlab3.scbdd.com/server/evaluation',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        )
-        
-        with opener.open(req_post, timeout=60) as response:
-            result = response.read()
-        _cache_set(cache_key, result)
-        return result
-
-    except Exception as err:
-        print(f"ADMETlab Error: {err}")
-        return f"Error connecting to ADMETlab: {err}", 500
 
 @app.route("/predict/pkcsm/fetch", methods=["POST"])
 def predict_pkcsm_fetch():
@@ -499,14 +583,515 @@ def predict_pkcsm_fetch():
         opener = get_pkcsm_opener(smiles_hash)
 
         if opener:
-            with opener.open(req, timeout=60) as response:
+            with opener.open(req, timeout=300) as response:
                 return response.read()
         else:
-            with urllib.request.urlopen(req, timeout=60) as response:
+            with urllib.request.urlopen(req, timeout=120) as response:
                 return response.read()
     except Exception as err:
         print(f"pkCSM Fetch Error: {err}")
         return f"Error fetching pkCSM results: {err}", 500
+
+@app.route("/export/report", methods=["POST"])
+def export_report():
+    """Generate a professional enterprise-grade ADMET PDF report with automated interpretation."""
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.platypus import (
+            SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+            HRFlowable, KeepTogether, Image as RLImage, PageBreak,
+        )
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
+        from rdkit import Chem
+        from rdkit.Chem import Draw
+        import io as _io
+        import datetime
+        from collections import OrderedDict
+
+        raw = request.get_json()
+        if not raw:
+            return "No data provided", 400
+
+        # ── Palette ────────────────────────────────────────────────────────────
+        BRAND_BLUE    = colors.HexColor("#1a3a5c")
+        ACCENT_GREEN  = colors.HexColor("#16a34a")
+        LIGHT_GRAY    = colors.HexColor("#f8f9fa")
+        MID_GRAY      = colors.HexColor("#dee2e6")
+        TEXT_DARK     = colors.HexColor("#1e293b")
+        TEXT_MID      = colors.HexColor("#475569")
+
+        TOOL_COLORS = {
+            "StopTox":      colors.HexColor("#b45309"),
+            "StopLight":    colors.HexColor("#1d4ed8"),
+            "pkCSM":        ACCENT_GREEN,
+            "RDKit Filters": colors.HexColor("#0d9488"),
+        }
+        FLAG_COLORS = {
+            "critical": colors.HexColor("#7f1d1d"),
+            "high":     colors.HexColor("#dc2626"),
+            "medium":   colors.HexColor("#d97706"),
+            "low":      colors.HexColor("#16a34a"),
+        }
+        FLAG_BG = {
+            "critical": colors.HexColor("#fef2f2"),
+            "high":     colors.HexColor("#fff1f1"),
+            "medium":   colors.HexColor("#fffbeb"),
+            "low":      colors.HexColor("#f0fdf4"),
+        }
+        FLAG_ICON = {"critical": "[!!]", "high": "[!]", "medium": "[~]", "low": "[ok]"}
+
+        # ── Styles ─────────────────────────────────────────────────────────────
+        base = getSampleStyleSheet()
+
+        def ps(name, parent="Normal", **kw):
+            return ParagraphStyle(name, parent=base[parent], **kw)
+
+        sTitle      = ps("sTitle",    "Title", fontSize=26, textColor=BRAND_BLUE,
+                         spaceAfter=4, leading=30, alignment=TA_CENTER)
+        sSubtitle   = ps("sSubtitle", fontSize=11, textColor=TEXT_MID,
+                         alignment=TA_CENTER, spaceAfter=2)
+        sMeta       = ps("sMeta",     fontSize=9, textColor=TEXT_MID,
+                         alignment=TA_CENTER, spaceAfter=6)
+        sSection    = ps("sSection",  "Heading1", fontSize=13, textColor=BRAND_BLUE,
+                         spaceBefore=14, spaceAfter=4, leading=16)
+        sTool       = ps("sTool",     "Heading2", fontSize=11, textColor=colors.white,
+                         spaceBefore=8, spaceAfter=4, leading=14)
+        sCategory   = ps("sCategory", "Heading3", fontSize=9, textColor=BRAND_BLUE,
+                         spaceBefore=6, spaceAfter=2, leading=12, fontName="Helvetica-Bold")
+        sBody       = ps("sBody",     fontSize=8, textColor=TEXT_DARK, leading=11)
+        sBodyJ      = ps("sBodyJ",    fontSize=8, textColor=TEXT_DARK, leading=12,
+                         alignment=TA_JUSTIFY)
+        sSmall      = ps("sSmall",    fontSize=7, textColor=TEXT_MID, leading=9)
+        sFooter     = ps("sFooter",   fontSize=7, textColor=TEXT_MID, alignment=TA_CENTER)
+        sNarrative  = ps("sNarr",     fontSize=8.5, textColor=TEXT_DARK, leading=13,
+                         alignment=TA_JUSTIFY, spaceBefore=4, spaceAfter=4,
+                         leftIndent=6, rightIndent=6)
+        sInterpHdr  = ps("sIntHdr",   fontSize=10, textColor=BRAND_BLUE,
+                         fontName="Helvetica-Bold", spaceBefore=8, spaceAfter=4)
+        sFlag       = ps("sFlag",     fontSize=8, textColor=TEXT_DARK, leading=11)
+
+        # ── Organise data: smiles → tool → category → rows ─────────────────────
+        organised  = OrderedDict()
+        mol_names  = {}   # {smiles: display_name}
+        for row in raw:
+            smi  = row.get("SMILES", "")
+            tool = row.get("Tool", "Unknown")
+            cat  = row.get("Category", "General")
+            name = row.get("Name", "").strip()
+            if smi not in organised:
+                organised[smi] = OrderedDict()
+            if tool not in organised[smi]:
+                organised[smi][tool] = OrderedDict()
+            if cat not in organised[smi][tool]:
+                organised[smi][tool][cat] = []
+            organised[smi][tool][cat].append(row)
+            if name and smi not in mol_names:
+                mol_names[smi] = name
+
+        # ── Run interpretation for every molecule ──────────────────────────────
+        profiles = {smi: interpret(smi, tools) for smi, tools in organised.items()}
+
+        now      = datetime.datetime.now()
+        story    = []
+        W, _H    = A4
+        usable_w = W - 4 * cm
+
+        # ── Helper: coloured tool header ───────────────────────────────────────
+        def tool_header(tool_name):
+            col = TOOL_COLORS.get(tool_name, BRAND_BLUE)
+            t = Table([[Paragraph(tool_name, sTool)]], colWidths=[usable_w])
+            t.setStyle(TableStyle([
+                ("BACKGROUND",    (0,0), (-1,-1), col),
+                ("TOPPADDING",    (0,0), (-1,-1), 5),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+                ("LEFTPADDING",   (0,0), (-1,-1), 10),
+            ]))
+            return t
+
+        # ── Helper: data table ─────────────────────────────────────────────────
+        def data_table(rows, tool_name):
+            col = TOOL_COLORS.get(tool_name, BRAND_BLUE)
+            hdr = [Paragraph(h, ps(f"th{tool_name}", fontSize=8, textColor=colors.white,
+                                   fontName="Helvetica-Bold"))
+                   for h in ["Property", "Value", "Unit"]]
+            data = [hdr]
+            for r in rows:
+                data.append([
+                    Paragraph(str(r.get("Property", "")), sBody),
+                    Paragraph(str(r.get("Value", "")),
+                              ps(f"tv{tool_name}", fontSize=8, textColor=TEXT_DARK,
+                                 fontName="Helvetica-Bold")),
+                    Paragraph(str(r.get("Unit", "-")), sSmall),
+                ])
+            t = Table(data, colWidths=[usable_w * 0.55, usable_w * 0.30, usable_w * 0.15])
+            t.setStyle(TableStyle([
+                ("BACKGROUND",     (0,0), (-1,0),  col),
+                ("TEXTCOLOR",      (0,0), (-1,0),  colors.white),
+                ("ROWBACKGROUNDS", (0,1), (-1,-1), [LIGHT_GRAY, colors.white]),
+                ("GRID",           (0,0), (-1,-1), 0.3, MID_GRAY),
+                ("TOPPADDING",     (0,0), (-1,-1), 3),
+                ("BOTTOMPADDING",  (0,0), (-1,-1), 3),
+                ("LEFTPADDING",    (0,0), (-1,-1), 6),
+                ("FONTSIZE",       (0,0), (-1,-1), 8),
+            ]))
+            return t
+
+        # ── Helper: molecule image ─────────────────────────────────────────────
+        def mol_image(smi, size=160):
+            try:
+                mol = Chem.MolFromSmiles(smi)
+                if mol is None:
+                    return None
+                pil = Draw.MolToImage(mol, size=(size, size))
+                buf = _io.BytesIO()
+                pil.save(buf, format="PNG")
+                buf.seek(0)
+                return RLImage(buf, width=size * 0.4, height=size * 0.4)
+            except Exception:
+                return None
+
+        # ── Helper: risk badge (small coloured pill) ───────────────────────────
+        def risk_badge(level: str):
+            label = RISK_LABEL.get(level, level.title())
+            col   = FLAG_COLORS.get(level, BRAND_BLUE)
+            t = Table([[Paragraph(label, ps(f"rb{level}", fontSize=9, textColor=colors.white,
+                                            fontName="Helvetica-Bold", alignment=TA_CENTER))]],
+                      colWidths=[3.5 * cm])
+            t.setStyle(TableStyle([
+                ("BACKGROUND",    (0,0), (-1,-1), col),
+                ("TOPPADDING",    (0,0), (-1,-1), 4),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+                ("LEFTPADDING",   (0,0), (-1,-1), 8),
+                ("RIGHTPADDING",  (0,0), (-1,-1), 8),
+            ]))
+            return t
+
+        # ── Helper: interpretation block ───────────────────────────────────────
+        def interpretation_block(profile):
+            """Returns a list of flowables for the Interpretation section."""
+            blk = []
+            lvl = profile.overall
+
+            # Header bar with risk level
+            hdr_col = FLAG_COLORS.get(lvl, BRAND_BLUE)
+            hdr_txt = f"Interpretation  ·  {RISK_LABEL.get(lvl, lvl.title())}"
+            hdr_tbl = Table(
+                [[Paragraph(hdr_txt, ps(f"ih{lvl}", fontSize=10, textColor=colors.white,
+                                        fontName="Helvetica-Bold"))],],
+                colWidths=[usable_w]
+            )
+            hdr_tbl.setStyle(TableStyle([
+                ("BACKGROUND",    (0,0), (-1,-1), hdr_col),
+                ("TOPPADDING",    (0,0), (-1,-1), 6),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+                ("LEFTPADDING",   (0,0), (-1,-1), 10),
+            ]))
+            blk.append(hdr_tbl)
+
+            # Narrative paragraph
+            blk.append(Spacer(1, 0.2 * cm))
+            blk.append(Paragraph(profile.narrative, sNarrative))
+            blk.append(Spacer(1, 0.25 * cm))
+
+            # Flags table — only non-low flags unless there are very few
+            show_flags = [f for f in profile.flags if f.level != "low"]
+            positives  = [f for f in profile.flags if f.level == "low"]
+
+            if show_flags:
+                flag_data = [[
+                    Paragraph("Risk", ps("fh1", fontSize=8, textColor=colors.white,
+                                         fontName="Helvetica-Bold")),
+                    Paragraph("Source", ps("fh2", fontSize=8, textColor=colors.white,
+                                           fontName="Helvetica-Bold")),
+                    Paragraph("Finding", ps("fh3", fontSize=8, textColor=colors.white,
+                                            fontName="Helvetica-Bold")),
+                ]]
+                style_cmds = [
+                    ("BACKGROUND",    (0,0), (-1,0),  BRAND_BLUE),
+                    ("GRID",          (0,0), (-1,-1), 0.3, MID_GRAY),
+                    ("TOPPADDING",    (0,0), (-1,-1), 3),
+                    ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+                    ("LEFTPADDING",   (0,0), (-1,-1), 6),
+                    ("VALIGN",        (0,0), (-1,-1), "TOP"),
+                ]
+                for i, f in enumerate(show_flags, 1):
+                    icon  = FLAG_ICON.get(f.level, "·")
+                    fcol  = FLAG_COLORS.get(f.level, TEXT_DARK)
+                    bg    = FLAG_BG.get(f.level, colors.white)
+                    flag_data.append([
+                        Paragraph(f"{icon} {f.level.upper()}",
+                                  ps(f"fl{i}", fontSize=7, textColor=fcol,
+                                     fontName="Helvetica-Bold")),
+                        Paragraph(f.tool, ps(f"fs{i}", fontSize=7, textColor=TEXT_MID)),
+                        Paragraph(f.text, ps(f"ff{i}", fontSize=7.5, textColor=TEXT_DARK,
+                                             leading=10)),
+                    ])
+                    style_cmds.append(("BACKGROUND", (0,i), (-1,i), bg))
+
+                ft = Table(flag_data,
+                           colWidths=[usable_w * 0.13, usable_w * 0.17, usable_w * 0.70])
+                ft.setStyle(TableStyle(style_cmds))
+                blk.append(ft)
+                blk.append(Spacer(1, 0.15 * cm))
+
+            # Positive findings summary (condensed)
+            if positives:
+                pos_text = "  ·  ".join(
+                    f"🟢 {f.text}" for f in positives[:6]
+                )
+                if len(positives) > 6:
+                    pos_text += f"  ·  … +{len(positives)-6} more"
+                blk.append(Paragraph(pos_text,
+                                     ps("posf", fontSize=7, textColor=colors.HexColor("#15803d"),
+                                        leading=11)))
+                blk.append(Spacer(1, 0.15 * cm))
+
+            return blk
+
+        # ══════════════════════════════════════════════════════════════════════
+        # COVER PAGE
+        # ══════════════════════════════════════════════════════════════════════
+        story.append(Spacer(1, 2.5 * cm))
+        story.append(Paragraph("ADMET Profiling Report", sTitle))
+        story.append(Paragraph("Multi-Engine Computational ADMET Analysis with Automated Interpretation", sSubtitle))
+        story.append(Spacer(1, 0.4 * cm))
+        story.append(HRFlowable(width=usable_w, thickness=2, color=BRAND_BLUE))
+        story.append(Spacer(1, 0.4 * cm))
+        story.append(Paragraph(
+            f"Generated: {now.strftime('%B %d, %Y  |  %H:%M')}  ·  "
+            f"Molecules: {len(organised)}  ·  "
+            "Tools: RDKit Filters · StopTox · StopLight · pkCSM",
+            sMeta
+        ))
+        story.append(Spacer(1, 1.2 * cm))
+
+        # Tool legend
+        leg_data = [[Paragraph(t, ps(f"leg{t}", fontSize=9, textColor=colors.white,
+                                      alignment=TA_CENTER, fontName="Helvetica-Bold"))
+                     for t in ["RDKit Filters", "StopTox", "StopLight", "pkCSM"]]]
+        leg = Table(leg_data, colWidths=[usable_w / 4] * 4)
+        leg.setStyle(TableStyle([
+            ("BACKGROUND",    (0,0), (0,0), colors.HexColor("#0d9488")),
+            ("BACKGROUND",    (1,0), (1,0), TOOL_COLORS["StopTox"]),
+            ("BACKGROUND",    (2,0), (2,0), TOOL_COLORS["StopLight"]),
+            ("BACKGROUND",    (3,0), (3,0), TOOL_COLORS["pkCSM"]),
+            ("TOPPADDING",    (0,0), (-1,-1), 8),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 8),
+            ("INNERGRID",     (0,0), (-1,-1), 1, colors.white),
+        ]))
+        story.append(leg)
+        story.append(Spacer(1, 0.8 * cm))
+
+        # ── Executive Summary table ────────────────────────────────────────────
+        story.append(Paragraph("Executive Summary", sSection))
+        has_names = bool(mol_names)
+        exec_cols = ["#", "Name", "SMILES", "Overall Risk", "Critical", "High", "Medium"] if has_names \
+                    else ["#", "SMILES", "Overall Risk", "Critical", "High", "Medium"]
+        exec_hdr = [Paragraph(h, ps(f"eh{h}", fontSize=8, textColor=colors.white,
+                                     fontName="Helvetica-Bold"))
+                    for h in exec_cols]
+        exec_rows = [exec_hdr]
+        for n, (smi, _) in enumerate(organised.items(), 1):
+            prof  = profiles[smi]
+            rlvl  = prof.overall
+            rcol  = FLAG_COLORS.get(rlvl, BRAND_BLUE)
+            rbg   = FLAG_BG.get(rlvl, colors.white)
+            nc    = sum(1 for f in prof.flags if f.level == "critical")
+            nh    = sum(1 for f in prof.flags if f.level == "high")
+            nm    = sum(1 for f in prof.flags if f.level == "medium")
+            base_row = [Paragraph(str(n), sBody)]
+            if has_names:
+                base_row.append(Paragraph(mol_names.get(smi, "—"), sBody))
+            base_row += [
+                Paragraph(smi[:45] + ("…" if len(smi) > 45 else ""), sSmall),
+                Paragraph(RISK_LABEL.get(rlvl, rlvl.title()),
+                          ps(f"rl{n}", fontSize=8, textColor=colors.white,
+                             fontName="Helvetica-Bold", alignment=TA_CENTER)),
+                Paragraph(str(nc) if nc else "—",
+                          ps(f"nc{n}", fontSize=8, fontName="Helvetica-Bold",
+                             textColor=FLAG_COLORS["critical"] if nc else TEXT_MID,
+                             alignment=TA_CENTER)),
+                Paragraph(str(nh) if nh else "—",
+                          ps(f"nh{n}", fontSize=8, fontName="Helvetica-Bold",
+                             textColor=FLAG_COLORS["high"] if nh else TEXT_MID,
+                             alignment=TA_CENTER)),
+                Paragraph(str(nm) if nm else "—",
+                          ps(f"nm{n}", fontSize=8,
+                             textColor=FLAG_COLORS["medium"] if nm else TEXT_MID,
+                             alignment=TA_CENTER)),
+            ]
+            exec_rows.append(base_row)
+
+        exec_style = [
+            ("BACKGROUND",    (0,0), (-1,0), BRAND_BLUE),
+            ("GRID",          (0,0), (-1,-1), 0.3, MID_GRAY),
+            ("TOPPADDING",    (0,0), (-1,-1), 4),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+            ("LEFTPADDING",   (0,0), (-1,-1), 5),
+            ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+        ]
+        for n, (smi, _) in enumerate(organised.items(), 1):
+            rlvl = profiles[smi].overall
+            rcol = FLAG_COLORS.get(rlvl, BRAND_BLUE)
+            rbg  = FLAG_BG.get(rlvl, colors.white)
+            exec_style.append(("BACKGROUND", (2, n), (2, n), rcol))
+            exec_style.append(("ROWBACKGROUNDS", (0, n), (1, n), [
+                LIGHT_GRAY if n % 2 == 0 else colors.white]))
+
+        if has_names:
+            exec_col_w = [0.8*cm, usable_w*0.20, usable_w*0.32, usable_w*0.16,
+                          usable_w*0.10, usable_w*0.10, usable_w*0.10]
+        else:
+            exec_col_w = [0.8*cm, usable_w*0.50, usable_w*0.18,
+                          usable_w*0.10, usable_w*0.10, usable_w*0.10]
+        et = Table(exec_rows, colWidths=exec_col_w)
+        et.setStyle(TableStyle(exec_style))
+        story.append(et)
+        story.append(Spacer(1, 0.3 * cm))
+
+        # Risk legend
+        legend_row = []
+        for lvl in ("critical", "high", "medium", "low"):
+            legend_row.append(
+                Paragraph(f"{FLAG_ICON[lvl]}  {RISK_LABEL[lvl]}",
+                          ps(f"ll{lvl}", fontSize=7, textColor=FLAG_COLORS[lvl],
+                             alignment=TA_CENTER))
+            )
+        lt = Table([legend_row], colWidths=[usable_w / 4] * 4)
+        lt.setStyle(TableStyle([("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2)]))
+        story.append(lt)
+
+        story.append(PageBreak())
+
+        # ══════════════════════════════════════════════════════════════════════
+        # PER-MOLECULE SECTIONS
+        # ══════════════════════════════════════════════════════════════════════
+        tool_order = ["RDKit Filters", "StopTox", "StopLight", "pkCSM"]
+
+        for mol_idx, (smi, tools) in enumerate(organised.items(), 1):
+            story.append(HRFlowable(width=usable_w, thickness=1.5, color=BRAND_BLUE))
+
+            # Molecule heading + 2D structure
+            img = mol_image(smi)
+            mol_label = mol_names.get(smi, "")
+            heading_title = f"Molecule {mol_idx}" + (f"  —  {mol_label}" if mol_label else "")
+            heading_paras = [
+                Paragraph(heading_title, sSection),
+                Paragraph(smi, ps("smilesCode", fontSize=8.5, textColor=TEXT_MID,
+                                  fontName="Courier", leading=12)),
+            ]
+            if img:
+                mol_tbl = Table(
+                    [[heading_paras, img]],
+                    colWidths=[usable_w - 6.5*cm, 6.5*cm]
+                )
+                mol_tbl.setStyle(TableStyle([
+                    ("VALIGN",       (0,0), (-1,-1), "TOP"),
+                    ("TOPPADDING",   (0,0), (-1,-1), 0),
+                    ("LEFTPADDING",  (0,0), (-1,-1), 0),
+                    ("RIGHTPADDING", (0,0), (-1,-1), 0),
+                ]))
+                story.append(mol_tbl)
+            else:
+                for para in heading_paras:
+                    story.append(para)
+
+            # ── Interpretation ────────────────────────────────────────────────
+            story.append(Spacer(1, 0.3 * cm))
+            for item in interpretation_block(profiles[smi]):
+                story.append(item)
+
+            # ── Raw data per tool ─────────────────────────────────────────────
+            for tool in tool_order:
+                if tool not in tools:
+                    continue
+                cats = tools[tool]
+                block = [Spacer(1, 0.3*cm), tool_header(tool)]
+                for cat, rows in cats.items():
+                    block.append(Paragraph(cat, sCategory))
+                    block.append(data_table(rows, tool))
+                    block.append(Spacer(1, 0.2*cm))
+                story.append(KeepTogether(block[:6]))
+                for item in block[6:]:
+                    story.append(item)
+
+            if mol_idx < len(organised):
+                story.append(PageBreak())
+
+        # ══════════════════════════════════════════════════════════════════════
+        # METHODOLOGY
+        # ══════════════════════════════════════════════════════════════════════
+        story.append(Spacer(1, 0.8*cm))
+        story.append(HRFlowable(width=usable_w, thickness=2, color=BRAND_BLUE))
+        story.append(Paragraph("Methodology", sSection))
+        methods = [
+            ("StopTox",      "In silico acute toxicity predictions (oral, dermal, inhalation LD50/LC50) via the UNC MML StopTox server. GHS hazard classification applied."),
+            ("StopLight",    "Drug-likeness and pharmacokinetic profiling via the UNC MML StopLight server. Lipinski Rule of 5, Veber and Egan rules evaluated."),
+            ("pkCSM",        "Comprehensive ADME + toxicity predictions (absorption, distribution, metabolism, excretion, AMES, hERG, hepatotoxicity) via the pkCSM server (University of Queensland)."),
+            ("ProTox-3.0",   "Toxicity prediction across 12 endpoints (DILI, neurotoxicity, nephrotoxicity, carcinogenicity, mutagenicity, BBB permeability, etc.) via the ProTox-3.0 server (Charité Berlin)."),
+        ]
+        for tool, desc in methods:
+            col = TOOL_COLORS.get(tool, BRAND_BLUE)
+            t = Table([[Paragraph(f"<b>{tool}</b> — {desc}", sBody)]], colWidths=[usable_w])
+            t.setStyle(TableStyle([
+                ("LEFTBORDERPADDING", (0,0), (-1,-1), 4),
+                ("LEFTPADDING",       (0,0), (-1,-1), 8),
+                ("TOPPADDING",        (0,0), (-1,-1), 4),
+                ("BOTTOMPADDING",     (0,0), (-1,-1), 4),
+                ("LINEAFTER",         (0,0), (0,-1),  0, colors.white),
+                ("LINEBEFORE",        (0,0), (0,-1),  3, col),
+            ]))
+            story.append(t)
+            story.append(Spacer(1, 0.15*cm))
+
+        story.append(Spacer(1, 0.4*cm))
+        story.append(Paragraph(
+            "Disclaimer: All predictions are computational estimates generated for research "
+            "purposes only. They do not constitute regulatory advice and should be validated "
+            "by experimental studies before use in any decision-making process.",
+            ps("disc", fontSize=7, textColor=TEXT_MID, alignment=TA_JUSTIFY, leading=10)
+        ))
+        story.append(Spacer(1, 0.3*cm))
+        story.append(Paragraph(
+            f"Report generated by SmileRender · {now.strftime('%Y-%m-%d %H:%M')}",
+            sFooter
+        ))
+
+        # ── Build PDF ─────────────────────────────────────────────────────────
+        buf = _io.BytesIO()
+
+        def footer_canvas(canvas, doc):
+            canvas.saveState()
+            canvas.setFont("Helvetica", 7)
+            canvas.setFillColor(TEXT_MID)
+            canvas.drawCentredString(
+                W / 2, 1.2*cm,
+                f"SmileRender · ADMET Report · {now.strftime('%Y-%m-%d')} · Page {doc.page}"
+            )
+            canvas.restoreState()
+
+        doc = SimpleDocTemplate(
+            buf, pagesize=A4,
+            leftMargin=2*cm, rightMargin=2*cm,
+            topMargin=2.2*cm, bottomMargin=2.2*cm,
+            title="ADMET Profiling Report",
+            author="SmileRender",
+        )
+        doc.build(story, onFirstPage=footer_canvas, onLaterPages=footer_canvas)
+        buf.seek(0)
+
+        filename = f"ADMET_Report_{now.strftime('%Y%m%d_%H%M')}.pdf"
+        return send_file(buf, mimetype="application/pdf",
+                         as_attachment=True, download_name=filename)
+
+    except Exception as err:
+        print(f"Report Export Error: {err}")
+        import traceback; traceback.print_exc()
+        return f"Error generating report: {err}", 500
+
 
 @app.route("/export/excel", methods=["POST"])
 def export_excel():
@@ -526,7 +1111,10 @@ def export_excel():
              return f"Exceeded the limit of {MAX_SMILES} unique SMILES for export!", 413
         
         # Garantir colunas padrão
-        for col in ["SMILES", "Tool", "Category", "Property", "Value", "Unit"]:
+        base_cols = ["SMILES", "Tool", "Category", "Property", "Value", "Unit"]
+        if "Name" in df_detailed.columns:
+            base_cols = ["Name"] + base_cols
+        for col in base_cols:
             if col not in df_detailed.columns:
                 df_detailed[col] = "-"
 

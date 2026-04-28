@@ -1,69 +1,64 @@
 export function getDelimiter(text: string): string {
   text = text.trim();
-  const symbols = text
-    .replace(/[A-Za-z0-9=\-#\(\)\[\]\/:@ \s]/g, '')
-    .replace('\n', '')
-    .split('');
-
-  const symbolsCount: Record<string, number> = {};
-  for (const symbol of symbols) {
-    if (symbolsCount[symbol]) symbolsCount[symbol] += 1;
-    else symbolsCount[symbol] = 1;
+  if (!text) return ',';
+  const firstLine = text.split('\n')[0];
+  const counts: Record<string, number> = { ',': 0, ';': 0, '\t': 0 };
+  let inQ = false;
+  for (let i = 0; i < firstLine.length; i++) {
+    if (firstLine[i] === '"') inQ = !inQ;
+    if (!inQ && firstLine[i] in counts) counts[firstLine[i]]++;
   }
-
-  let mostFrequestSimbol = '';
-  let frequentSymbolCount = 0;
-  for (const symbol of Object.keys(symbolsCount)) {
-    if (symbolsCount[symbol] >= frequentSymbolCount) {
-      mostFrequestSimbol = symbol;
-      frequentSymbolCount = symbolsCount[symbol];
-    }
-  }
-
-  return mostFrequestSimbol;
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
 }
 
-function splitCsvLine(line: string, delimiter: string): string[] {
-  const strings: string[] = [];
+export function parseCSV(text: string, delimiter?: string): string[][] {
+  const delim = delimiter || getDelimiter(text);
+  const rows: string[][] = [];
+  let currentRow: string[] = [];
+  let currentField = '';
   let insideQuotes = false;
+  
+  // Normalize line endings
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
 
-  let buffer = '';
-  for (const c of line) {
-    if (c === "'" || c === '"') {
-      insideQuotes = !insideQuotes;
-      continue;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    
+    if (c === '"') {
+      if (insideQuotes && text[i + 1] === '"') {
+        currentField += '"';
+        i++;
+      } else {
+        insideQuotes = !insideQuotes;
+      }
+    } else if (c === delim && !insideQuotes) {
+      currentRow.push(currentField.trim());
+      currentField = '';
+    } else if (c === '\n' && !insideQuotes) {
+      currentRow.push(currentField.trim());
+      rows.push(currentRow);
+      currentRow = [];
+      currentField = '';
+    } else {
+      currentField += c;
     }
-
-    if (c === delimiter && !insideQuotes) {
-      strings.push(buffer);
-      buffer = '';
-      continue;
-    }
-
-    buffer = buffer + c;
+  }
+  
+  currentRow.push(currentField.trim());
+  if (currentRow.length > 0 && currentRow.some(c => c !== '')) {
+    rows.push(currentRow);
   }
 
-  strings.push(buffer);
-  return strings;
-}
-
-export function parseCSV(text: string, delimiter: string): string[][] {
-  const lines = text.split('\n');
-  const columns: string[][] = [];
-  for (const line of lines)
-    if (line) columns.push(splitCsvLine(line, delimiter));
-
-  return columns;
+  return rows;
 }
 
 export function getCSVColumn(csvData: string[][], name: string): string[] {
-  const index = csvData[0].indexOf(name);
-  if (index === -1) return [];
+  const header = csvData[0];
+  const colIndex = header.indexOf(name);
+  if (colIndex === -1) return [];
+  return csvData.slice(1).map((row) => row[colIndex] || '');
+}
 
-  return csvData
-    .map((row) => row[index])
-    .filter((cell) => {
-      if (cell === name) return null;
-      return cell;
-    });
+export function autoDetect(headers: string[], pattern: RegExp): string {
+  return headers.find(h => pattern.test(h)) ?? '';
 }

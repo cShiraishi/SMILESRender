@@ -208,7 +208,7 @@ function PeptideContent() {
                             border: '1px solid #fef3c7', color: '#92400e', fontSize: '14px', lineHeight: 1.6
                          }}>
                             <h4 style={{ margin: '0 0 10px', fontSize: '15px' }}>🧬 Bi-Structural Intelligence</h4>
-                            Processing engine: <b>PepLink 1.0</b>.
+                            Processing engine: <b>PepLink v0.1.0</b>.
                             <br/><br/>
                             {mode === 'seq-to-smiles' ? (
                                 <>Converts peptide sequences (canonical and non-canonical) into precise molecular topologies for drug design.</>

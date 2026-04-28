@@ -49,7 +49,7 @@ function Prediction(props: { smiles: string; onDataLoaded?: (data: any[]) => voi
   useEffect(() => {
     setIsLoading(true);
 
-    const worker = new Worker(new URL('../workers/prediction.worker.ts', import.meta.url));
+    const worker = new Worker(new URL('./prediction.worker.js', import.meta.url));
     
     worker.onmessage = (e) => {
         const { html, status, error } = e.data;
@@ -101,8 +101,10 @@ function Prediction(props: { smiles: string; onDataLoaded?: (data: any[]) => voi
         } else {
             console.error('Worker Error:', error);
             setIsError(true);
+            setIsLoading(false);
+            if (props.onDataLoaded) props.onDataLoaded([]);
         }
-        
+
         worker.terminate();
     };
 

@@ -14,7 +14,7 @@ const tableStyle: React.CSSProperties = {
   width: '100%',
   borderCollapse: 'collapse',
   fontSize: '13px',
-  marginTop: '10px'
+  marginTop: '10px',
 };
 
 const thStyle: React.CSSProperties = {
@@ -22,150 +22,75 @@ const thStyle: React.CSSProperties = {
   border: '1px solid #dee2e6',
   padding: '8px',
   textAlign: 'left',
-  fontWeight: 'bold'
+  fontWeight: 'bold',
 };
 
 const tdStyle: React.CSSProperties = {
   border: '1px solid #dee2e6',
   padding: '8px',
-  textAlign: 'left'
+  textAlign: 'left',
 };
 
 function PKCSM(props: { smiles: string; onDataLoaded?: (data: any[]) => void }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isError, setIsError] = useState<boolean>(false);
   const [results, setResults] = useState<any[]>([]);
-  const [status, setStatus] = useState<string>("Iniciando predição...");
-  const pollInterval = useRef<any>(null);
-  const resultUrl = useRef<string>("");
-  const smilesHash = useRef<string>("");
-  const pollCount = useRef<number>(0);
-  const MAX_POLLS = 20; // 60 s max (20 × 3 s)
-
-  const stopPolling = () => {
-    if (pollInterval.current) {
-      clearInterval(pollInterval.current);
-      pollInterval.current = null;
-    }
-  };
-
-  const fetchResults = async () => {
-    pollCount.current += 1;
-    if (pollCount.current > MAX_POLLS) {
-      stopPolling();
-      setIsLoading(false);
-      setStatus("Tempo esgotado");
-      if (props.onDataLoaded) props.onDataLoaded([]);
-      return;
-    }
-    try {
-      const response = await fetch('/predict/pkcsm/fetch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: resultUrl.current, smiles_hash: smilesHash.current })
-      });
-
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      
-      const html = await response.text();
-      // Sanitizar o HTML contra scripts e anúncios externos
-      const cleanHtml = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-                            .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
-
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(cleanHtml, 'text/html');
-      
-      // O pkCSM tem os resultados na segunda tabela da classe especificada
-      const tables = doc.querySelectorAll('.table.table-hover.table-striped');
-      const targetTable = tables.length > 1 ? tables[1] : tables[0];
-
-      if (!targetTable) {
-        setStatus("Aguardando tabela de resultados...");
-        return;
-      }
-
-      const rows = targetTable.querySelectorAll('tbody tr');
-      const extractedResults: any[] = [];
-      let allReady = true;
-
-      rows.forEach((row) => {
-        const cells = row.querySelectorAll('td');
-        if (cells.length >= 4) {
-          const predValue = cells[2].innerText.trim();
-          if (predValue.toLowerCase().includes("running")) {
-            allReady = false;
-          }
-          
-          extractedResults.push({
-            property: cells[0].innerText.trim(),
-            model: cells[1].innerText.trim(),
-            value: predValue,
-            unit: cells[3].innerText.trim()
-          });
-        }
-      });
-
-      if (extractedResults.length > 0) {
-        setResults(extractedResults);
-        if (allReady) {
-          setIsLoading(false);
-          stopPolling();
-          
-          // Finalizar exportação quando tudo estiver carregado
-          if (props.onDataLoaded) {
-              props.onDataLoaded(extractedResults.map(p => ({
-                  SMILES: props.smiles,
-                  Tool: "pkCSM",
-                  Category: p.property,
-                  Property: p.model,
-                  Value: p.value,
-                  Unit: p.unit
-              })));
-          }
-        } else {
-          setStatus("Processando modelos ADMET...");
-        }
-      }
-    } catch (err) {
-      console.error('pkCSM Fetch Error:', err);
-      // Não parar o polling no primeiro erro, pode ser oscilação, mas marcar erro se persistir?
-    }
-  };
+  const [status, setStatus] = useState<string>('Conectando ao pkCSM...');
+  const workerRef = useRef<Worker | null>(null);
 
   useEffect(() => {
     setIsLoading(true);
     setIsError(false);
     setResults([]);
-    pollCount.current = 0;
-    setStatus("Conectando ao pkCSM...");
+    setStatus('Conectando ao pkCSM...');
 
-    // 1. Inicializar a predição e pegar a URL única
-    fetch(`/predict/pkcsm/base64/${encodeURIComponent(window.btoa(props.smiles))}`)
-      .then(res => {
-        if (!res.ok) throw new Error("Falha ao iniciar pkCSM");
-        return res.json();
-      })
-      .then(data => {
-        if (data.result_url) {
-          resultUrl.current = data.result_url;
-          smilesHash.current = data.smiles_hash || "";
-          setStatus("Predição iniciada. Aguardando resultados...");
-          
-          // 2. Começar a poll os resultados
-          pollInterval.current = setInterval(fetchResults, 3000);
-          fetchResults(); // Primeira chamada imediata
-        } else {
-          throw new Error("URL de resultado não encontrada");
+    workerRef.current?.terminate();
+    const worker = new Worker(new URL('./pkcsm.worker.js', import.meta.url));
+    workerRef.current = worker;
+
+    worker.onmessage = (e) => {
+      const { status: wStatus, results: wResults, message, error } = e.data;
+
+      if (wStatus === 'started') {
+        setStatus(message);
+      } else if (wStatus === 'waiting') {
+        setStatus(message);
+      } else if (wStatus === 'partial') {
+        setResults(wResults);
+        setStatus(message);
+      } else if (wStatus === 'done') {
+        setResults(wResults);
+        setIsLoading(false);
+        if (props.onDataLoaded) {
+          props.onDataLoaded(
+            wResults.map((p: any) => ({
+              SMILES: props.smiles,
+              Tool: 'pkCSM',
+              Category: p.property,
+              Property: p.model,
+              Value: p.value,
+              Unit: p.unit,
+            }))
+          );
         }
-      })
-      .catch(err => {
-        console.error("pkCSM Init Error:", err);
+        worker.terminate();
+      } else if (wStatus === 'timeout') {
+        setIsLoading(false);
+        setStatus('Tempo esgotado');
+        if (props.onDataLoaded) props.onDataLoaded([]);
+        worker.terminate();
+      } else if (wStatus === 'error') {
+        console.error('pkCSM Worker Error:', error);
         setIsError(true);
         setIsLoading(false);
         if (props.onDataLoaded) props.onDataLoaded([]);
-      });
+        worker.terminate();
+      }
+    };
 
-    return () => stopPolling();
+    worker.postMessage({ smiles: props.smiles, type: 'FETCH_PKCSM' });
+
+    return () => worker.terminate();
   }, [props.smiles]);
 
   if (isLoading && results.length === 0 && !isError) {
@@ -185,9 +110,8 @@ function PKCSM(props: { smiles: string; onDataLoaded?: (data: any[]) => void }) 
     );
   }
 
-  // Agrupar resultados por 'Property'
   const groupedResults: { [key: string]: any[] } = {};
-  results.forEach(res => {
+  results.forEach((res) => {
     if (!groupedResults[res.property]) groupedResults[res.property] = [];
     groupedResults[res.property].push(res);
   });

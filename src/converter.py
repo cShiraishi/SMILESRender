@@ -42,18 +42,21 @@ def convert_smiles(smiles: str, format: str) -> BytesIO:
     molecule = Chem.MolFromSmiles(smiles)
     image = Draw.MolToImage(molecule)
 
-    image = image.convert("RGBA")
-    data = image.getdata()
-    new_data = []
-    for item in data:
-        if item[0] > 200 and item[1] > 200 and item[2] > 200:
-            new_data.append((255, 255, 255, 0))
-        else:
-            new_data.append(item)
-    image.putdata(new_data)
+    if format.upper() == "JPEG":
+        image = image.convert("RGB")
+    else:
+        image = image.convert("RGBA")
+        data = image.getdata()
+        new_data = []
+        for item in data:
+            if item[0] > 200 and item[1] > 200 and item[2] > 200:
+                new_data.append((255, 255, 255, 0))
+            else:
+                new_data.append(item)
+        image.putdata(new_data)
 
     bin_image = BytesIO()
-    image.save(bin_image, format.upper())
+    image.save(bin_image, format.upper(), quality=95)
     bin_image.seek(0)
 
     return bin_image
@@ -83,7 +86,9 @@ def convert_many_smiles_and_zip(smiles: list[tuple[str, str, str]]) -> BytesIO:
     zip_file.seek(0)
 
     return zip_file
-def create_mols_grid(smiles_list: list[str], labels: list[str] = None, mols_per_row: int = 3, sub_img_size: tuple = (300, 300)) -> BytesIO:
+
+
+def create_mols_grid(smiles_list: list[str], labels: list[str] = None, mols_per_row: int = 3, sub_img_size: tuple = (300, 300), format: str = "PNG") -> BytesIO:
     mols = []
     legends = []
     for i, smi in enumerate(smiles_list):
@@ -103,7 +108,10 @@ def create_mols_grid(smiles_list: list[str], labels: list[str] = None, mols_per_
         useSVG=False # For consistency with PNG export, but we can make it SVG if needed
     )
     
+    
     buf = BytesIO()
-    img.save(buf, format="PNG")
+    if format.upper() == "JPEG":
+        img = img.convert("RGB")
+    img.save(buf, format=format.upper(), quality=95)
     buf.seek(0)
     return buf

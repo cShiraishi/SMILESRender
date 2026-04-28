@@ -73,33 +73,46 @@ function ConvertFromCsv() {
     setSmilesToRender(smiles);
   };
 
-  const downloadSmiles = (smiles: Array<[string, string]>) => {
-    fetch('/render', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        smiles: smiles.map((data) => {
-          const [smiles, name] = data;
-          return {
-            smiles,
-            name,
-            format: 'png',
-          };
-        }),
-      }),
-    })
-      .then((response) => response.blob())
-      .then((blob) => downloadBlob({ name: 'smiles.zip', blob }))
-      .finally(() => {
-        setFileInputError(null);
-        setSmilesError(null);
-      })
-      .catch((error) => {
-        console.error('Could not download smiles zip:', error);
-        setFileInputError({
-          message: `Could not download smiles zip: ${error}`,
+  const downloadSmiles = async (smiles: Array<[string, string]>) => {
+    setFileInputError(null);
+    setSmilesError(null);
+
+    const CHUNK_SIZE = 10;
+    const chunks: Array<[string, string]>[] = [];
+    for (let i = 0; i < smiles.length; i += CHUNK_SIZE) {
+      chunks.push(smiles.slice(i, i + CHUNK_SIZE));
+    }
+
+    try {
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const response = await fetch('/render', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            smiles: chunk.map((data) => {
+              const [smi, name] = data;
+              return { smiles: smi, name, format: 'png' };
+            }),
+          }),
         });
-      });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status} on batch ${i + 1}`);
+        const blob = await response.blob();
+        downloadBlob({ 
+          name: `smiles_batch_${i + 1}.zip`, 
+          blob 
+        });
+        
+        // Brief delay to prevent browser from blocking multiple downloads
+        if (i < chunks.length - 1) {
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+    } catch (error: any) {
+      console.error('Could not download smiles zip:', error);
+      setFileInputError({ message: `Download failed: ${error.message}` });
+    }
   };
 
   const handleSubmit = () => {

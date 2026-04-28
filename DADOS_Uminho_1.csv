@@ -1,0 +1,29 @@
+﻿Name,SMILES,
+"methyl 5-(phenylamino)thieno[2,3-b]pyridine-2-carboxylat",O=C(OC)c1cc2cc(cnc2s1)Nc1ccccc1,
+"methyl 5-((3-methoxyphenyl)amino)thieno[2,3-b]pyridine-",COC(=O)c1cc2cc(cnc2s1)Nc1cc(ccc1)OC,
+"methyl 5-((2,4-dimethoxyphenyl)amino)thieno[2,3-b]pyridine-",COC(=O)c1cc2cc(cnc2s1)Nc1ccc(cc1OC)OC,
+"methyl 5-((3,5-dimethoxyphenyl)amino)thieno[2,-b]pyridine-2-carboxylat",COC(=O)c1cc2cc(cnc2s1)Nc1cc(cc(c1)OC)OC,
+"methyl 5-((2,4-dimethylphenyl)amino)thieno[2,3-b]pyridine-2-carboxylat
+
+",COC(=O)c1cc2cc(cnc2s1)Nc1ccc(C)cc1C,
+"methyl 5-((2-fluorophenyl)amino)thieno[2,3-b]pyridine-2-carboxylat
+
+",O=C(OC)c1cc2cc(cnc2s1)Nc1ccccc1F,
+"methyl 5-((4-fluorophenyl)amino)thieno[2,3-b]pyridine-2-carboxylat",O=C(OC)c1cc2cc(cnc2s1)Nc1ccc(F)cc1,
+"methyl 5-((4-cyanophenyl)amino)thieno[2,3-b]pyridine-2-carboxylat",O=C(OC)c1cc2cc(cnc2s1)Nc1ccc(C#N)cc1,
+"methyl 5-(pyridin-3-ylamino)thieno[2,3-b]pyridine-2-carboxylat",O=C(OC)c1cc2cc(cnc2s1)Nc1cnccc1,
+"methyl 5-((2-methoxyphenyl)amino)thieno[2,3-b]pyridine-2-carboxylat
+
+",COC(=O)c1cc2cc(cnc2s1)Nc1ccccc1OC,
+"methyl 5-((4-methoxyphenyl)amino)thieno[2,3-b]pyridine-2-carboxylat",COC(=O)c1cc2cc(cnc2s1)Nc1ccc(cc1)OC,
+"methyl 5-((3,4-dimethoxyphenyl)amino)thieno[2,3-b]pyridine-2-carboxylat",COC(=O)c1cc2cc(cnc2s1)Nc1cc(OC)c(cc1)OC,
+"methyl 5-(p-tolylamino)thieno[2,3-b]pyridine-2-carboxylat",COC(=O)c1cc2cc(cnc2s1)Nc1ccc(C)cc1,
+"methyl 5-((2-chloro-5-methoxyphenyl)amino)thieno[2,3-b]pyridine-2-carboxylat",O=C(OC)c1cc2cc(cnc2s1)Nc1cc(ccc1Cl)OC,
+"methyl 5-((3-fluorophenyl)amino)thieno[2,3-b]pyridine-2-carboxylat",O=C(OC)c1cc2cc(cnc2s1)Nc1cc(F)ccc1,
+"methyl 5-((3-cyanophenyl)amino)thieno[2,3-b]pyridine-2-carboxylat",O=C(OC)c1cc2cc(cnc2s1)Nc1cc(C#N)ccc1,
+"methyl 5-(pyridin-2-ylamino)thieno[2,3-b]pyridine-2-carboxylat",O=C(OC)c1cc2cc(cnc2s1)Nc1ccccn1,
+"methyl 5-morpholinothieno[2,3-b]pyridine-2-carboxylat",O=C(OC)c1cc2cc(cnc2s1)N1CCOCC1,
+"methyl 5-(piperidin-1-yl)thieno[2,
+-b]pyridine-2-carboxylat
+",O=C(OC)c1cc2cc(cnc2s1)N1CCCCC1,
+"methyl 5-(m-tolylamino)thieno[2,3-b]pyridine-2-carboxylat",COC(=O)c1cc2cc(cnc2s1)Nc1cc(C)ccc1,

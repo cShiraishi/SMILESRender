@@ -1,0 +1,1062 @@
+[
+    {
+        "Nome": "AvgIpc",
+        "Definição": "This returns the average information content of the coefficients of the characteristic",
+        "Função RDKit": "Descriptors.AvgIpc"
+    },
+    {
+        "Nome": "BCUT2D_CHGHI",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.BCUT2D_CHGHI"
+    },
+    {
+        "Nome": "BCUT2D_CHGLO",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.BCUT2D_CHGLO"
+    },
+    {
+        "Nome": "BCUT2D_LOGPHI",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.BCUT2D_LOGPHI"
+    },
+    {
+        "Nome": "BCUT2D_LOGPLOW",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.BCUT2D_LOGPLOW"
+    },
+    {
+        "Nome": "BCUT2D_MRHI",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.BCUT2D_MRHI"
+    },
+    {
+        "Nome": "BCUT2D_MRLOW",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.BCUT2D_MRLOW"
+    },
+    {
+        "Nome": "BCUT2D_MWHI",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.BCUT2D_MWHI"
+    },
+    {
+        "Nome": "BCUT2D_MWLOW",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.BCUT2D_MWLOW"
+    },
+    {
+        "Nome": "BalabanJ",
+        "Definição": "Calculate Balaban's J value for a molecule",
+        "Função RDKit": "Descriptors.BalabanJ"
+    },
+    {
+        "Nome": "BertzCT",
+        "Definição": "A topological index meant to quantify \"complexity\" of molecules.",
+        "Função RDKit": "Descriptors.BertzCT"
+    },
+    {
+        "Nome": "Chi0",
+        "Definição": "From equations (1),(9) and (10) of Rev. Comp. Chem. vol 2, 367-422, (1991)",
+        "Função RDKit": "Descriptors.Chi0"
+    },
+    {
+        "Nome": "Chi0n",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.Chi0n"
+    },
+    {
+        "Nome": "Chi0v",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.Chi0v"
+    },
+    {
+        "Nome": "Chi1",
+        "Definição": "From equations (1),(11) and (12) of Rev. Comp. Chem. vol 2, 367-422, (1991)",
+        "Função RDKit": "Descriptors.Chi1"
+    },
+    {
+        "Nome": "Chi1n",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.Chi1n"
+    },
+    {
+        "Nome": "Chi1v",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.Chi1v"
+    },
+    {
+        "Nome": "Chi2n",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.Chi2n"
+    },
+    {
+        "Nome": "Chi2v",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.Chi2v"
+    },
+    {
+        "Nome": "Chi3n",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.Chi3n"
+    },
+    {
+        "Nome": "Chi3v",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.Chi3v"
+    },
+    {
+        "Nome": "Chi4n",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.Chi4n"
+    },
+    {
+        "Nome": "Chi4v",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.Chi4v"
+    },
+    {
+        "Nome": "EState_VSA1",
+        "Definição": "EState VSA Descriptor 1 (-inf < x <  -0.39)",
+        "Função RDKit": "Descriptors.EState_VSA1"
+    },
+    {
+        "Nome": "EState_VSA10",
+        "Definição": "EState VSA Descriptor 10 ( 9.17 <= x <  15.00)",
+        "Função RDKit": "Descriptors.EState_VSA10"
+    },
+    {
+        "Nome": "EState_VSA11",
+        "Definição": "EState VSA Descriptor 11 ( 15.00 <= x < inf)",
+        "Função RDKit": "Descriptors.EState_VSA11"
+    },
+    {
+        "Nome": "EState_VSA2",
+        "Definição": "EState VSA Descriptor 2 ( -0.39 <= x <  0.29)",
+        "Função RDKit": "Descriptors.EState_VSA2"
+    },
+    {
+        "Nome": "EState_VSA3",
+        "Definição": "EState VSA Descriptor 3 ( 0.29 <= x <  0.72)",
+        "Função RDKit": "Descriptors.EState_VSA3"
+    },
+    {
+        "Nome": "EState_VSA4",
+        "Definição": "EState VSA Descriptor 4 ( 0.72 <= x <  1.17)",
+        "Função RDKit": "Descriptors.EState_VSA4"
+    },
+    {
+        "Nome": "EState_VSA5",
+        "Definição": "EState VSA Descriptor 5 ( 1.17 <= x <  1.54)",
+        "Função RDKit": "Descriptors.EState_VSA5"
+    },
+    {
+        "Nome": "EState_VSA6",
+        "Definição": "EState VSA Descriptor 6 ( 1.54 <= x <  1.81)",
+        "Função RDKit": "Descriptors.EState_VSA6"
+    },
+    {
+        "Nome": "EState_VSA7",
+        "Definição": "EState VSA Descriptor 7 ( 1.81 <= x <  2.05)",
+        "Função RDKit": "Descriptors.EState_VSA7"
+    },
+    {
+        "Nome": "EState_VSA8",
+        "Definição": "EState VSA Descriptor 8 ( 2.05 <= x <  4.69)",
+        "Função RDKit": "Descriptors.EState_VSA8"
+    },
+    {
+        "Nome": "EState_VSA9",
+        "Definição": "EState VSA Descriptor 9 ( 4.69 <= x <  9.17)",
+        "Função RDKit": "Descriptors.EState_VSA9"
+    },
+    {
+        "Nome": "ExactMolWt",
+        "Definição": "The exact molecular weight of the molecule",
+        "Função RDKit": "Descriptors.ExactMolWt"
+    },
+    {
+        "Nome": "FpDensityMorgan1",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.FpDensityMorgan1"
+    },
+    {
+        "Nome": "FpDensityMorgan2",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.FpDensityMorgan2"
+    },
+    {
+        "Nome": "FpDensityMorgan3",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.FpDensityMorgan3"
+    },
+    {
+        "Nome": "FractionCSP3",
+        "Definição": "CalcFractionCSP3( (Mol)mol) -> float :",
+        "Função RDKit": "Descriptors.FractionCSP3"
+    },
+    {
+        "Nome": "HallKierAlpha",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.HallKierAlpha"
+    },
+    {
+        "Nome": "HeavyAtomCount",
+        "Definição": "Number of heavy atoms a molecule.",
+        "Função RDKit": "Descriptors.HeavyAtomCount"
+    },
+    {
+        "Nome": "HeavyAtomMolWt",
+        "Definição": "The average molecular weight of the molecule ignoring hydrogens",
+        "Função RDKit": "Descriptors.HeavyAtomMolWt"
+    },
+    {
+        "Nome": "Ipc",
+        "Definição": "This returns the information content of the coefficients of the characteristic",
+        "Função RDKit": "Descriptors.Ipc"
+    },
+    {
+        "Nome": "Kappa1",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.Kappa1"
+    },
+    {
+        "Nome": "Kappa2",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.Kappa2"
+    },
+    {
+        "Nome": "Kappa3",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.Kappa3"
+    },
+    {
+        "Nome": "LabuteASA",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.LabuteASA"
+    },
+    {
+        "Nome": "MaxAbsEStateIndex",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.MaxAbsEStateIndex"
+    },
+    {
+        "Nome": "MaxAbsPartialCharge",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.MaxAbsPartialCharge"
+    },
+    {
+        "Nome": "MaxEStateIndex",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.MaxEStateIndex"
+    },
+    {
+        "Nome": "MaxPartialCharge",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.MaxPartialCharge"
+    },
+    {
+        "Nome": "MinAbsEStateIndex",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.MinAbsEStateIndex"
+    },
+    {
+        "Nome": "MinAbsPartialCharge",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.MinAbsPartialCharge"
+    },
+    {
+        "Nome": "MinEStateIndex",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.MinEStateIndex"
+    },
+    {
+        "Nome": "MinPartialCharge",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.MinPartialCharge"
+    },
+    {
+        "Nome": "MolLogP",
+        "Definição": "Wildman-Crippen LogP value",
+        "Função RDKit": "Descriptors.MolLogP"
+    },
+    {
+        "Nome": "MolMR",
+        "Definição": "Wildman-Crippen MR value",
+        "Função RDKit": "Descriptors.MolMR"
+    },
+    {
+        "Nome": "MolWt",
+        "Definição": "The average molecular weight of the molecule",
+        "Função RDKit": "Descriptors.MolWt"
+    },
+    {
+        "Nome": "NHOHCount",
+        "Definição": "Number of NHs or OHs",
+        "Função RDKit": "Descriptors.NHOHCount"
+    },
+    {
+        "Nome": "NOCount",
+        "Definição": "Number of Nitrogens and Oxygens",
+        "Função RDKit": "Descriptors.NOCount"
+    },
+    {
+        "Nome": "NumAliphaticCarbocycles",
+        "Definição": "CalcNumAliphaticCarbocycles( (Mol)mol) -> int :",
+        "Função RDKit": "Descriptors.NumAliphaticCarbocycles"
+    },
+    {
+        "Nome": "NumAliphaticHeterocycles",
+        "Definição": "CalcNumAliphaticHeterocycles( (Mol)mol) -> int :",
+        "Função RDKit": "Descriptors.NumAliphaticHeterocycles"
+    },
+    {
+        "Nome": "NumAliphaticRings",
+        "Definição": "CalcNumAliphaticRings( (Mol)mol) -> int :",
+        "Função RDKit": "Descriptors.NumAliphaticRings"
+    },
+    {
+        "Nome": "NumAromaticCarbocycles",
+        "Definição": "CalcNumAromaticCarbocycles( (Mol)mol) -> int :",
+        "Função RDKit": "Descriptors.NumAromaticCarbocycles"
+    },
+    {
+        "Nome": "NumAromaticHeterocycles",
+        "Definição": "CalcNumAromaticHeterocycles( (Mol)mol) -> int :",
+        "Função RDKit": "Descriptors.NumAromaticHeterocycles"
+    },
+    {
+        "Nome": "NumAromaticRings",
+        "Definição": "CalcNumAromaticRings( (Mol)mol) -> int :",
+        "Função RDKit": "Descriptors.NumAromaticRings"
+    },
+    {
+        "Nome": "NumHAcceptors",
+        "Definição": "Number of Hydrogen Bond Acceptors",
+        "Função RDKit": "Descriptors.NumHAcceptors"
+    },
+    {
+        "Nome": "NumHDonors",
+        "Definição": "Number of Hydrogen Bond Donors",
+        "Função RDKit": "Descriptors.NumHDonors"
+    },
+    {
+        "Nome": "NumHeteroatoms",
+        "Definição": "Number of Heteroatoms",
+        "Função RDKit": "Descriptors.NumHeteroatoms"
+    },
+    {
+        "Nome": "NumRadicalElectrons",
+        "Definição": "The number of radical electrons the molecule has",
+        "Função RDKit": "Descriptors.NumRadicalElectrons"
+    },
+    {
+        "Nome": "NumRings",
+        "Definição": "CalcNumRings( (Mol)mol) -> int :",
+        "Função RDKit": "rdMolDescriptors.CalcNumRings"
+    },
+    {
+        "Nome": "NumRotatableBonds",
+        "Definição": "Number of Rotatable Bonds",
+        "Função RDKit": "Descriptors.NumRotatableBonds"
+    },
+    {
+        "Nome": "NumSaturatedCarbocycles",
+        "Definição": "CalcNumSaturatedCarbocycles( (Mol)mol) -> int :",
+        "Função RDKit": "Descriptors.NumSaturatedCarbocycles"
+    },
+    {
+        "Nome": "NumSaturatedHeterocycles",
+        "Definição": "CalcNumSaturatedHeterocycles( (Mol)mol) -> int :",
+        "Função RDKit": "Descriptors.NumSaturatedHeterocycles"
+    },
+    {
+        "Nome": "NumSaturatedRings",
+        "Definição": "CalcNumSaturatedRings( (Mol)mol) -> int :",
+        "Função RDKit": "Descriptors.NumSaturatedRings"
+    },
+    {
+        "Nome": "NumValenceElectrons",
+        "Definição": "The number of valence electrons the molecule has",
+        "Função RDKit": "Descriptors.NumValenceElectrons"
+    },
+    {
+        "Nome": "PEOE_VSA1",
+        "Definição": "MOE Charge VSA Descriptor 1 (-inf < x < -0.30)",
+        "Função RDKit": "Descriptors.PEOE_VSA1"
+    },
+    {
+        "Nome": "PEOE_VSA10",
+        "Definição": "MOE Charge VSA Descriptor 10 ( 0.10 <= x <  0.15)",
+        "Função RDKit": "Descriptors.PEOE_VSA10"
+    },
+    {
+        "Nome": "PEOE_VSA11",
+        "Definição": "MOE Charge VSA Descriptor 11 ( 0.15 <= x <  0.20)",
+        "Função RDKit": "Descriptors.PEOE_VSA11"
+    },
+    {
+        "Nome": "PEOE_VSA12",
+        "Definição": "MOE Charge VSA Descriptor 12 ( 0.20 <= x <  0.25)",
+        "Função RDKit": "Descriptors.PEOE_VSA12"
+    },
+    {
+        "Nome": "PEOE_VSA13",
+        "Definição": "MOE Charge VSA Descriptor 13 ( 0.25 <= x <  0.30)",
+        "Função RDKit": "Descriptors.PEOE_VSA13"
+    },
+    {
+        "Nome": "PEOE_VSA14",
+        "Definição": "MOE Charge VSA Descriptor 14 ( 0.30 <= x < inf)",
+        "Função RDKit": "Descriptors.PEOE_VSA14"
+    },
+    {
+        "Nome": "PEOE_VSA2",
+        "Definição": "MOE Charge VSA Descriptor 2 (-0.30 <= x < -0.25)",
+        "Função RDKit": "Descriptors.PEOE_VSA2"
+    },
+    {
+        "Nome": "PEOE_VSA3",
+        "Definição": "MOE Charge VSA Descriptor 3 (-0.25 <= x < -0.20)",
+        "Função RDKit": "Descriptors.PEOE_VSA3"
+    },
+    {
+        "Nome": "PEOE_VSA4",
+        "Definição": "MOE Charge VSA Descriptor 4 (-0.20 <= x < -0.15)",
+        "Função RDKit": "Descriptors.PEOE_VSA4"
+    },
+    {
+        "Nome": "PEOE_VSA5",
+        "Definição": "MOE Charge VSA Descriptor 5 (-0.15 <= x < -0.10)",
+        "Função RDKit": "Descriptors.PEOE_VSA5"
+    },
+    {
+        "Nome": "PEOE_VSA6",
+        "Definição": "MOE Charge VSA Descriptor 6 (-0.10 <= x < -0.05)",
+        "Função RDKit": "Descriptors.PEOE_VSA6"
+    },
+    {
+        "Nome": "PEOE_VSA7",
+        "Definição": "MOE Charge VSA Descriptor 7 (-0.05 <= x <  0.00)",
+        "Função RDKit": "Descriptors.PEOE_VSA7"
+    },
+    {
+        "Nome": "PEOE_VSA8",
+        "Definição": "MOE Charge VSA Descriptor 8 ( 0.00 <= x <  0.05)",
+        "Função RDKit": "Descriptors.PEOE_VSA8"
+    },
+    {
+        "Nome": "PEOE_VSA9",
+        "Definição": "MOE Charge VSA Descriptor 9 ( 0.05 <= x <  0.10)",
+        "Função RDKit": "Descriptors.PEOE_VSA9"
+    },
+    {
+        "Nome": "QED",
+        "Definição": "Quantitative Estimation of Drug-likeness",
+        "Função RDKit": "QED.qed"
+    },
+    {
+        "Nome": "RingCount",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.RingCount"
+    },
+    {
+        "Nome": "SMR_VSA1",
+        "Definição": "MOE MR VSA Descriptor 1 (-inf < x <  1.29)",
+        "Função RDKit": "Descriptors.SMR_VSA1"
+    },
+    {
+        "Nome": "SMR_VSA10",
+        "Definição": "MOE MR VSA Descriptor 10 ( 4.00 <= x < inf)",
+        "Função RDKit": "Descriptors.SMR_VSA10"
+    },
+    {
+        "Nome": "SMR_VSA2",
+        "Definição": "MOE MR VSA Descriptor 2 ( 1.29 <= x <  1.82)",
+        "Função RDKit": "Descriptors.SMR_VSA2"
+    },
+    {
+        "Nome": "SMR_VSA3",
+        "Definição": "MOE MR VSA Descriptor 3 ( 1.82 <= x <  2.24)",
+        "Função RDKit": "Descriptors.SMR_VSA3"
+    },
+    {
+        "Nome": "SMR_VSA4",
+        "Definição": "MOE MR VSA Descriptor 4 ( 2.24 <= x <  2.45)",
+        "Função RDKit": "Descriptors.SMR_VSA4"
+    },
+    {
+        "Nome": "SMR_VSA5",
+        "Definição": "MOE MR VSA Descriptor 5 ( 2.45 <= x <  2.75)",
+        "Função RDKit": "Descriptors.SMR_VSA5"
+    },
+    {
+        "Nome": "SMR_VSA6",
+        "Definição": "MOE MR VSA Descriptor 6 ( 2.75 <= x <  3.05)",
+        "Função RDKit": "Descriptors.SMR_VSA6"
+    },
+    {
+        "Nome": "SMR_VSA7",
+        "Definição": "MOE MR VSA Descriptor 7 ( 3.05 <= x <  3.63)",
+        "Função RDKit": "Descriptors.SMR_VSA7"
+    },
+    {
+        "Nome": "SMR_VSA8",
+        "Definição": "MOE MR VSA Descriptor 8 ( 3.63 <= x <  3.80)",
+        "Função RDKit": "Descriptors.SMR_VSA8"
+    },
+    {
+        "Nome": "SMR_VSA9",
+        "Definição": "MOE MR VSA Descriptor 9 ( 3.80 <= x <  4.00)",
+        "Função RDKit": "Descriptors.SMR_VSA9"
+    },
+    {
+        "Nome": "SPS",
+        "Definição": "Calculates the SpacialScore descriptor. By default, the score is normalized by the number of heavy atoms (nSPS) resulting in a float value,",
+        "Função RDKit": "Descriptors.SPS"
+    },
+    {
+        "Nome": "SlogP_VSA1",
+        "Definição": "MOE logP VSA Descriptor 1 (-inf < x < -0.40)",
+        "Função RDKit": "Descriptors.SlogP_VSA1"
+    },
+    {
+        "Nome": "SlogP_VSA10",
+        "Definição": "MOE logP VSA Descriptor 10 ( 0.40 <= x <  0.50)",
+        "Função RDKit": "Descriptors.SlogP_VSA10"
+    },
+    {
+        "Nome": "SlogP_VSA11",
+        "Definição": "MOE logP VSA Descriptor 11 ( 0.50 <= x <  0.60)",
+        "Função RDKit": "Descriptors.SlogP_VSA11"
+    },
+    {
+        "Nome": "SlogP_VSA12",
+        "Definição": "MOE logP VSA Descriptor 12 ( 0.60 <= x < inf)",
+        "Função RDKit": "Descriptors.SlogP_VSA12"
+    },
+    {
+        "Nome": "SlogP_VSA2",
+        "Definição": "MOE logP VSA Descriptor 2 (-0.40 <= x < -0.20)",
+        "Função RDKit": "Descriptors.SlogP_VSA2"
+    },
+    {
+        "Nome": "SlogP_VSA3",
+        "Definição": "MOE logP VSA Descriptor 3 (-0.20 <= x <  0.00)",
+        "Função RDKit": "Descriptors.SlogP_VSA3"
+    },
+    {
+        "Nome": "SlogP_VSA4",
+        "Definição": "MOE logP VSA Descriptor 4 ( 0.00 <= x <  0.10)",
+        "Função RDKit": "Descriptors.SlogP_VSA4"
+    },
+    {
+        "Nome": "SlogP_VSA5",
+        "Definição": "MOE logP VSA Descriptor 5 ( 0.10 <= x <  0.15)",
+        "Função RDKit": "Descriptors.SlogP_VSA5"
+    },
+    {
+        "Nome": "SlogP_VSA6",
+        "Definição": "MOE logP VSA Descriptor 6 ( 0.15 <= x <  0.20)",
+        "Função RDKit": "Descriptors.SlogP_VSA6"
+    },
+    {
+        "Nome": "SlogP_VSA7",
+        "Definição": "MOE logP VSA Descriptor 7 ( 0.20 <= x <  0.25)",
+        "Função RDKit": "Descriptors.SlogP_VSA7"
+    },
+    {
+        "Nome": "SlogP_VSA8",
+        "Definição": "MOE logP VSA Descriptor 8 ( 0.25 <= x <  0.30)",
+        "Função RDKit": "Descriptors.SlogP_VSA8"
+    },
+    {
+        "Nome": "SlogP_VSA9",
+        "Definição": "MOE logP VSA Descriptor 9 ( 0.30 <= x <  0.40)",
+        "Função RDKit": "Descriptors.SlogP_VSA9"
+    },
+    {
+        "Nome": "TPSA",
+        "Definição": "No definition available",
+        "Função RDKit": "Descriptors.TPSA"
+    },
+    {
+        "Nome": "VSA_EState1",
+        "Definição": "VSA EState Descriptor 1 (-inf < x <  4.78)",
+        "Função RDKit": "Descriptors.VSA_EState1"
+    },
+    {
+        "Nome": "VSA_EState10",
+        "Definição": "VSA EState Descriptor 10 ( 11.00 <= x < inf)",
+        "Função RDKit": "Descriptors.VSA_EState10"
+    },
+    {
+        "Nome": "VSA_EState2",
+        "Definição": "VSA EState Descriptor 2 ( 4.78 <= x <  5.00)",
+        "Função RDKit": "Descriptors.VSA_EState2"
+    },
+    {
+        "Nome": "VSA_EState3",
+        "Definição": "VSA EState Descriptor 3 ( 5.00 <= x <  5.41)",
+        "Função RDKit": "Descriptors.VSA_EState3"
+    },
+    {
+        "Nome": "VSA_EState4",
+        "Definição": "VSA EState Descriptor 4 ( 5.41 <= x <  5.74)",
+        "Função RDKit": "Descriptors.VSA_EState4"
+    },
+    {
+        "Nome": "VSA_EState5",
+        "Definição": "VSA EState Descriptor 5 ( 5.74 <= x <  6.00)",
+        "Função RDKit": "Descriptors.VSA_EState5"
+    },
+    {
+        "Nome": "VSA_EState6",
+        "Definição": "VSA EState Descriptor 6 ( 6.00 <= x <  6.07)",
+        "Função RDKit": "Descriptors.VSA_EState6"
+    },
+    {
+        "Nome": "VSA_EState7",
+        "Definição": "VSA EState Descriptor 7 ( 6.07 <= x <  6.45)",
+        "Função RDKit": "Descriptors.VSA_EState7"
+    },
+    {
+        "Nome": "VSA_EState8",
+        "Definição": "VSA EState Descriptor 8 ( 6.45 <= x <  7.00)",
+        "Função RDKit": "Descriptors.VSA_EState8"
+    },
+    {
+        "Nome": "VSA_EState9",
+        "Definição": "VSA EState Descriptor 9 ( 7.00 <= x <  11.00)",
+        "Função RDKit": "Descriptors.VSA_EState9"
+    },
+    {
+        "Nome": "fr_Al_COO",
+        "Definição": "Number of aliphatic carboxylic acids",
+        "Função RDKit": "Descriptors.fr_Al_COO"
+    },
+    {
+        "Nome": "fr_Al_OH",
+        "Definição": "Number of aliphatic hydroxyl groups",
+        "Função RDKit": "Descriptors.fr_Al_OH"
+    },
+    {
+        "Nome": "fr_Al_OH_noTert",
+        "Definição": "Number of aliphatic hydroxyl groups excluding tert-OH",
+        "Função RDKit": "Descriptors.fr_Al_OH_noTert"
+    },
+    {
+        "Nome": "fr_ArN",
+        "Definição": "Number of N functional groups attached to aromatics",
+        "Função RDKit": "Descriptors.fr_ArN"
+    },
+    {
+        "Nome": "fr_Ar_COO",
+        "Definição": "Number of Aromatic carboxylic acide",
+        "Função RDKit": "Descriptors.fr_Ar_COO"
+    },
+    {
+        "Nome": "fr_Ar_N",
+        "Definição": "Number of aromatic nitrogens",
+        "Função RDKit": "Descriptors.fr_Ar_N"
+    },
+    {
+        "Nome": "fr_Ar_NH",
+        "Definição": "Number of aromatic amines",
+        "Função RDKit": "Descriptors.fr_Ar_NH"
+    },
+    {
+        "Nome": "fr_Ar_OH",
+        "Definição": "Number of aromatic hydroxyl groups",
+        "Função RDKit": "Descriptors.fr_Ar_OH"
+    },
+    {
+        "Nome": "fr_COO",
+        "Definição": "Number of carboxylic acids",
+        "Função RDKit": "Descriptors.fr_COO"
+    },
+    {
+        "Nome": "fr_COO2",
+        "Definição": "Number of carboxylic acids",
+        "Função RDKit": "Descriptors.fr_COO2"
+    },
+    {
+        "Nome": "fr_C_O",
+        "Definição": "Number of carbonyl O",
+        "Função RDKit": "Descriptors.fr_C_O"
+    },
+    {
+        "Nome": "fr_C_O_noCOO",
+        "Definição": "Number of carbonyl O, excluding COOH",
+        "Função RDKit": "Descriptors.fr_C_O_noCOO"
+    },
+    {
+        "Nome": "fr_C_S",
+        "Definição": "Number of thiocarbonyl",
+        "Função RDKit": "Descriptors.fr_C_S"
+    },
+    {
+        "Nome": "fr_HOCCN",
+        "Definição": "Number of C(OH)CCN-Ctert-alkyl or  C(OH)CCNcyclic",
+        "Função RDKit": "Descriptors.fr_HOCCN"
+    },
+    {
+        "Nome": "fr_Imine",
+        "Definição": "Number of Imines",
+        "Função RDKit": "Descriptors.fr_Imine"
+    },
+    {
+        "Nome": "fr_NH0",
+        "Definição": "Number of Tertiary amines",
+        "Função RDKit": "Descriptors.fr_NH0"
+    },
+    {
+        "Nome": "fr_NH1",
+        "Definição": "Number of Secondary amines",
+        "Função RDKit": "Descriptors.fr_NH1"
+    },
+    {
+        "Nome": "fr_NH2",
+        "Definição": "Number of Primary amines",
+        "Função RDKit": "Descriptors.fr_NH2"
+    },
+    {
+        "Nome": "fr_N_O",
+        "Definição": "Number of hydroxylamine groups",
+        "Função RDKit": "Descriptors.fr_N_O"
+    },
+    {
+        "Nome": "fr_Ndealkylation1",
+        "Definição": "Number of XCCNR groups",
+        "Função RDKit": "Descriptors.fr_Ndealkylation1"
+    },
+    {
+        "Nome": "fr_Ndealkylation2",
+        "Definição": "Number of tert-alicyclic amines (no heteroatoms, not quinine-like bridged N)",
+        "Função RDKit": "Descriptors.fr_Ndealkylation2"
+    },
+    {
+        "Nome": "fr_Nhpyrrole",
+        "Definição": "Number of H-pyrrole nitrogens",
+        "Função RDKit": "Descriptors.fr_Nhpyrrole"
+    },
+    {
+        "Nome": "fr_SH",
+        "Definição": "Number of thiol groups",
+        "Função RDKit": "Descriptors.fr_SH"
+    },
+    {
+        "Nome": "fr_aldehyde",
+        "Definição": "Number of aldehydes",
+        "Função RDKit": "Descriptors.fr_aldehyde"
+    },
+    {
+        "Nome": "fr_alkyl_carbamate",
+        "Definição": "Number of alkyl carbamates (subject to hydrolysis)",
+        "Função RDKit": "Descriptors.fr_alkyl_carbamate"
+    },
+    {
+        "Nome": "fr_alkyl_halide",
+        "Definição": "Number of alkyl halides",
+        "Função RDKit": "Descriptors.fr_alkyl_halide"
+    },
+    {
+        "Nome": "fr_allylic_oxid",
+        "Definição": "Number of allylic oxidation sites excluding steroid dienone",
+        "Função RDKit": "Descriptors.fr_allylic_oxid"
+    },
+    {
+        "Nome": "fr_amide",
+        "Definição": "Number of amides",
+        "Função RDKit": "Descriptors.fr_amide"
+    },
+    {
+        "Nome": "fr_amidine",
+        "Definição": "Number of amidine groups",
+        "Função RDKit": "Descriptors.fr_amidine"
+    },
+    {
+        "Nome": "fr_aniline",
+        "Definição": "Number of anilines",
+        "Função RDKit": "Descriptors.fr_aniline"
+    },
+    {
+        "Nome": "fr_aryl_methyl",
+        "Definição": "Number of aryl methyl sites for hydroxylation",
+        "Função RDKit": "Descriptors.fr_aryl_methyl"
+    },
+    {
+        "Nome": "fr_azide",
+        "Definição": "Number of azide groups",
+        "Função RDKit": "Descriptors.fr_azide"
+    },
+    {
+        "Nome": "fr_azo",
+        "Definição": "Number of azo groups",
+        "Função RDKit": "Descriptors.fr_azo"
+    },
+    {
+        "Nome": "fr_barbitur",
+        "Definição": "Number of barbiturate groups",
+        "Função RDKit": "Descriptors.fr_barbitur"
+    },
+    {
+        "Nome": "fr_benzene",
+        "Definição": "Number of benzene rings",
+        "Função RDKit": "Descriptors.fr_benzene"
+    },
+    {
+        "Nome": "fr_benzodiazepine",
+        "Definição": "Number of benzodiazepines with no additional fused rings",
+        "Função RDKit": "Descriptors.fr_benzodiazepine"
+    },
+    {
+        "Nome": "fr_bicyclic",
+        "Definição": "Bicyclic",
+        "Função RDKit": "Descriptors.fr_bicyclic"
+    },
+    {
+        "Nome": "fr_diazo",
+        "Definição": "Number of diazo groups",
+        "Função RDKit": "Descriptors.fr_diazo"
+    },
+    {
+        "Nome": "fr_dihydropyridine",
+        "Definição": "Number of dihydropyridines",
+        "Função RDKit": "Descriptors.fr_dihydropyridine"
+    },
+    {
+        "Nome": "fr_epoxide",
+        "Definição": "Number of epoxide rings",
+        "Função RDKit": "Descriptors.fr_epoxide"
+    },
+    {
+        "Nome": "fr_ester",
+        "Definição": "Number of esters",
+        "Função RDKit": "Descriptors.fr_ester"
+    },
+    {
+        "Nome": "fr_ether",
+        "Definição": "Number of ether oxygens (including phenoxy)",
+        "Função RDKit": "Descriptors.fr_ether"
+    },
+    {
+        "Nome": "fr_furan",
+        "Definição": "Number of furan rings",
+        "Função RDKit": "Descriptors.fr_furan"
+    },
+    {
+        "Nome": "fr_guanido",
+        "Definição": "Number of guanidine groups",
+        "Função RDKit": "Descriptors.fr_guanido"
+    },
+    {
+        "Nome": "fr_halogen",
+        "Definição": "Number of halogens",
+        "Função RDKit": "Descriptors.fr_halogen"
+    },
+    {
+        "Nome": "fr_hdrzine",
+        "Definição": "Number of hydrazine groups",
+        "Função RDKit": "Descriptors.fr_hdrzine"
+    },
+    {
+        "Nome": "fr_hdrzone",
+        "Definição": "Number of hydrazone groups",
+        "Função RDKit": "Descriptors.fr_hdrzone"
+    },
+    {
+        "Nome": "fr_imidazole",
+        "Definição": "Number of imidazole rings",
+        "Função RDKit": "Descriptors.fr_imidazole"
+    },
+    {
+        "Nome": "fr_imide",
+        "Definição": "Number of imide groups",
+        "Função RDKit": "Descriptors.fr_imide"
+    },
+    {
+        "Nome": "fr_isocyan",
+        "Definição": "Number of isocyanates",
+        "Função RDKit": "Descriptors.fr_isocyan"
+    },
+    {
+        "Nome": "fr_isothiocyan",
+        "Definição": "Number of isothiocyanates",
+        "Função RDKit": "Descriptors.fr_isothiocyan"
+    },
+    {
+        "Nome": "fr_ketone",
+        "Definição": "Number of ketones",
+        "Função RDKit": "Descriptors.fr_ketone"
+    },
+    {
+        "Nome": "fr_ketone_Topliss",
+        "Definição": "Number of ketones excluding diaryl, a,b-unsat. dienones, heteroatom on Calpha",
+        "Função RDKit": "Descriptors.fr_ketone_Topliss"
+    },
+    {
+        "Nome": "fr_lactam",
+        "Definição": "Number of beta lactams",
+        "Função RDKit": "Descriptors.fr_lactam"
+    },
+    {
+        "Nome": "fr_lactone",
+        "Definição": "Number of cyclic esters (lactones)",
+        "Função RDKit": "Descriptors.fr_lactone"
+    },
+    {
+        "Nome": "fr_methoxy",
+        "Definição": "Number of methoxy groups -OCH3",
+        "Função RDKit": "Descriptors.fr_methoxy"
+    },
+    {
+        "Nome": "fr_morpholine",
+        "Definição": "Number of morpholine rings",
+        "Função RDKit": "Descriptors.fr_morpholine"
+    },
+    {
+        "Nome": "fr_nitrile",
+        "Definição": "Number of nitriles",
+        "Função RDKit": "Descriptors.fr_nitrile"
+    },
+    {
+        "Nome": "fr_nitro",
+        "Definição": "Number of nitro groups",
+        "Função RDKit": "Descriptors.fr_nitro"
+    },
+    {
+        "Nome": "fr_nitro_arom",
+        "Definição": "Number of nitro benzene ring substituents",
+        "Função RDKit": "Descriptors.fr_nitro_arom"
+    },
+    {
+        "Nome": "fr_nitro_arom_nonortho",
+        "Definição": "Number of non-ortho nitro benzene ring substituents",
+        "Função RDKit": "Descriptors.fr_nitro_arom_nonortho"
+    },
+    {
+        "Nome": "fr_nitroso",
+        "Definição": "Number of nitroso groups, excluding NO2",
+        "Função RDKit": "Descriptors.fr_nitroso"
+    },
+    {
+        "Nome": "fr_oxazole",
+        "Definição": "Number of oxazole rings",
+        "Função RDKit": "Descriptors.fr_oxazole"
+    },
+    {
+        "Nome": "fr_oxime",
+        "Definição": "Number of oxime groups",
+        "Função RDKit": "Descriptors.fr_oxime"
+    },
+    {
+        "Nome": "fr_para_hydroxylation",
+        "Definição": "Number of para-hydroxylation sites",
+        "Função RDKit": "Descriptors.fr_para_hydroxylation"
+    },
+    {
+        "Nome": "fr_phenol",
+        "Definição": "Number of phenols",
+        "Função RDKit": "Descriptors.fr_phenol"
+    },
+    {
+        "Nome": "fr_phenol_noOrthoHbond",
+        "Definição": "Number of phenolic OH excluding ortho intramolecular Hbond substituents",
+        "Função RDKit": "Descriptors.fr_phenol_noOrthoHbond"
+    },
+    {
+        "Nome": "fr_phos_acid",
+        "Definição": "Number of phosphoric acid groups",
+        "Função RDKit": "Descriptors.fr_phos_acid"
+    },
+    {
+        "Nome": "fr_phos_ester",
+        "Definição": "Number of phosphoric ester groups",
+        "Função RDKit": "Descriptors.fr_phos_ester"
+    },
+    {
+        "Nome": "fr_piperdine",
+        "Definição": "Number of piperdine rings",
+        "Função RDKit": "Descriptors.fr_piperdine"
+    },
+    {
+        "Nome": "fr_piperzine",
+        "Definição": "Number of piperzine rings",
+        "Função RDKit": "Descriptors.fr_piperzine"
+    },
+    {
+        "Nome": "fr_priamide",
+        "Definição": "Number of primary amides",
+        "Função RDKit": "Descriptors.fr_priamide"
+    },
+    {
+        "Nome": "fr_prisulfonamd",
+        "Definição": "Number of primary sulfonamides",
+        "Função RDKit": "Descriptors.fr_prisulfonamd"
+    },
+    {
+        "Nome": "fr_pyridine",
+        "Definição": "Number of pyridine rings",
+        "Função RDKit": "Descriptors.fr_pyridine"
+    },
+    {
+        "Nome": "fr_quatN",
+        "Definição": "Number of quaternary nitrogens",
+        "Função RDKit": "Descriptors.fr_quatN"
+    },
+    {
+        "Nome": "fr_sulfide",
+        "Definição": "Number of thioether",
+        "Função RDKit": "Descriptors.fr_sulfide"
+    },
+    {
+        "Nome": "fr_sulfonamd",
+        "Definição": "Number of sulfonamides",
+        "Função RDKit": "Descriptors.fr_sulfonamd"
+    },
+    {
+        "Nome": "fr_sulfone",
+        "Definição": "Number of sulfone groups",
+        "Função RDKit": "Descriptors.fr_sulfone"
+    },
+    {
+        "Nome": "fr_term_acetylene",
+        "Definição": "Number of terminal acetylenes",
+        "Função RDKit": "Descriptors.fr_term_acetylene"
+    },
+    {
+        "Nome": "fr_tetrazole",
+        "Definição": "Number of tetrazole rings",
+        "Função RDKit": "Descriptors.fr_tetrazole"
+    },
+    {
+        "Nome": "fr_thiazole",
+        "Definição": "Number of thiazole rings",
+        "Função RDKit": "Descriptors.fr_thiazole"
+    },
+    {
+        "Nome": "fr_thiocyan",
+        "Definição": "Number of thiocyanates",
+        "Função RDKit": "Descriptors.fr_thiocyan"
+    },
+    {
+        "Nome": "fr_thiophene",
+        "Definição": "Number of thiophene rings",
+        "Função RDKit": "Descriptors.fr_thiophene"
+    },
+    {
+        "Nome": "fr_unbrch_alkane",
+        "Definição": "Number of unbranched alkanes  of at least 4 members (excludes halogenated alkanes)",
+        "Função RDKit": "Descriptors.fr_unbrch_alkane"
+    },
+    {
+        "Nome": "fr_urea",
+        "Definição": "Number of urea groups",
+        "Função RDKit": "Descriptors.fr_urea"
+    },
+    {
+        "Nome": "qed",
+        "Definição": "Calculate the weighted sum of ADS mapped properties",
+        "Função RDKit": "Descriptors.qed"
+    }
+]

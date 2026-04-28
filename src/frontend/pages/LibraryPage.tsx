@@ -114,16 +114,19 @@ const PROP_THRESHOLDS: Record<string, { value: number; label: string } | null> =
 const CORR_PROPS  = ['MolecularWeight','LogP','TPSA','HBD','HBA','RotatableBonds','QED','Rings','FractionCSP3','MolMR'];
 const CORR_LABELS = ['MW','LogP','TPSA','HBD','HBA','RotB','QED','Rings','Fsp3','MR'];
 
-// Radar: Lipinski / Veber reference limits for normalization
+// Radar: min-max normalization with drug-like property ranges
+// norm(v) = (v - min) / (max - min) → always in [0, 1]
 const RADAR_PROPS = [
-  { key: 'MolecularWeight', label: 'MW',   max: 600, ref: 500 },
-  { key: 'LogP',            label: 'LogP', max: 8,   ref: 5   },
-  { key: 'TPSA',            label: 'TPSA', max: 180, ref: 140 },
-  { key: 'HBD',             label: 'HBD',  max: 8,   ref: 5   },
-  { key: 'HBA',             label: 'HBA',  max: 14,  ref: 10  },
-  { key: 'RotatableBonds',  label: 'RotB', max: 14,  ref: 10  },
-  { key: 'QED',             label: 'QED',  max: 1,   ref: 0.6 },
+  { key: 'MolecularWeight', label: 'MW',   min: 0,  max: 600, ref: 500 },
+  { key: 'LogP',            label: 'LogP', min: -3, max: 7,   ref: 5   },
+  { key: 'TPSA',            label: 'TPSA', min: 0,  max: 180, ref: 140 },
+  { key: 'HBD',             label: 'HBD',  min: 0,  max: 8,   ref: 5   },
+  { key: 'HBA',             label: 'HBA',  min: 0,  max: 14,  ref: 10  },
+  { key: 'RotatableBonds',  label: 'RotB', min: 0,  max: 14,  ref: 10  },
+  { key: 'QED',             label: 'QED',  min: 0,  max: 1,   ref: 0.6 },
 ];
+const normRadar = (v: number, p: typeof RADAR_PROPS[0]) =>
+  Math.min(1, Math.max(0, (v - p.min) / (p.max - p.min)));
 
 const MOL_COLORS = [
   '#0ea5e9','#8b5cf6','#f59e0b','#10b981','#ef4444',
@@ -154,6 +157,32 @@ function LibraryContent({ initialSmiles }: { initialSmiles?: string }) {
   const chartRef      = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<any>(null);
 
+  const downloadChartAsJpeg = () => {
+    const canvas = chartRef.current;
+    if (!canvas) return;
+
+    // Create a temporary canvas to add a white background
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    const ctx = tempCanvas.getContext('2d');
+    if (!ctx) return;
+
+    // Fill with white
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+    // Draw the original canvas on top
+    ctx.drawImage(canvas, 0, 0);
+
+    // Download
+    const dataUrl = tempCanvas.toDataURL('image/jpeg', 1.0);
+    const link = document.createElement('a');
+    link.download = `smilerender_analytics_${activeTab}_${new Date().getTime()}.jpeg`;
+    link.href = dataUrl;
+    link.click();
+  };
+
   // ── Fetch descriptors ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!initialSmiles) { setError('Please paste SMILES in the Hub to visualize data.'); return; }
@@ -163,7 +192,7 @@ function LibraryContent({ initialSmiles }: { initialSmiles?: string }) {
       const smiles = initialSmiles.split('\n').map(s => s.trim()).filter(Boolean);
       if (smiles.length === 0) { setError('SMILES list is empty.'); setLoading(false); return; }
 
-      const CHUNK_SIZE = 20;
+      const CHUNK_SIZE = 10;
       const allClean: MolData[] = [];
 
       try {
@@ -333,7 +362,10 @@ function LibraryContent({ initialSmiles }: { initialSmiles?: string }) {
         const mols = data.slice(0, 10);
         const datasets: any[] = mols.map((m, i) => ({
           label: `#${i + 1}`,
-          data: RADAR_PROPS.map(p => Math.min(1, (m[p.key] as number ?? 0) / p.max)),
+          data: RADAR_PROPS.map(p => {
+            const v = Number(m[p.key]);
+            return isNaN(v) ? normRadar(0, p) : normRadar(v, p);
+          }),
           borderColor: MOL_COLORS[i % MOL_COLORS.length],
           backgroundColor: MOL_COLORS[i % MOL_COLORS.length] + '22',
           borderWidth: 2,
@@ -343,7 +375,7 @@ function LibraryContent({ initialSmiles }: { initialSmiles?: string }) {
 
         datasets.push({
           label: 'Ro5/Veber limit',
-          data: RADAR_PROPS.map(p => p.ref / p.max),
+          data: RADAR_PROPS.map(p => normRadar(p.ref, p)),
           borderColor: '#94a3b8',
           backgroundColor: 'transparent',
           borderWidth: 2,
@@ -371,13 +403,13 @@ function LibraryContent({ initialSmiles }: { initialSmiles?: string }) {
               tooltip: {
                 callbacks: {
                   label: (item: any) => {
-                    if (item.datasetIndex >= mols.length) {
-                      const p = RADAR_PROPS[item.dataIndex];
-                      return ` Ro5/Veber limit: ${p.ref} (norm: ${(p.ref / p.max).toFixed(2)})`;
-                    }
                     const p = RADAR_PROPS[item.dataIndex];
-                    const mol = data[item.datasetIndex];
-                    return ` ${item.dataset.label}: ${mol?.[p.key] ?? 'N/A'} ${p.max === 1 ? '' : `/ ${p.max}`}`;
+                    if (item.datasetIndex >= mols.length) {
+                      return ` Ro5/Veber limit: ${p.ref} (range ${p.min}–${p.max})`;
+                    }
+                    const mol = mols[item.datasetIndex];
+                    const raw = mol?.[p.key] ?? 'N/A';
+                    return ` ${item.dataset.label}: ${typeof raw === 'number' ? raw.toFixed(p.max <= 1 ? 3 : 1) : raw}`;
                   },
                 },
               },
@@ -587,10 +619,10 @@ function LibraryContent({ initialSmiles }: { initialSmiles?: string }) {
         </div>
 
         {/* Tab controls bar */}
-        <div style={{ padding: '16px 24px', borderBottom: `1px solid ${colors.borderLight}`, backgroundColor: '#fafbfd', minHeight: '62px', display: 'flex', alignItems: 'center' }}>
+        <div style={{ padding: '16px 24px', borderBottom: `1px solid ${colors.borderLight}`, backgroundColor: '#fafbfd', minHeight: '62px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
 
           {activeTab === 'bubble' && (
-            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'flex-end', width: '100%' }}>
+            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'flex-end', flex: 1 }}>
               <div style={{ display: 'flex', borderRadius: '8px', border: `1px solid ${colors.border}`, overflow: 'hidden', flexShrink: 0, alignSelf: 'flex-end', marginBottom: '1px' }}>
                 {([['scatter', 'bi-circle', '2 Variables'], ['bubble', 'bi-circle-fill', '3 Variables']] as const).map(([mode, icon, lbl]) => (
                   <button key={mode} onClick={() => setSpaceMode(mode)} style={{
@@ -638,12 +670,12 @@ function LibraryContent({ initialSmiles }: { initialSmiles?: string }) {
           {activeTab === 'radar' && (
             <p style={{ margin: 0, fontSize: '12px', color: colors.textMuted, lineHeight: 1.5 }}>
               <b style={{ color: colors.text }}>Drug-likeness Radar —</b> Normalized property profiles vs. Ro5/Veber reference limits (max 10 compounds).
-              Dashed ring: MW≤500, LogP≤5, TPSA≤140, HBD≤5, HBA≤10, RotB≤10, QED≥0.6.
+              Dashed ring = Ro5/Veber limits. Each axis normalized to its drug-like range (LogP: −3→7, MW: 0→600, TPSA: 0→180, etc.) — hover for raw values.
             </p>
           )}
 
           {activeTab === 'histogram' && (
-            <div style={{ display: 'flex', gap: '18px', flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
+            <div style={{ display: 'flex', gap: '18px', flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
               <div style={{ minWidth: '200px' }}>
                 <label style={{ fontSize: '10px', fontWeight: 700, color: colors.textLight, textTransform: 'uppercase', marginBottom: '5px', display: 'block', letterSpacing: '0.06em' }}>Property</label>
                 <select value={histProp} onChange={e => setHistProp(e.target.value)} style={{ padding: '8px 10px', borderRadius: '8px', border: `1px solid ${colors.border}`, fontSize: '12px', minWidth: '200px' }}>

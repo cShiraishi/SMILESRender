@@ -53,11 +53,26 @@ function SmilesCard(props: { smiles: string; name?: string }) {
         textAlign: 'center',
         overflowWrap: 'break-word',
         width: '100%',
-        margin: 0,
+        margin: '0 0 10px 0',
         fontFamily: 'monospace',
       }}>
         {label}
       </p>
+      <button 
+        onClick={() => {
+          const a = document.createElement('a');
+          a.href = `/render/${window.btoa(props.smiles)}?format=jpeg`;
+          a.download = `molecule_${new Date().getTime()}.jpg`;
+          a.click();
+        }}
+        style={{
+          border: 'none', background: 'none', color: '#007bff', 
+          fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: '4px'
+        }}
+      >
+        <i className="bi bi-download"></i> JPEG
+      </button>
     </div>
   );
 }

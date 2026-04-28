@@ -33,7 +33,26 @@
       "Bash(ollama list:*)",
       "Bash(ollama pull:*)",
       "Bash(ollama show:*)",
-      "Bash(ollama run:*)"
+      "Bash(ollama run:*)",
+      "Bash(.venv/Scripts/python *)",
+      "Bash(netstat -ano)",
+      "Bash(start *)",
+      "Bash(../.venv/Scripts/python -c \"from tasks import render_batch_task, predict_tool_task; print\\('OK'\\)\")",
+      "Bash(../.venv/Scripts/python -c \"from routes import app; print\\('OK'\\)\")",
+      "Bash(python3 src/main.py)",
+      "Bash(python *)",
+      "Bash(py -3 --version)",
+      "Bash(.venv/Scripts/python.exe --version)",
+      "Bash(.venv/Scripts/python.exe *)",
+      "Bash(.venv/Scripts/pip.exe list *)",
+      "Bash(.venv/Scripts/pip.exe install *)",
+      "Bash(../.venv/Scripts/python.exe -c \"from admet_interpreter import interpret; print\\('OK'\\)\")",
+      "Bash(../.venv/Scripts/python.exe -c ' *)",
+      "Bash(taskkill /F /IM python.exe)",
+      "PowerShell(Stop-Process *)",
+      "Bash(node --input-type=module --eval ' *)",
+      "PowerShell(Start-Process -FilePath \".\\\\.venv\\\\Scripts\\\\python.exe\" -ArgumentList \"src\\\\main.py\" -NoNewWindow -PassThru | Select-Object -ExpandProperty Id)",
+      "PowerShell(py *)"
     ]
   }
 }

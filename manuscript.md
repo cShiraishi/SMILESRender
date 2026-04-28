@@ -10,7 +10,7 @@
 
 **Background:** The *in silico* evaluation of absorption, distribution, metabolism, excretion, and toxicity (ADMET) alongside structural conversions is a critical phase in modern hit-to-lead optimization pipelines. However, the current landscape of cheminformatics web tools is highly fragmented, forcing researchers to navigate multiple disjointed server portals to aggregate predictive models. Furthermore, novel computational libraries for specialized tasks, such as bidirectional peptide-SMILES translations, often lack accessible graphical user interfaces (GUIs), limiting their adoption by structural biologists and medicinal chemists without advanced programming expertise.
 
-**Results:** We present SMILESRender, an open-source, web-based platform that unifies disparate computational chemistry toolsets into a single, high-performance interface. The platform orchestrates five independent, state-of-the-art predictive oracles (StopTox [1], SwissADME [2], StopLight [3], pkCSM [4], and ADMETlab 3.0 [5]) via a secure, asynchronous local reverse-proxy. Concurrently, it computes 212 physicochemical descriptors (see Table S1) and multiple structural fingerprints (Morgan ECFP4, MACCS, and Atom Pairs) locally using RDKit. We also integrated the `PepLink` library to provide seamless bidirectional translation between canonical amino acid sequences and molecular SMILES. To ensure robust deployment on low-resource cloud infrastructures, SMILESRender implements a frontend-driven asynchronous chunking algorithm that prevents server-side Out-Of-Memory (OOM) crashes during bulk dataset processing by segmenting requests into throttled payload chunks ($k=10$).
+**Results:** We present SMILESRender, an open-source, web-based platform that unifies disparate computational chemistry toolsets into a single, high-performance interface. The platform orchestrates four independent, state-of-the-art predictive oracles (StopTox [1], StopLight [2], pkCSM [3], and ADMETlab 3.0 [4]) via a secure, asynchronous local reverse-proxy. Concurrently, it computes 212 physicochemical descriptors (see Table S1) and multiple structural fingerprints (Morgan ECFP4, MACCS, and Atom Pairs) locally using RDKit. We also integrated the `PepLink` library to provide seamless bidirectional translation between canonical amino acid sequences and molecular SMILES. To ensure robust deployment on low-resource cloud infrastructures, SMILESRender implements a frontend-driven asynchronous chunking algorithm that prevents server-side Out-Of-Memory (OOM) crashes during bulk dataset processing by segmenting requests into throttled payload chunks ($k=10$).
 
 **Conclusions:** SMILESRender bridges the gap between advanced predictive cheminformatics algorithms and accessible web design. By consolidating diverse endpoints and structural analyses into a highly reactive dashboard natively deployable via Docker, it significantly lowers the barrier to entry for bulk chemical space profiling, dataset preparation for machine learning, and peptide drug exploration.
 
@@ -18,7 +18,7 @@
 
 ## 1. Background
 
-The early-stage identification of drug-like candidates relies heavily on the computational modeling of physicochemical properties and ADMET profiles. The scientific community has historically relied on a suite of renowned, independent web servers such as SwissADME, pkCSM, and ADMETlab 3.0 for these models. While highly accurate, performing high-throughput comparative benchmarking across these platforms is notoriously inefficient. Researchers are typically forced to submit queries manually, scrape the heterogeneous outputs, and compile data into spreadsheets—a process vulnerable to human error and severely lacking in automation.
+The early-stage identification of drug-like candidates relies heavily on the computational modeling of physicochemical properties and ADMET profiles. The scientific community has historically relied on a suite of renowned, independent web servers such as pkCSM and ADMETlab 3.0 for these models. While highly accurate, performing high-throughput comparative benchmarking across these platforms is notoriously inefficient. Researchers are typically forced to submit queries manually, scrape the heterogeneous outputs, and compile data into spreadsheets—a process vulnerable to human error and severely lacking in automation.
 
 Simultaneously, the computational engineering of peptide therapeutics is gaining unprecedented momentum. Converting canonical amino acid sequences to their Simplified Molecular-Input Line-Entry System (SMILES) representations—and crucially, reverse-engineering chemical SMILES back into biological sequences—remains an informatics bottleneck. Modern Python libraries like `PepLink` execute these tasks programmatically, yet they lack integrated web frameworks to serve the broader life sciences community.
 
@@ -73,7 +73,6 @@ SMILESRender successfully demonstrates that the aggressive consolidation of dece
 
 ## 7. References
 1. *Placeholder for StopTox reference.*
-2. *Placeholder for SwissADME reference.*
-3. *Placeholder for StopLight reference.*
-4. *Placeholder for pkCSM reference.*
-5. *Placeholder for ADMETlab 3.0 reference.*
+2. *Placeholder for StopLight reference.*
+3. *Placeholder for pkCSM reference.*
+4. *Placeholder for ADMETlab 3.0 reference.*

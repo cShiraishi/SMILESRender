@@ -1,7 +1,7 @@
 import type { BuildConfig } from 'bun';
 
 // Build workers first as separate bundles
-const workers = ['prediction.worker', 'pkcsm.worker', 'admetlab.worker'];
+const workers = ['prediction.worker', 'admetlab.worker'];
 
 for (const name of workers) {
   const result = await Bun.build({

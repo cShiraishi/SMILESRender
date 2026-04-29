@@ -17,51 +17,52 @@ function PageShell({ icon, title, subtitle, accentColor = colors.blue, onBack, c
       <div style={{
         backgroundColor: colors.surface,
         borderBottom: `1px solid ${colors.border}`,
-        padding: '0 32px',
+        padding: '10px 20px',
         boxShadow: shadow.sm,
       }}>
         <div style={{
-          maxWidth: '96%',
-          margin: '0 auto',
-          height: '56px',
+          width: '100%',
+          padding: '0 20px',
           display: 'flex',
           alignItems: 'center',
-          gap: '16px',
+          gap: '12px',
+          flexWrap: 'wrap',
         }}>
           <button
             onClick={onBack}
             style={{
               background: 'none',
               border: `1px solid ${colors.border}`,
-              borderRadius: '4px',
-              padding: '5px 12px',
+              borderRadius: '6px',
+              padding: '6px 14px',
               cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: 500,
+              fontSize: '13px',
+              fontWeight: 600,
               color: colors.textMuted,
               fontFamily: font,
-              display: 'flex', alignItems: 'center', gap: '4px',
+              display: 'flex', alignItems: 'center', gap: '6px',
+              backgroundColor: '#fff',
             }}
           >
             <i className="bi bi-arrow-left"></i> All Tools
           </button>
-          <div style={{ width: '1px', height: '20px', backgroundColor: colors.border }} />
+          <div style={{ width: '1px', height: '24px', backgroundColor: colors.border, margin: '0 8px' }} />
           <div style={{
-            width: '32px', height: '32px',
+            width: '38px', height: '38px',
             backgroundColor: `${accentColor}14`,
-            borderRadius: '6px',
+            borderRadius: '8px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <i className={`bi ${icon}`} style={{ fontSize: '15px', color: accentColor }}></i>
+            <i className={`bi ${icon}`} style={{ fontSize: '18px', color: accentColor }}></i>
           </div>
-          <div>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: colors.text }}>{title}</div>
-            {subtitle && <div style={{ fontSize: '11px', color: colors.textMuted }}>{subtitle}</div>}
+          <div style={{ flex: '1 1 auto', minWidth: '150px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: colors.text, lineHeight: 1.2 }}>{title}</div>
+            {subtitle && <div style={{ fontSize: '11px', color: colors.textMuted, marginTop: '2px' }}>{subtitle}</div>}
           </div>
         </div>
       </div>
       {/* Content */}
-      <div style={{ maxWidth: '96%', margin: '0 auto', padding: '32px' }}>
+      <div style={{ width: '100%', padding: '20px 40px' }}>
         {children}
       </div>
     </div>

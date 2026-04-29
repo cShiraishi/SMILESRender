@@ -44,13 +44,15 @@ const DiscoverGrid: React.FC<Props> = ({ apps, onNavigate }) => {
           }}
           onMouseEnter={e => {
             const el = e.currentTarget as HTMLElement;
-            el.style.transform = 'translateY(-8px) scale(1.02)';
-            el.style.boxShadow = '0 25px 50px rgba(0,0,0,0.1)';
+            el.style.transform = 'translateY(-12px) scale(1.03)';
+            el.style.boxShadow = `0 30px 60px rgba(0,0,0,0.12), 0 0 20px ${app.color}22`;
+            el.style.borderColor = app.color;
           }}
           onMouseLeave={e => {
             const el = e.currentTarget as HTMLElement;
             el.style.transform = 'translateY(0) scale(1)';
             el.style.boxShadow = '0 4px 15px rgba(0,0,0,0.05)';
+            el.style.borderColor = '#f1f5f9';
           }}
         >
           {/* iOS Style Squircle Icon with Molecule Interaction */}
@@ -70,26 +72,26 @@ const DiscoverGrid: React.FC<Props> = ({ apps, onNavigate }) => {
           </div>
 
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <h3 style={{ fontSize: '17px', fontWeight: 700, color: colors.text, margin: '0 0 4px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b', margin: '0 0 4px' }}>
               {app.title}
             </h3>
-            <span style={{ fontSize: '12px', color: colors.textMuted, fontWeight: 500, marginBottom: '16px', display: 'block' }}>
-              {app.tags[0]} &middot; AI Intelligence
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500, marginBottom: '16px', display: 'block' }}>
+              {app.tags[0]} &middot; Professional Tool
             </span>
             
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
               <button className="get-btn" style={{
-                backgroundColor: '#f1f2f6',
-                color: colors.blue,
+                backgroundColor: '#f1f5f9',
+                color: app.color,
                 fontWeight: 800,
                 fontSize: '13px',
-                padding: '6px 22px',
+                padding: '8px 24px',
                 borderRadius: '20px',
                 border: 'none',
-                cursor: 'pointer',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                cursor: 'inherit',
+                transition: 'all 0.2s ease',
               }}>
-                OPEN
+                GET
               </button>
               <div style={{ display: 'flex', gap: '3px' }}>
                 <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: colors.border }}></div>
@@ -100,6 +102,10 @@ const DiscoverGrid: React.FC<Props> = ({ apps, onNavigate }) => {
           </div>
 
           <style>{`
+            .appstore-card {
+              /* Molecule Cursor (Base64 SVG) */
+              cursor: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIzIiBzdHJva2U9IiMxYTNhNWMiIHN0cm9rZS13aWR0aD0iMiIvPjxjaXJjbGUgY3g9IjE5IiBjeT0iNSIgcj0iMiIgc3Ryb2tlPSIjMGQ5NDg4IiBzdHJva2Utd2lkdGg9IjIiLz48Y2lyY2xlIGN4PSI1IiBjeT0iMTkiIHI9IjIiIHN0cm9rZT0iIzBkOTQ4OCIgc3Ryb2tlLXdpZHRoPSIyIi8+PGNpcmNsZSBjeD0iMTkiIGN5PSIxOSIgcj0iMiIgc3Ryb2tlPSIjYjQ1MzA5IiBzdHJva2Utd2lkdGg9IjIiLz48Y2lyY2xlIGN4PSI1IiBjeT0iNSIgcj0iMiIgc3Ryb2tlPSIjYjQ1MzA5IiBzdHJva2Utd2lkdGg9IjIiLz48bGluZSB4MT0iNyIgeTE9IjciIHgyPSIxMCIgeTI9IjEwIiBzdHJva2U9IiM5NGEzYjgiIHN0cm9rZS13aWR0aD0iMSIvPjxsaW5lIHgxPSIxNyIgeTE9IjE3IiB4Mj0iMTQiIHkyPSIxNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjEiLz48bGluZSB4MT0iMTciIHkxPSI3IiB4Mj0iMTQiIHkyPSIxMCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjEiLz48bGluZSB4MT0iNyIgeTE9IjE3IiB4Mj0iMTAiIHkyPSIxNCIgc3Ryb2tlPSIjOTRhM2I4IiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4="KSAxNiAxNiwgYXV0bzsg
+            }
             .appstore-card:hover .icon-squircle i {
               transform: scale(1.1) rotate(-8deg);
               filter: drop-shadow(0 0 8px rgba(255,255,255,0.4));
@@ -109,8 +115,9 @@ const DiscoverGrid: React.FC<Props> = ({ apps, onNavigate }) => {
               background-color: #e2e8f0;
             }
             .get-btn:hover {
-              background-color: #eaebf0;
-              opacity: 0.9;
+              background-color: #fff;
+              box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+              transform: scale(1.05);
             }
           `}</style>
         </div>

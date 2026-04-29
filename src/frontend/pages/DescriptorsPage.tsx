@@ -338,55 +338,25 @@ function DescContent({ initialSmiles }: { initialSmiles?: string }) {
           <button onClick={run} disabled={loading} style={btnStyle(false, true)}>
             {loading ? 'Calculating…' : 'Calculate Descriptors'}
           </button>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button
             onClick={() => {
               setFigSelected(new Set(results.map(r => r.smiles)));
               setFigureOpen(true);
             }}
             disabled={loading || !results.length}
-            className="panel-btn"
-            style={{ 
-              background: 'linear-gradient(135deg, #4f46e5, #0891b2)', 
-              color: 'white', 
-              border: 'none',
-              padding: '0.6rem 1.2rem',
-              borderRadius: '12px',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              cursor: results.length ? 'pointer' : 'not-allowed',
-              opacity: results.length ? 1 : 0.6,
-              boxShadow: '0 4px 12px rgba(8, 145, 178, 0.2)'
-            }}
+            style={{ ...btnStyle(false, false), opacity: results.length ? 1 : 0.45 }}
           >
-            <span style={{ fontSize: '1.2rem' }}>🖼️</span>
+            <i className="bi bi-grid" style={{ marginRight: '5px' }} />
             Publication Figure
           </button>
           <button
             onClick={exportExcel}
             disabled={exporting || !results.length}
-            className="panel-btn"
-            style={{
-              background: 'rgba(15, 23, 42, 0.8)',
-              color: 'white',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              padding: '0.6rem 1.2rem',
-              borderRadius: '12px',
-              cursor: results.length ? 'pointer' : 'not-allowed',
-              opacity: results.length ? 1 : 0.6
-            }}
+            style={{ ...btnStyle(false, false), opacity: results.length ? 1 : 0.45 }}
           >
-            {exporting ? 'Exporting...' : 'Export Excel'}
+            <i className="bi bi-file-earmark-excel" style={{ marginRight: '5px' }} />
+            {exporting ? 'Exporting…' : 'Export Excel'}
           </button>
-        </div>
-          {results.length > 0 && (
-            <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
-              <button onClick={() => setView('table')} style={btnStyle(view === 'table', false)}>Table</button>
-              <button onClick={() => setView('cards')} style={btnStyle(view === 'cards', false)}>Cards</button>
-            </div>
-          )}
         </div>
       {fpStale && (
         <div style={{ marginTop: '10px', padding: '10px 14px', backgroundColor: '#fffbeb', border: `1px solid ${colors.warning}`, borderRadius: radius.sm, fontSize: '13px', fontFamily: font, color: '#92400e', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -400,6 +370,23 @@ function DescContent({ initialSmiles }: { initialSmiles?: string }) {
         </div>
       )}
       </div>
+
+      {/* Results toolbar */}
+      {results.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: colors.textMuted }}>
+            {results.filter(r => !r.error).length} molecule{results.filter(r => !r.error).length !== 1 ? 's' : ''} calculated
+          </span>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button onClick={() => setView('table')} style={btnStyle(view === 'table', false)}>
+              <i className="bi bi-table" style={{ marginRight: '4px' }} />Table
+            </button>
+            <button onClick={() => setView('cards')} style={btnStyle(view === 'cards', false)}>
+              <i className="bi bi-grid-3x3-gap" style={{ marginRight: '4px' }} />Cards
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Category tabs */}
       {results.length > 0 && (
@@ -423,8 +410,8 @@ function DescContent({ initialSmiles }: { initialSmiles?: string }) {
 
       {/* Table view */}
       {results.length > 0 && view === 'table' && (
-        <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: radius.lg, overflow: 'hidden', boxShadow: shadow.sm }}>
-          <div style={{ overflowX: 'auto' }}>
+        <div style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}`, borderRadius: radius.lg, overflow: 'hidden', boxShadow: shadow.sm, minWidth: 0 }}>
+          <div style={{ overflowX: 'auto', width: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', fontFamily: font }}>
               <thead>
                 <tr style={{ backgroundColor: colors.navy }}>

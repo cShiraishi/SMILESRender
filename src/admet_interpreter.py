@@ -200,94 +200,6 @@ def _check_stoplight(tools: dict, p: MoleculeProfile):
         p.add(Flag("low", "StopLight", "Passes Lipinski Rule of 5 — good oral drug-likeness"))
 
 
-def _check_pkcsm(tools: dict, p: MoleculeProfile):
-    pk = tools.get("pkCSM", {})
-
-    def pkv(*kws):
-        return _find({"pkCSM": pk}, "pkCSM", *kws)
-
-    # Absorption
-    ia = _num(pkv("intestinal absorption"))
-    if ia is not None:
-        if ia < 30:
-            p.add(Flag("high", "pkCSM", f"Human intestinal absorption {ia:.1f}% — poor (< 30%)"))
-        elif ia < 70:
-            p.add(Flag("medium", "pkCSM", f"Human intestinal absorption {ia:.1f}% — moderate (30-70%)"))
-        else:
-            p.add(Flag("low", "pkCSM", f"Human intestinal absorption {ia:.1f}% — good"))
-
-    caco2 = _num(pkv("caco2"))
-    if caco2 is not None:
-        if caco2 < -5.15:
-            p.add(Flag("medium", "pkCSM",
-                       f"Caco-2 permeability {caco2:.2f} log cm/s — low intestinal permeability"))
-
-    pgp_sub = _yes(pkv("p-glycoprotein substrate"))
-    if pgp_sub is True:
-        p.add(Flag("medium", "pkCSM",
-                   "P-glycoprotein substrate — risk of active efflux, reduced CNS/intestinal exposure"))
-
-    # Distribution
-    bbb = _yes(pkv("bbb"))
-    if bbb is True:
-        p.add(Flag("low", "pkCSM", "BBB permeable — CNS penetration predicted"))
-    elif bbb is False:
-        p.add(Flag("low", "pkCSM", "BBB non-permeable — limited CNS penetration"))
-
-    vd = _num(pkv("vdss") or pkv("volume of distribution"))
-    if vd is not None:
-        if vd < 0.04:
-            p.add(Flag("medium", "pkCSM", f"VDss {vd:.2f} L/kg — very low distribution (plasma-confined)"))
-        elif vd > 20:
-            p.add(Flag("medium", "pkCSM", f"VDss {vd:.2f} L/kg — very high tissue distribution"))
-
-    # Metabolism — CYP inhibition
-    cyp_inh = []
-    for cyp in ("CYP1A2", "CYP2C19", "CYP2C9", "CYP2D6", "CYP3A4"):
-        v = _yes(pkv(cyp, "inhibitor"))
-        if v is True:
-            cyp_inh.append(cyp)
-    if len(cyp_inh) >= 3:
-        p.add(Flag("high", "pkCSM",
-                   f"Inhibits {len(cyp_inh)} CYP isoforms ({', '.join(cyp_inh)}) — high drug-drug interaction risk"))
-    elif cyp_inh:
-        p.add(Flag("medium", "pkCSM",
-                   f"CYP inhibitor: {', '.join(cyp_inh)} — potential drug-drug interactions"))
-    else:
-        p.add(Flag("low", "pkCSM", "No major CYP450 inhibition predicted"))
-
-    # Toxicity
-    ames = _yes(pkv("ames"))
-    if ames is True:
-        p.add(Flag("critical", "pkCSM", "AMES mutagenicity: POSITIVE — genotoxicity concern"))
-    elif ames is False:
-        p.add(Flag("low", "pkCSM", "AMES mutagenicity: negative"))
-
-    hepato = _yes(pkv("hepatotox"))
-    if hepato is True:
-        p.add(Flag("high", "pkCSM", "Hepatotoxicity predicted — liver safety concern"))
-    elif hepato is False:
-        p.add(Flag("low", "pkCSM", "No hepatotoxicity predicted"))
-
-    for herg in ("herg i inhibitor", "herg ii inhibitor"):
-        v = _yes(pkv(herg))
-        label = "hERG I" if "i inhib" in herg and "ii" not in herg else "hERG II"
-        if v is True:
-            p.add(Flag("critical", "pkCSM",
-                       f"{label} inhibitor — cardiac arrhythmia (QT prolongation) risk"))
-
-    skin_sens = _yes(pkv("skin sensitisation") or pkv("skin sensitization"))
-    if skin_sens is True:
-        p.add(Flag("medium", "pkCSM", "Skin sensitisation predicted"))
-
-    ld50_oral = _num(pkv("oral rat acute") or pkv("ld50"))
-    if ld50_oral is not None:
-        # pkCSM returns log(mol/kg); convert back if < 5 (probably already in log scale)
-        if ld50_oral < 1.0:
-            p.add(Flag("high", "pkCSM",
-                       f"Oral acute toxicity LD50 {ld50_oral:.2f} log mol/kg — high acute toxicity"))
-
-
 def _check_protox(tools: dict, p: MoleculeProfile):
     pt = tools.get("ADMETlab 3.0", {})
 
@@ -390,7 +302,6 @@ def interpret(smiles: str, tools: dict) -> MoleculeProfile:
     p = MoleculeProfile(smiles=smiles)
     _check_stoptox(tools, p)
     _check_stoplight(tools, p)
-    _check_pkcsm(tools, p)
     _check_protox(tools, p)  # Checks ADMETlab 3.0
     p.narrative = _narrative(p)
     return p

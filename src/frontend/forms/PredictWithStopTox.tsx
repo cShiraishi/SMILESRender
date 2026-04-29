@@ -2,8 +2,8 @@ import React, { useRef } from 'react';
 import { useState, useEffect } from 'react';
 import Prediction from '../components/Prediction';
 import StopLight from '../components/StopLight';
-import PKCSM from '../components/PKCSM';
 import ToolErrorBoundary from '../components/ToolErrorBoundary';
+import Dashboard from '../components/Dashboard';
 import MoleculeDrawerModal from '../components/MoleculeDrawerModal';
 import RDKitFilters from '../components/RDKitFilters';
 import * as csvTools from '../tools/csv';
@@ -14,15 +14,14 @@ const defaultSmiles = [
   'OC[C@@H](O1)[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)1',
 ];
 
-const TOOLS = ['RDKit', 'StopTox', 'StopLight', 'pkCSM'] as const;
+const TOOLS = ['RDKit', 'StopTox', 'StopLight'] as const;
 type ToolName = typeof TOOLS[number];
 type ToolState = 'loading' | 'done' | 'error' | 'queued';
 
 const TOOL_COLORS: Record<ToolName, string> = {
-  RDKit:          '#0d9488',
-  StopTox:        '#b45309',
-  StopLight:      '#1d4ed8',
-  pkCSM:          '#16a34a',
+  RDKit:      '#0d9488',
+  StopTox:    '#b45309',
+  StopLight:  '#1d4ed8',
 };
 
 
@@ -185,13 +184,24 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
   return (
     <div style={{ width: '95%', maxWidth: '1200px' }}>
       {/* Tab nav */}
-      <div style={{ display: 'flex', marginBottom: '20px', gap: '10px' }}>
+      <div style={{ display: 'flex', marginBottom: '20px', gap: '10px', flexWrap: 'wrap' }}>
         {(['input', 'results'] as const).map(tab => (
           <button key={tab}
             disabled={tab === 'results' && !smilesToRender.length}
             onClick={() => setActiveTab(tab)}
-            style={{ backgroundColor: activeTab === tab ? '#007bff' : '#e0e0e0', color: activeTab === tab ? 'white' : '#333', border: 'none', padding: '10px 20px', borderRadius: '5px', cursor: 'pointer' }}
-          >{tab === 'input' ? 'SMILES Input' : 'Results'}</button>
+            style={{ 
+              backgroundColor: activeTab === tab ? '#1a3a5c' : '#e2e8f0', 
+              color: activeTab === tab ? 'white' : '#475569', 
+              border: 'none', 
+              padding: '12px 24px', 
+              borderRadius: '8px', 
+              cursor: 'pointer',
+              flex: '1 1 auto',
+              fontWeight: 600,
+              fontSize: '14px',
+              transition: 'all 0.2s'
+            }}
+          >{tab === 'input' ? '🧪 SMILES Input' : '📊 Results Dashboard'}</button>
         ))}
       </div>
 
@@ -371,7 +381,7 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
                 {isReady ? '✅ Analysis complete' : `⏳ Analysing… ${percentage}%`}
               </span>
               <span style={{ fontSize: '13px', color: '#666' }}>
-                {uniqueSmiles.length} molécula{uniqueSmiles.length !== 1 ? 's' : ''} · 4 tools each
+                {uniqueSmiles.length} molécula{uniqueSmiles.length !== 1 ? 's' : ''} · 3 tools each
               </span>
             </div>
 
@@ -379,6 +389,11 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
             <div style={{ width: '100%', height: '8px', backgroundColor: '#e0e0e0', borderRadius: '4px', overflow: 'hidden', marginBottom: '16px' }}>
               <div style={{ width: `${percentage}%`, height: '100%', backgroundColor: isReady ? '#16a34a' : '#007bff', transition: 'width 0.4s ease', borderRadius: '4px' }} />
             </div>
+
+            {/* Dashboard Overview — only after full analysis */}
+            {isReady && (
+              <Dashboard allResults={Object.values(allResults).flat()} uniqueSmiles={uniqueSmiles} />
+            )}
 
             {/* Per-molecule status cards */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -396,9 +411,8 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
                       {TOOLS.map(tool => {
                         const state = toolStatus[`${smi}-${tool}`] ?? 'queued';
                         const icon  = state === 'done' ? '✅' : state === 'error' ? '❌' : state === 'queued' ? '⏸️' : '⏳';
-                        const slow  = state === 'loading' && tool === 'pkCSM';
                         return (
-                          <span key={tool} title={slow ? 'pkCSM faz polling no servidor externo — pode demorar até ~100s' : undefined}
+                          <span key={tool}
                             style={{
                               display: 'inline-flex', alignItems: 'center', gap: '4px',
                               padding: '3px 10px', borderRadius: '20px', fontSize: '12px',
@@ -406,7 +420,7 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
                               color: state === 'done' ? '#16a34a' : state === 'error' ? '#dc2626' : state === 'queued' ? '#94a3b8' : '#64748b',
                               border: `1px solid ${TOOL_COLORS[tool]}22`,
                             }}>
-                            {icon} {tool}{slow ? ' (~100s)' : ''}
+                            {icon} {tool}
                           </span>
                         );
                       })}
@@ -418,16 +432,22 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
 
             {/* Export buttons */}
             {doneCount > 0 && (
-              <div style={{ display: 'flex', gap: '12px', marginTop: '16px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginTop: '20px' }}>
                 <button onClick={() => handleExport('excel')}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#16a34a', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', backgroundColor: '#16a34a', color: 'white', border: 'none', padding: '12px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', transition: 'transform 0.1s' }}
+                  onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
+                  onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+                >
                   <i className="bi bi-file-earmark-excel"></i>
-                  {isReady ? 'Export Excel' : `Export Excel (${percentage}%)`}
+                  {isReady ? 'Export Excel' : `Export Excel (${percentage}% complete)`}
                 </button>
                 <button onClick={() => handleExport('report')}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#1a3a5c', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', backgroundColor: '#1a3a5c', color: 'white', border: 'none', padding: '12px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', transition: 'transform 0.1s' }}
+                  onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
+                  onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+                >
                   <i className="bi bi-file-earmark-pdf"></i>
-                  {isReady ? 'Export PDF Report' : `Export PDF Report (${percentage}%)`}
+                  {isReady ? 'Export PDF Report' : `Export PDF Report (${percentage}% complete)`}
                 </button>
               </div>
             )}
@@ -448,9 +468,6 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
                   </ToolErrorBoundary>
                   <ToolErrorBoundary toolName="StopLight" onError={() => updateResults(smi, 'StopLight', [])}>
                     <StopLight smiles={smi} onDataLoaded={d => updateResults(smi, 'StopLight', d)} />
-                  </ToolErrorBoundary>
-                  <ToolErrorBoundary toolName="pkCSM"     onError={() => updateResults(smi, 'pkCSM',     [])}>
-                    <PKCSM smiles={smi} onDataLoaded={d => updateResults(smi, 'pkCSM', d)} />
                   </ToolErrorBoundary>
                 </div>
               );

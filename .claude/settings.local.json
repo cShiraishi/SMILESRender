@@ -52,7 +52,11 @@
       "PowerShell(Stop-Process *)",
       "Bash(node --input-type=module --eval ' *)",
       "PowerShell(Start-Process -FilePath \".\\\\.venv\\\\Scripts\\\\python.exe\" -ArgumentList \"src\\\\main.py\" -NoNewWindow -PassThru | Select-Object -ExpandProperty Id)",
-      "PowerShell(py *)"
+      "PowerShell(py *)",
+      "mcp__claude_ai_PubMed__search_articles",
+      "mcp__claude_ai_PubMed__get_article_metadata",
+      "WebFetch(domain:jcheminf.biomedcentral.com)",
+      "WebFetch(domain:link.springer.com)"
     ]
   }
 }

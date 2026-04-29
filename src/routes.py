@@ -20,7 +20,6 @@ from admet_interpreter import interpret, RISK_LABEL
 
 # Limite de concorrência: apenas 1 processamento pesado por vez (Otimizado para Render Free)
 processing_semaphore = threading.Semaphore(1)
-pkcsm_lock = threading.Lock()
 MAX_SMILES = 10
 
 # Redis cache (opcional — fallback silencioso se indisponível)
@@ -45,27 +44,6 @@ def _cache_set(key: str, value: bytes, ttl: int = 86400):
         except Exception: pass
 
 import time
-# Armazena openers pkCSM com cookies de sessão: smiles_hash -> {opener, time}
-_pkcsm_openers = {}
-
-def get_pkcsm_opener(hash_val):
-    with pkcsm_lock:
-        entry = _pkcsm_openers.get(hash_val)
-        if entry and time.time() - entry['time'] < 1800:
-            return entry['opener']
-        if entry:
-            del _pkcsm_openers[hash_val]
-    return None
-
-def set_pkcsm_opener(hash_val, opener):
-    with pkcsm_lock:
-        if len(_pkcsm_openers) > 500:
-            now = time.time()
-            to_del = [k for k, v in _pkcsm_openers.items() if now - v['time'] > 1800]
-            for k in to_del:
-                del _pkcsm_openers[k]
-        _pkcsm_openers[hash_val] = {'opener': opener, 'time': time.time()}
-
 
 from tasks import render_batch_task, predict_tool_task
 from celery.result import AsyncResult
@@ -537,61 +515,6 @@ def predict_stoplight(smiles: str):
                 continue
             return f"Error connecting to StopLight after 3 attempts: {err}", 500
 
-@app.route("/predict/pkcsm/base64/<string:smiles>", methods=["GET"])
-def predict_pkcsm_init(smiles: str):
-    decoded_smiles = b64decode(smiles.encode("utf-8")).decode("utf-8")
-    smiles_hash = hashlib.md5(decoded_smiles.encode()).hexdigest()
-
-    for attempt in range(3):
-        try:
-            cj = http.cookiejar.CookieJar()
-            opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
-            params = {"smiles_str": decoded_smiles, "pred_type": "adme"}
-            data = urllib.parse.urlencode(params).encode("utf-8")
-            req = urllib.request.Request(
-                "https://biosig.lab.uq.edu.au/pkcsm/admet_prediction",
-                data=data,
-                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-            )
-
-            with opener.open(req, timeout=300) as response:
-                final_url = response.geturl()
-            
-            set_pkcsm_opener(smiles_hash, opener)
-            return jsonify({"result_url": final_url, "smiles_hash": smiles_hash})
-        except Exception as err:
-            import traceback
-            error_details = traceback.format_exc()
-            print(f"!!! pkCSM FAILURE for {decoded_smiles} (Attempt {attempt+1}):\n{error_details}")
-            if attempt < 2:
-                time.sleep(3)
-                continue
-            return f"pkCSM failed after 3 attempts. Possible causes: Invalid SMILES or External Server Down. Error: {err}", 500
-
-
-@app.route("/predict/pkcsm/fetch", methods=["POST"])
-def predict_pkcsm_fetch():
-    try:
-        req_data = request.get_json()
-        target_url = req_data.get('url')
-        smiles_hash = req_data.get('smiles_hash', '')
-
-        if not target_url:
-            return "No URL provided", 400
-
-        req = urllib.request.Request(target_url, headers={'User-Agent': 'Mozilla/5.0'})
-        opener = get_pkcsm_opener(smiles_hash)
-
-        if opener:
-            with opener.open(req, timeout=300) as response:
-                return response.read()
-        else:
-            with urllib.request.urlopen(req, timeout=120) as response:
-                return response.read()
-    except Exception as err:
-        print(f"pkCSM Fetch Error: {err}")
-        return f"Error fetching pkCSM results: {err}", 500
-
 @app.route("/export/report", methods=["POST"])
 def export_report():
     """Generate a professional enterprise-grade ADMET PDF report with automated interpretation."""
@@ -624,9 +547,8 @@ def export_report():
         TEXT_MID      = colors.HexColor("#475569")
 
         TOOL_COLORS = {
-            "StopTox":      colors.HexColor("#b45309"),
-            "StopLight":    colors.HexColor("#1d4ed8"),
-            "pkCSM":        ACCENT_GREEN,
+            "StopTox":       colors.HexColor("#b45309"),
+            "StopLight":     colors.HexColor("#1d4ed8"),
             "RDKit Filters": colors.HexColor("#0d9488"),
         }
         FLAG_COLORS = {
@@ -840,10 +762,10 @@ def export_report():
             # Positive findings summary (condensed)
             if positives:
                 pos_text = "  ·  ".join(
-                    f"🟢 {f.text}" for f in positives[:6]
+                    f"[OK] {f.text}" for f in positives[:6]
                 )
                 if len(positives) > 6:
-                    pos_text += f"  ·  … +{len(positives)-6} more"
+                    pos_text += f"  ·  (+{len(positives)-6} more)"
                 blk.append(Paragraph(pos_text,
                                      ps("posf", fontSize=7, textColor=colors.HexColor("#15803d"),
                                         leading=11)))
@@ -863,7 +785,7 @@ def export_report():
         story.append(Paragraph(
             f"Generated: {now.strftime('%B %d, %Y  |  %H:%M')}  ·  "
             f"Molecules: {len(organised)}  ·  "
-            "Tools: RDKit Filters · StopTox · StopLight · pkCSM",
+            "Tools: RDKit Filters · StopTox · StopLight",
             sMeta
         ))
         story.append(Spacer(1, 1.2 * cm))
@@ -871,13 +793,12 @@ def export_report():
         # Tool legend
         leg_data = [[Paragraph(t, ps(f"leg{t}", fontSize=9, textColor=colors.white,
                                       alignment=TA_CENTER, fontName="Helvetica-Bold"))
-                     for t in ["RDKit Filters", "StopTox", "StopLight", "pkCSM"]]]
-        leg = Table(leg_data, colWidths=[usable_w / 4] * 4)
+                     for t in ["RDKit Filters", "StopTox", "StopLight"]]]
+        leg = Table(leg_data, colWidths=[usable_w / 3] * 3)
         leg.setStyle(TableStyle([
             ("BACKGROUND",    (0,0), (0,0), colors.HexColor("#0d9488")),
             ("BACKGROUND",    (1,0), (1,0), TOOL_COLORS["StopTox"]),
             ("BACKGROUND",    (2,0), (2,0), TOOL_COLORS["StopLight"]),
-            ("BACKGROUND",    (3,0), (3,0), TOOL_COLORS["pkCSM"]),
             ("TOPPADDING",    (0,0), (-1,-1), 8),
             ("BOTTOMPADDING", (0,0), (-1,-1), 8),
             ("INNERGRID",     (0,0), (-1,-1), 1, colors.white),
@@ -969,7 +890,7 @@ def export_report():
         # ══════════════════════════════════════════════════════════════════════
         # PER-MOLECULE SECTIONS
         # ══════════════════════════════════════════════════════════════════════
-        tool_order = ["RDKit Filters", "StopTox", "StopLight", "pkCSM"]
+        tool_order = ["RDKit Filters", "StopTox", "StopLight"]
 
         for mol_idx, (smi, tools) in enumerate(organised.items(), 1):
             story.append(HRFlowable(width=usable_w, thickness=1.5, color=BRAND_BLUE))
@@ -1028,10 +949,8 @@ def export_report():
         story.append(HRFlowable(width=usable_w, thickness=2, color=BRAND_BLUE))
         story.append(Paragraph("Methodology", sSection))
         methods = [
-            ("StopTox",      "In silico acute toxicity predictions (oral, dermal, inhalation LD50/LC50) via the UNC MML StopTox server. GHS hazard classification applied."),
-            ("StopLight",    "Drug-likeness and pharmacokinetic profiling via the UNC MML StopLight server. Lipinski Rule of 5, Veber and Egan rules evaluated."),
-            ("pkCSM",        "Comprehensive ADME + toxicity predictions (absorption, distribution, metabolism, excretion, AMES, hERG, hepatotoxicity) via the pkCSM server (University of Queensland)."),
-            ("ProTox-3.0",   "Toxicity prediction across 12 endpoints (DILI, neurotoxicity, nephrotoxicity, carcinogenicity, mutagenicity, BBB permeability, etc.) via the ProTox-3.0 server (Charité Berlin)."),
+            ("StopTox",   "In silico acute toxicity predictions (oral, dermal, inhalation LD50/LC50) via the UNC MML StopTox server. GHS hazard classification applied."),
+            ("StopLight", "Drug-likeness and pharmacokinetic profiling via the UNC MML StopLight server. Lipinski Rule of 5, Veber and Egan rules evaluated."),
         ]
         for tool, desc in methods:
             col = TOOL_COLORS.get(tool, BRAND_BLUE)
@@ -1523,3 +1442,106 @@ def export_grid():
     except Exception as err:
         print(f"Grid Export Error: {err}")
         return str(err), 500
+@app.route("/export/excel", methods=["POST"])
+def export_excel_all():
+    """Export any list of results to Excel."""
+    try:
+        import pandas as pd
+        import io
+        data = request.get_json()
+        print(f"DEBUG: Exporting Excel with {len(data) if data else 0} rows")
+        if not data: return "No data provided", 400
+        
+        df = pd.DataFrame(data)
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="ADMET Results")
+        output.seek(0)
+        return send_file(output, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", as_attachment=True, download_name="ADMET_Analysis.xlsx")
+    except Exception as err:
+        print(f"CRITICAL: Excel Export Error: {err}")
+        import traceback
+        traceback.print_exc()
+        return str(err), 500
+
+@app.route("/export/report", methods=["POST"])
+def export_report_pdf():
+    """Generate a professional PDF report with better character handling."""
+    try:
+        from fpdf import FPDF
+        import pandas as pd
+        import io
+        
+        data = request.get_json()
+        print(f"DEBUG: Generating PDF with {len(data) if data else 0} rows")
+        if not data: return "No data provided", 400
+        
+        df = pd.DataFrame(data)
+        
+        class PDF(FPDF):
+            def header(self):
+                self.set_font('Arial', 'B', 15)
+                self.set_text_color(26, 58, 92)
+                self.cell(0, 10, 'SMILESRender - ADMET Profiling Report', 0, 1, 'C')
+                self.set_font('Arial', 'I', 8)
+                self.set_text_color(120)
+                self.cell(0, 10, 'Generated via Local Intelligence Engine', 0, 1, 'C')
+                self.ln(5)
+            def footer(self):
+                self.set_y(-15)
+                self.set_font('Arial', 'I', 8)
+                self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
+
+        pdf = PDF()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
+        
+        # Helper to clean string for FPDF (Latin-1 fallback)
+        def clean_s(s):
+            return str(s).encode('latin-1', 'replace').decode('latin-1')
+
+        for smiles, group in df.groupby('SMILES'):
+            pdf.set_fill_color(245, 247, 250)
+            pdf.set_font('Arial', 'B', 10)
+            # Use multi_cell for long SMILES
+            pdf.multi_cell(0, 8, f" Molecule: {clean_s(smiles)}", 1, 'L', fill=True)
+            pdf.ln(2)
+            
+            # Table Header
+            pdf.set_fill_color(226, 232, 240)
+            pdf.set_font('Arial', 'B', 8)
+            pdf.cell(35, 7, ' Tool', 1, 0, 'L', fill=True)
+            pdf.cell(55, 7, ' Property', 1, 0, 'L', fill=True)
+            pdf.cell(70, 7, ' Value', 1, 0, 'L', fill=True)
+            pdf.cell(30, 7, ' Status', 1, 1, 'L', fill=True)
+            
+            pdf.set_font('Arial', '', 8)
+            for _, row in group.iterrows():
+                if row['Unit'] == 'HIGH RISK':
+                    pdf.set_text_color(200, 0, 0)
+                elif row['Unit'] == 'SAFE':
+                    pdf.set_text_color(0, 128, 0)
+                else:
+                    pdf.set_text_color(0)
+                
+                pdf.cell(35, 6, f" {clean_s(row['Tool'])}", 1)
+                pdf.cell(55, 6, f" {clean_s(row['Property'])}", 1)
+                pdf.cell(70, 6, f" {clean_s(row['Value'])}", 1)
+                pdf.cell(30, 6, f" {clean_s(row['Unit'])}", 1)
+                pdf.set_text_color(0)
+            
+            pdf.ln(8)
+
+        # In fpdf2, we can just return the byte string
+        pdf_bytes = pdf.output()
+        return send_file(
+            io.BytesIO(pdf_bytes),
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name="ADMET_Report.pdf"
+        )
+    except Exception as err:
+        print(f"CRITICAL: PDF Export Error: {err}")
+        import traceback
+        traceback.print_exc()
+        return f"Server Error: {str(err)}", 500

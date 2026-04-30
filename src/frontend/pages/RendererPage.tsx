@@ -1,10 +1,9 @@
 import React from 'react';
 import PageShell from '../components/PageShell';
 import DirectInput from '../forms/DirectInput';
-import ConvertFromCsv from '../forms/ConvertFromCsv';
 import { colors } from '../styles/themes';
 
-function RendererPage({ onBack, initialSmiles }: { onBack: () => void; initialSmiles?: string }) {
+function RendererPage({ onBack, initialSmiles, onNavigate }: { onBack: () => void; initialSmiles?: string; onNavigate?: (page: string, smiles?: string) => void }) {
   return (
     <PageShell
       icon="bi-diagram-2"
@@ -14,8 +13,7 @@ function RendererPage({ onBack, initialSmiles }: { onBack: () => void; initialSm
       onBack={onBack}
     >
       <>
-        <DirectInput initialSmiles={initialSmiles} />
-        <ConvertFromCsv />
+        <DirectInput initialSmiles={initialSmiles} onNavigate={onNavigate} />
       </>
     </PageShell>
   );

@@ -56,7 +56,25 @@
       "mcp__claude_ai_PubMed__search_articles",
       "mcp__claude_ai_PubMed__get_article_metadata",
       "WebFetch(domain:jcheminf.biomedcentral.com)",
-      "WebFetch(domain:link.springer.com)"
+      "WebFetch(domain:link.springer.com)",
+      "Bash(where py *)",
+      "Bash(py --version)",
+      "Bash(py *)",
+      "Bash(taskkill /F /IM py.exe)",
+      "Bash(gh repo *)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:webs.iiitd.edu.in)",
+      "Bash(py train_bbb_model.py)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(\"C:/Users/ruiab/AppData/Local/Programs/Python/Python312/python.exe\" train_bbb_model.py)",
+      "Bash(\"C:/Users/ruiab/AppData/Local/Programs/Python/Python312/python.exe\" src/train_bbb_model.py)",
+      "Bash(C:/Users/ruiab/AppData/Local/Programs/Python/Python312/python.exe C:/Users/ruiab/Documents/SmileRender/src/train_bbb_model.py)",
+      "Bash(\"C:/Users/ruiab/AppData/Local/Programs/Python/Python312/python.exe\" \"C:/Users/ruiab/Documents/SmileRender/src/main.py\")",
+      "Bash(git *)",
+      "Bash(C:/Users/ruiab/AppData/Local/Programs/Python/Python312/python.exe *)",
+      "Bash(\"C:/Users/ruiab/AppData/Local/Programs/Python/Python312/python.exe\" -m pip install python-docx --quiet)",
+      "Bash(\"C:/Users/ruiab/AppData/Local/Programs/Python/Python312/python.exe\" -W ignore train_bbb_model.py)"
     ]
   }
 }

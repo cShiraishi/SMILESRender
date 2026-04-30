@@ -21,6 +21,7 @@ function Header() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        boxSizing: 'border-box',
       }}>
         {/* Logo Section */}
         <a href="/" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '15px', minWidth: 'fit-content' }}>

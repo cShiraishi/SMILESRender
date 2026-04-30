@@ -5,29 +5,84 @@ interface DashboardProps {
   uniqueSmiles: string[];
 }
 
-const cardStyle: React.CSSProperties = {
-  backgroundColor: '#fff',
-  borderRadius: '12px',
-  padding: '20px',
-  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-  border: '1px solid #e2e8f0',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  textAlign: 'center',
-};
+// ── helpers ──────────────────────────────────────────────────────────────────
 
-const barStyle = (percent: number, color: string): React.CSSProperties => ({
-  height: '10px',
-  width: `${Math.min(100, Math.max(0, percent))}%`,
-  backgroundColor: color,
-  borderRadius: '5px',
-  transition: 'width 0.5s ease-out',
-});
+function deepProb(results: any[], smiles: string, prop: string): number | null {
+  const r = results.find(x => x.SMILES === smiles && x.Tool === 'Chemprop (D-MPNN)' && x.Property === prop);
+  return r != null ? parseFloat(r.Probability) : null;
+}
+
+function deepVal(results: any[], smiles: string, prop: string): number | null {
+  const r = results.find(x => x.SMILES === smiles && x.Tool === 'Chemprop (D-MPNN)' && x.Property === prop);
+  return r != null ? parseFloat(r.Value) : null;
+}
+
+function rdkitVal(results: any[], smiles: string, prop: string): string | null {
+  const r = results.find(x => x.SMILES === smiles && String(x.Tool).includes('RDKit') && x.Property === prop);
+  return r ? String(r.Value) : null;
+}
+
+function avg(nums: number[]): number {
+  return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0;
+}
+
+// ── sub-components ────────────────────────────────────────────────────────────
+
+function MetricCard({ label, value, unit, accent }: { label: string; value: string; unit?: string; accent?: string }) {
+  return (
+    <div style={{
+      backgroundColor: '#fff', borderRadius: '12px', padding: '18px 20px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0',
+      borderLeft: accent ? `5px solid ${accent}` : undefined,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '4px',
+    }}>
+      <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+      <div style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>
+        {value}<span style={{ fontSize: '13px', fontWeight: 500, color: '#64748b', marginLeft: '3px' }}>{unit}</span>
+      </div>
+    </div>
+  );
+}
+
+function RiskDot({ prob, threshold = 0.4 }: { prob: number | null; threshold?: number }) {
+  if (prob == null) return <span style={{ color: '#cbd5e1', fontSize: '18px' }}>·</span>;
+  const color = prob >= 0.6 ? '#ef4444' : prob >= threshold ? '#f59e0b' : '#22c55e';
+  const label = prob >= 0.6 ? 'High' : prob >= threshold ? 'Med' : 'Low';
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+      <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: color }} title={`${(prob * 100).toFixed(0)}%`} />
+      <span style={{ fontSize: '9px', color, fontWeight: 700 }}>{label}</span>
+    </div>
+  );
+}
+
+function CypDot({ prob }: { prob: number | null }) {
+  if (prob == null) return <span style={{ color: '#e2e8f0' }}>—</span>;
+  const bg = prob >= 0.5 ? '#fef2f2' : prob >= 0.25 ? '#fffbeb' : '#f0fdf4';
+  const color = prob >= 0.5 ? '#dc2626' : prob >= 0.25 ? '#d97706' : '#16a34a';
+  return (
+    <div style={{
+      padding: '3px 6px', borderRadius: '4px', backgroundColor: bg,
+      color, fontSize: '10px', fontWeight: 700, minWidth: '34px', textAlign: 'center',
+    }}>
+      {(prob * 100).toFixed(0)}%
+    </div>
+  );
+}
+
+function MiniBar({ value, max = 1, color }: { value: number; max?: number; color: string }) {
+  const pct = Math.min(100, (value / max) * 100);
+  return (
+    <div style={{ flex: 1, height: '6px', backgroundColor: '#f1f5f9', borderRadius: '3px', overflow: 'hidden' }}>
+      <div style={{ width: `${pct}%`, height: '100%', backgroundColor: color, borderRadius: '3px', transition: 'width 0.4s ease' }} />
+    </div>
+  );
+}
+
+// ── main ──────────────────────────────────────────────────────────────────────
 
 function Dashboard({ allResults = [], uniqueSmiles = [] }: DashboardProps) {
-  if (!allResults || allResults.length === 0 || !uniqueSmiles || uniqueSmiles.length === 0) {
+  if (!allResults.length || !uniqueSmiles.length) {
     return (
       <div style={{ padding: '20px', backgroundColor: '#f1f5f9', borderRadius: '15px', marginBottom: '30px', textAlign: 'center', color: '#64748b' }}>
         Gerando dashboard estatístico...
@@ -35,114 +90,236 @@ function Dashboard({ allResults = [], uniqueSmiles = [] }: DashboardProps) {
     );
   }
 
-  // 1. Médias com proteção (Procuramos por Tool que contenha 'RDKit')
-  const rdkitData = allResults.filter(r => r && String(r.Tool).includes('RDKit'));
-  
-  const mwValues = rdkitData.filter(r => r.Property === 'MW').map(r => parseFloat(r.Value)).filter(v => !isNaN(v));
-  const avgMW = mwValues.length > 0 ? mwValues.reduce((a, b) => a + b, 0) / mwValues.length : 0;
+  const n = uniqueSmiles.length;
 
-  const logPValues = rdkitData.filter(r => r.Property === 'LogP').map(r => parseFloat(r.Value)).filter(v => !isNaN(v));
-  const avgLogP = logPValues.length > 0 ? logPValues.reduce((a, b) => a + b, 0) / logPValues.length : 0;
+  // ── RDKit aggregates ────────────────────────────────────────────────────────
+  const rdkit = allResults.filter(r => r && String(r.Tool).includes('RDKit'));
+  const mwVals   = rdkit.filter(r => r.Property === 'MW').map(r => parseFloat(r.Value)).filter(v => !isNaN(v));
+  const logPVals = rdkit.filter(r => r.Property === 'LogP').map(r => parseFloat(r.Value)).filter(v => !isNaN(v));
+  const lipinskiItems = rdkit.filter(r => r.Property === 'Lipinski Ro5');
+  const lipinskiRate  = lipinskiItems.length ? (lipinskiItems.filter(r => String(r.Value).toUpperCase() === 'PASS').length / lipinskiItems.length) * 100 : 0;
+  const esolClasses   = rdkit.filter(r => r.Property === 'Class');
+  const solDist: Record<string, number> = esolClasses.reduce((acc: any, r) => { if (r.Value) acc[r.Value] = (acc[r.Value] || 0) + 1; return acc; }, {});
 
-  // 2. Lipinski
-  const lipinskiItems = rdkitData.filter(r => r.Property === 'Lipinski Ro5');
-  const lipinskiPasses = lipinskiItems.filter(r => String(r.Value).toUpperCase() === 'PASS').length;
-  const lipinskiRate = lipinskiItems.length > 0 ? (lipinskiPasses / lipinskiItems.length) * 100 : 0;
+  // PAINS/BRENK per molecule
+  const painsHits  = uniqueSmiles.filter(smi => rdkitVal(allResults, smi, 'PAINS Alerts') !== 'PASS' && rdkitVal(allResults, smi, 'PAINS Alerts') !== null).length;
+  const brenkHits  = uniqueSmiles.filter(smi => rdkitVal(allResults, smi, 'BRENK Alerts') !== 'PASS' && rdkitVal(allResults, smi, 'BRENK Alerts') !== null).length;
 
-  // 3. Toxicity (StopTox)
-  const toxResults = allResults.filter(r => r && r.Tool === 'StopTox');
+  // ── Deep ADMET aggregates ───────────────────────────────────────────────────
+  const deepData  = allResults.filter(r => r && r.Tool === 'Chemprop (D-MPNN)');
+  const hasDeep   = deepData.length > 0;
+
+  const qedVals   = uniqueSmiles.map(s => deepVal(allResults, s, 'QED')).filter(v => v != null) as number[];
+  const bioaVals  = uniqueSmiles.map(s => deepProb(allResults, s, 'Bioavailability_Ma')).filter(v => v != null) as number[];
+  const avgQED    = avg(qedVals);
+  const avgBioav  = avg(bioaVals);
+
+  const hergHigh  = uniqueSmiles.filter(s => { const p = deepProb(allResults, s, 'hERG'); return p != null && p >= 0.4; }).length;
+  const diliHigh  = uniqueSmiles.filter(s => { const p = deepProb(allResults, s, 'DILI'); return p != null && p >= 0.5; }).length;
+  const bbbPlus   = uniqueSmiles.filter(s => { const p = deepProb(allResults, s, 'BBB_Martins'); return p != null && p >= 0.5; }).length;
+
+  // ── StopTox ─────────────────────────────────────────────────────────────────
+  const toxResults  = allResults.filter(r => r && r.Tool === 'StopTox');
   const highRiskTox = toxResults.filter(r => r.Unit === 'HIGH RISK').length;
-  const toxRiskRate = toxResults.length > 0 ? (highRiskTox / toxResults.length) * 100 : 0;
+  const toxRiskRate = toxResults.length ? (highRiskTox / toxResults.length) * 100 : 0;
 
-  // 4. Solubility
-  const esolClasses = rdkitData.filter(r => r.Property === 'Class');
-  const solDistribution = esolClasses.reduce((acc: any, curr) => {
-    if (curr && curr.Value) {
-      acc[curr.Value] = (acc[curr.Value] || 0) + 1;
-    }
-    return acc;
-  }, {});
+  // ── CYP isoforms ────────────────────────────────────────────────────────────
+  const CYP_ISOFORMS = ['CYP1A2_Veith', 'CYP2C9_Veith', 'CYP2C19_Veith', 'CYP2D6_Veith', 'CYP3A4_Veith'];
+  const CYP_LABELS   = ['CYP1A2', 'CYP2C9', 'CYP2C19', 'CYP2D6', 'CYP3A4'];
+
+  // ── Per-molecule risk score ─────────────────────────────────────────────────
+  function molRiskScore(smi: string): number {
+    let score = 0, count = 0;
+    const herg = deepProb(allResults, smi, 'hERG');       if (herg != null) { score += herg; count++; }
+    const dili = deepProb(allResults, smi, 'DILI');       if (dili != null) { score += dili; count++; }
+    const clin = deepProb(allResults, smi, 'ClinTox');    if (clin != null) { score += clin; count++; }
+    const tox  = toxResults.filter(r => r.SMILES === smi && r.Unit === 'HIGH RISK').length > 0 ? 0.8 : 0;
+    score += tox; count++;
+    return count ? score / count : 0;
+  }
+
+  // ── short label ─────────────────────────────────────────────────────────────
+  function shortSmi(smi: string): string {
+    return smi.length > 22 ? smi.slice(0, 20) + '…' : smi;
+  }
+
+  const SOL_COLORS: Record<string, string> = { Soluble: '#22c55e', Moderately: '#3b82f6', Poorly: '#f59e0b', Insoluble: '#ef4444' };
 
   return (
     <div style={{ padding: '20px', backgroundColor: '#f1f5f9', borderRadius: '15px', marginBottom: '30px', border: '1px solid #cbd5e1' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '25px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '22px' }}>
         <div style={{ width: '40px', height: '40px', backgroundColor: '#1a3a5c', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '20px' }}>📊</div>
         <div>
-          <h2 style={{ margin: 0, fontSize: '22px', color: '#0f172a' }}>Batch Analysis Overview</h2>
-          <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>Análise consolidada de {uniqueSmiles.length} moléculas.</p>
+          <h2 style={{ margin: 0, fontSize: '20px', color: '#0f172a' }}>Batch Analysis Overview</h2>
+          <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Análise consolidada de {n} molécula{n !== 1 ? 's' : ''}.</p>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '30px' }}>
-        <div style={cardStyle}>
-          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Total Molecules</div>
-          <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#0f172a' }}>{uniqueSmiles.length}</div>
-        </div>
-        <div style={cardStyle}>
-          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Avg Mol. Weight</div>
-          <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#0f172a' }}>{avgMW.toFixed(1)} <span style={{ fontSize: '14px' }}>Da</span></div>
-        </div>
-        <div style={cardStyle}>
-          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Avg LogP</div>
-          <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#0f172a' }}>{avgLogP.toFixed(2)}</div>
-        </div>
-        <div style={{ ...cardStyle, borderLeft: `6px solid ${lipinskiRate > 50 ? '#22c55e' : '#eab308'}` }}>
-          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Lipinski Compliance</div>
-          <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#0f172a' }}>{lipinskiRate.toFixed(0)}%</div>
-        </div>
+      {/* ── Row 1: metric cards ─────────────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+        <MetricCard label="Total Molecules"      value={String(n)} />
+        <MetricCard label="Avg Mol. Weight"      value={avg(mwVals).toFixed(1)} unit="Da" />
+        <MetricCard label="Avg LogP"             value={avg(logPVals).toFixed(2)} />
+        {hasDeep && <MetricCard label="Avg QED"  value={avgQED.toFixed(2)} accent={avgQED >= 0.6 ? '#22c55e' : avgQED >= 0.4 ? '#f59e0b' : '#ef4444'} />}
+        {hasDeep && <MetricCard label="Avg Oral Bioavailability" value={`${(avgBioav * 100).toFixed(0)}`} unit="%" accent="#3b82f6" />}
+        <MetricCard label="Lipinski Compliance"  value={`${lipinskiRate.toFixed(0)}`} unit="%" accent={lipinskiRate > 80 ? '#22c55e' : '#f59e0b'} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-        <div style={{ ...cardStyle, alignItems: 'stretch', textAlign: 'left' }}>
-          <h4 style={{ margin: '0 0 15px 0', fontSize: '15px', color: '#0f172a' }}>Global Toxicity Risk (StopTox)</h4>
-          <div style={{ height: '10px', width: '100%', backgroundColor: '#e2e8f0', borderRadius: '5px', overflow: 'hidden', display: 'flex' }}>
-            <div style={{ ...barStyle(100 - toxRiskRate, '#22c55e'), borderRadius: '0' }} />
-            <div style={{ ...barStyle(toxRiskRate, '#ef4444'), borderRadius: '0' }} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '12px', fontWeight: 'bold' }}>
-            <span style={{ color: '#166534' }}>Safe: {(100 - toxRiskRate).toFixed(0)}%</span>
-            <span style={{ color: '#991b1b' }}>High Risk: {toxRiskRate.toFixed(0)}%</span>
-          </div>
-        </div>
+      {/* ── Row 2: Safety Flags + Solubility ────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px', marginBottom: '20px' }}>
 
-        <div style={{ ...cardStyle, alignItems: 'stretch', textAlign: 'left' }}>
-          <h4 style={{ margin: '0 0 15px 0', fontSize: '15px', color: '#0f172a' }}>Aqueous Solubility (ESOL)</h4>
-          <div style={{ display: 'flex', gap: '5px', height: '30px' }}>
-            {Object.entries(solDistribution).map(([cat, count]: any, i) => {
-              const pct = esolClasses.length > 0 ? (count / esolClasses.length) * 100 : 0;
-              return (
-                <div 
-                  key={i} 
-                  style={{ 
-                    flex: count, 
-                    backgroundColor: cat === 'Soluble' ? '#22c55e' : cat === 'Moderately' ? '#3b82f6' : cat === 'Poorly' ? '#eab308' : '#ef4444',
-                    borderRadius: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#fff',
-                    fontSize: '10px',
-                    fontWeight: 'bold',
-                    overflow: 'hidden',
-                    minWidth: pct > 10 ? '30px' : '0'
-                  }}
-                  title={`${cat}: ${count}`}
-                >
-                  {pct > 15 ? `${pct.toFixed(0)}%` : ''}
+        {/* Safety Flags */}
+        {hasDeep && (
+          <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '18px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+            <h4 style={{ margin: '0 0 14px 0', fontSize: '14px', color: '#0f172a', fontWeight: 700 }}>Safety Flags</h4>
+            {[
+              { label: 'hERG Cardiotoxicity', count: hergHits(allResults, uniqueSmiles), color: '#ef4444', threshold: 0.4, prop: 'hERG', note: '≥40%' },
+              { label: 'DILI (Liver Injury)',  count: diliHigh,  color: '#f97316', threshold: 0.5, prop: 'DILI',  note: '≥50%' },
+              { label: 'PAINS Alerts',         count: painsHits, color: '#8b5cf6', threshold: 0,   prop: null,   note: 'structural' },
+              { label: 'BRENK Alerts',         count: brenkHits, color: '#ec4899', threshold: 0,   prop: null,   note: 'structural' },
+              { label: 'BBB Permeable',        count: bbbPlus,   color: '#10b981', threshold: 0.5, prop: 'BBB_Martins', note: 'CNS active' },
+            ].map(({ label, count, color, note }) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: count > 0 ? color : '#d1fae5', flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                    <span style={{ fontSize: '12px', color: '#374151', fontWeight: 600 }}>{label}</span>
+                    <span style={{ fontSize: '11px', color: count > 0 ? color : '#6b7280', fontWeight: 700 }}>
+                      {count}/{n} <span style={{ fontWeight: 400, color: '#9ca3af' }}>({note})</span>
+                    </span>
+                  </div>
+                  <MiniBar value={count} max={n} color={count > 0 ? color : '#d1fae5'} />
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
-          <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '10px' }}>
-            <span style={{ color: '#22c55e' }}>● Soluble</span>
-            <span style={{ color: '#3b82f6' }}>● Moderately</span>
-            <span style={{ color: '#eab308' }}>● Poorly</span>
-            <span style={{ color: '#ef4444' }}>● Insoluble</span>
+        )}
+
+        {/* Toxicity + Solubility stacked */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '18px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+            <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#0f172a', fontWeight: 700 }}>Global Toxicity Risk (StopTox)</h4>
+            <div style={{ height: '10px', width: '100%', backgroundColor: '#e2e8f0', borderRadius: '5px', overflow: 'hidden', display: 'flex' }}>
+              <div style={{ width: `${100 - toxRiskRate}%`, backgroundColor: '#22c55e' }} />
+              <div style={{ width: `${toxRiskRate}%`, backgroundColor: '#ef4444' }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '12px', fontWeight: 700 }}>
+              <span style={{ color: '#166534' }}>Safe: {(100 - toxRiskRate).toFixed(0)}%</span>
+              <span style={{ color: '#991b1b' }}>High Risk: {toxRiskRate.toFixed(0)}%</span>
+            </div>
+          </div>
+
+          <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '18px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+            <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#0f172a', fontWeight: 700 }}>Aqueous Solubility (ESOL)</h4>
+            <div style={{ display: 'flex', gap: '4px', height: '28px' }}>
+              {Object.entries(solDist).map(([cat, count]: any) => {
+                const pct = esolClasses.length ? (count / esolClasses.length) * 100 : 0;
+                return (
+                  <div key={cat} style={{ flex: count, backgroundColor: SOL_COLORS[cat] || '#94a3b8', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '10px', fontWeight: 700, minWidth: pct > 10 ? '28px' : 0 }} title={`${cat}: ${count}`}>
+                    {pct > 15 ? `${pct.toFixed(0)}%` : ''}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '8px', fontSize: '10px' }}>
+              {Object.keys(SOL_COLORS).map(cat => <span key={cat} style={{ color: SOL_COLORS[cat] }}>● {cat}</span>)}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* ── Row 3: Per-molecule risk matrix ─────────────────────────────────── */}
+      {hasDeep && (
+        <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '18px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '16px' }}>
+          <h4 style={{ margin: '0 0 14px 0', fontSize: '14px', color: '#0f172a', fontWeight: 700 }}>Per-Molecule Risk Matrix</h4>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
+                  {['Molecule', 'Overall', 'hERG', 'DILI', 'ClinTox', 'BBB', 'Bioavail.', 'QED'].map(h => (
+                    <th key={h} style={{ padding: '6px 10px', color: '#64748b', fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {uniqueSmiles.map((smi, i) => {
+                  const risk = molRiskScore(smi);
+                  const riskColor = risk >= 0.5 ? '#ef4444' : risk >= 0.3 ? '#f59e0b' : '#22c55e';
+                  const riskLabel = risk >= 0.5 ? 'High' : risk >= 0.3 ? 'Med' : 'Low';
+                  return (
+                    <tr key={smi} style={{ borderBottom: '1px solid #f8fafc', backgroundColor: i % 2 === 0 ? '#fff' : '#fafbfc' }}>
+                      <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontSize: '11px', color: '#475569', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={smi}>
+                        {shortSmi(smi)}
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                        <span style={{ padding: '3px 8px', borderRadius: '10px', backgroundColor: risk >= 0.5 ? '#fef2f2' : risk >= 0.3 ? '#fffbeb' : '#f0fdf4', color: riskColor, fontWeight: 700, fontSize: '11px' }}>
+                          {riskLabel}
+                        </span>
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}><RiskDot prob={deepProb(allResults, smi, 'hERG')} threshold={0.4} /></td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}><RiskDot prob={deepProb(allResults, smi, 'DILI')} threshold={0.5} /></td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}><RiskDot prob={deepProb(allResults, smi, 'ClinTox')} threshold={0.3} /></td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                        {(() => { const p = deepProb(allResults, smi, 'BBB_Martins'); return p != null ? <span style={{ fontSize: '11px', fontWeight: 700, color: p >= 0.5 ? '#10b981' : '#ef4444' }}>{p >= 0.5 ? 'BBB+' : 'BBB-'}</span> : <span style={{ color: '#cbd5e1' }}>—</span>; })()}
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: '#0f172a' }}>
+                        {(() => { const p = deepProb(allResults, smi, 'Bioavailability_Ma'); return p != null ? `${(p * 100).toFixed(0)}%` : '—'; })()}
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: '#0f172a' }}>
+                        {(() => { const v = deepVal(allResults, smi, 'QED'); return v != null ? v.toFixed(2) : '—'; })()}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Row 4: CYP inhibition heatmap ───────────────────────────────────── */}
+      {hasDeep && uniqueSmiles.some(smi => CYP_ISOFORMS.some(cyp => deepProb(allResults, smi, cyp) != null)) && (
+        <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '18px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+          <h4 style={{ margin: '0 0 14px 0', fontSize: '14px', color: '#0f172a', fontWeight: 700 }}>CYP Inhibition Profile</h4>
+          <p style={{ margin: '0 0 12px 0', fontSize: '11px', color: '#94a3b8' }}>Probability of inhibition — risk of drug-drug interactions</p>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ borderCollapse: 'collapse', fontSize: '12px', width: '100%' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
+                  <th style={{ padding: '6px 12px', color: '#64748b', fontWeight: 700, textAlign: 'left' }}>Molecule</th>
+                  {CYP_LABELS.map(l => <th key={l} style={{ padding: '6px 10px', color: '#64748b', fontWeight: 700, textAlign: 'center', whiteSpace: 'nowrap' }}>{l}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {uniqueSmiles.map((smi, i) => (
+                  <tr key={smi} style={{ borderBottom: '1px solid #f8fafc', backgroundColor: i % 2 === 0 ? '#fff' : '#fafbfc' }}>
+                    <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: '11px', color: '#475569', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={smi}>
+                      {shortSmi(smi)}
+                    </td>
+                    {CYP_ISOFORMS.map(cyp => (
+                      <td key={cyp} style={{ padding: '6px 10px', textAlign: 'center' }}>
+                        <CypDot prob={deepProb(allResults, smi, cyp)} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ marginTop: '10px', display: 'flex', gap: '16px', fontSize: '10px', color: '#94a3b8' }}>
+            <span style={{ color: '#16a34a' }}>■ &lt;25% Low</span>
+            <span style={{ color: '#d97706' }}>■ 25–50% Moderate</span>
+            <span style={{ color: '#dc2626' }}>■ &gt;50% High</span>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function hergHits(allResults: any[], uniqueSmiles: string[]): number {
+  return uniqueSmiles.filter(s => { const p = deepProb(allResults, s, 'hERG'); return p != null && p >= 0.4; }).length;
 }
 
 export default Dashboard;

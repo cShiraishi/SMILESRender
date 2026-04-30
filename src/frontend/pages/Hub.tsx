@@ -23,6 +23,7 @@ const apps: HubApp[] = [
   { id: 'similarity', icon: 'bi-cpu',      title: 'Similarity Searching',    description: 'Structure-based searching across chemical libraries using Tanimoto distance.', tags: ['Search'], color: '#ef4444' },
   { id: 'reaction',   icon: 'bi-diagram-3',   title: 'Reaction Prediction',     description: 'Predict organic reaction outcomes and mapping using chemical intelligence.', tags: ['Synthesis'], color: '#ec4899' },
   { id: 'peptide',    icon: 'bi-pentagon',    title: 'Peptide Engineering',    description: 'Convert amino acid sequences into chemical structures using PepLink.', tags: ['Peptides'], color: '#ec4899' },
+  { id: 'docking',    icon: 'bi-box-arrow-in-right', title: 'Docking LibPrep', description: 'Prepare molecular libraries for docking: 3D generation, minimization and PDBQT export.', tags: ['Docking'], color: '#14b8a6' },
 ];
 
 interface Props {
@@ -36,7 +37,7 @@ const Hub: React.FC<Props> = ({ onNavigate }) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const stats = [
-    { label: 'Prediction Engines', value: '5' },
+    { label: 'Prediction Engines', value: '9' },
     { label: 'Supported Formats', value: '13+' },
     { label: 'Batch Size (SMILES)', value: '≤ 20' },
     { label: 'Export Formats', value: 'XLSX · ZIP · PNG' },

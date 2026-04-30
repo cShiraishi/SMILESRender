@@ -1,12 +1,46 @@
 #root {
-  font-family: 'Verdana', 'Arial', sans-serif;
+  font-family: 'Inter', sans-serif;
+  width: 100%;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
 }
 
 a {
   text-decoration: none;
   color: inherit;
+}
+
+.smiles-input {
+  cursor: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDMyIDMyIj48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxNiwxNikiPjxwb2x5Z29uIHBvaW50cz0iMCwtMTIgMTAuNCwtNiAxMC40LDYgMCwxMiAtMTAuNCw2IC0xMC40LC02IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxwb2x5Z29uIHBvaW50cz0iMCwtMTIgMTAuNCwtNiAxMC40LDYgMCwxMiAtMTAuNCw2IC0xMC40LC02IiBmaWxsPSJub25lIiBzdHJva2U9IiMwMDVlYjgiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxjaXJjbGUgcj0iNS41IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWRhc2hhcnJheT0iMi41IDIiLz48Y2lyY2xlIHI9IjUuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDA1ZWI4IiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWRhc2hhcnJheT0iMi41IDIiLz48Y2lyY2xlIGN4PSIwIiBjeT0iLTEyIiByPSIyLjUiIGZpbGw9IndoaXRlIi8+PGNpcmNsZSBjeD0iMTAuNCIgY3k9Ii02IiByPSIyLjUiIGZpbGw9IndoaXRlIi8+PGNpcmNsZSBjeD0iMTAuNCIgY3k9IjYiIHI9IjIuNSIgZmlsbD0id2hpdGUiLz48Y2lyY2xlIGN4PSIwIiBjeT0iMTIiIHI9IjIuNSIgZmlsbD0id2hpdGUiLz48Y2lyY2xlIGN4PSItMTAuNCIgY3k9IjYiIHI9IjIuNSIgZmlsbD0id2hpdGUiLz48Y2lyY2xlIGN4PSItMTAuNCIgY3k9Ii02IiByPSIyLjUiIGZpbGw9IndoaXRlIi8+PGNpcmNsZSBjeD0iMCIgY3k9Ii0xMiIgcj0iMS44IiBmaWxsPSIjMDA1ZWI4Ii8+PGNpcmNsZSBjeD0iMTAuNCIgY3k9Ii02IiByPSIxLjgiIGZpbGw9IiMwMDVlYjgiLz48Y2lyY2xlIGN4PSIxMC40IiBjeT0iNiIgcj0iMS44IiBmaWxsPSIjMDA1ZWI4Ii8+PGNpcmNsZSBjeD0iMCIgY3k9IjEyIiByPSIxLjgiIGZpbGw9IiMwMDVlYjgiLz48Y2lyY2xlIGN4PSItMTAuNCIgY3k9IjYiIHI9IjEuOCIgZmlsbD0iIzAwNWViOCIvPjxjaXJjbGUgY3g9Ii0xMC40IiBjeT0iLTYiIHI9IjEuOCIgZmlsbD0iIzAwNWViOCIvPjwvZz48L3N2Zz4=") 16 16, text;
+}
+
+/* Skeleton shimmer animation */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #e8ecf1 25%, #f4f6f9 50%, #e8ecf1 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+.skeleton-dark {
+  background: linear-gradient(90deg, #252540 25%, #2a2a4a 50%, #252540 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+/* Skeleton molecule icon pulse */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+
+.skeleton-icon {
+  animation: skeleton-pulse 2s ease-in-out infinite;
 }

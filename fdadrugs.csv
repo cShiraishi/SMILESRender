@@ -1,0 +1,9 @@
+smiles,name
+CC(=O)Oc1ccccc1C(=O)O,Aspirin
+CC(=O)Nc1ccc(O)cc1,Paracetamol
+CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O,Ibuprofen
+CN1C(=O)N(C)c2ncn(C)c2C1=O,Caffeine
+CN(C)C(=N)N=C(N)N,Metformin
+CC1([C@@H](N2[C@H](S1)[C@@H](C2=O)NC(=O)[C@@H](c3ccc(cc3)O)N)C(=O)O)C,Amoxicillin
+CC(C)c1c(C(=O)Nc2ccc(cc2)F)c(c(n1CC[C@H](C[C@H](CC(=O)O)O)O)c3ccccc3)c4ccccc4,Atorvastatin
+CNCC[C@@H](Oc1ccc(cc1)C(F)(F)F)c2ccccc2,Fluoxetine

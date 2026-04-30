@@ -17,6 +17,33 @@ import os
 import subprocess
 from PepLink import aa_seqs_to_smiles, smiles_to_aa_seqs
 from admet_interpreter import interpret, RISK_LABEL
+import pickle
+from rdkit import Chem, DataStructs
+from rdkit.Chem import AllChem, Descriptors, rdMolDescriptors
+import numpy as np
+
+# Load Tox21 Model
+TOX21_MODEL = None
+try:
+    model_path = os.path.join(os.path.dirname(__file__), "tox21_model.pkl")
+    if os.path.exists(model_path):
+        with open(model_path, "rb") as f:
+            TOX21_MODEL = pickle.load(f)
+        print("Tox21 Model loaded successfully.")
+except Exception as e:
+    print(f"Error loading Tox21 model: {e}")
+
+# Load BBB Model (GraphB3-inspired, GradientBoosting on B3DB dataset)
+BBB_MODEL = None
+try:
+    bbb_model_path = os.path.join(os.path.dirname(__file__), "bbb_model.pkl")
+    if os.path.exists(bbb_model_path):
+        with open(bbb_model_path, "rb") as f:
+            BBB_MODEL = pickle.load(f)
+        print("BBB Model loaded successfully.")
+except Exception as e:
+    print(f"Error loading BBB model: {e}")
+
 
 # Limite de concorrência: apenas 1 processamento pesado por vez (Otimizado para Render Free)
 processing_semaphore = threading.Semaphore(1)
@@ -76,10 +103,28 @@ def ping():
     return "pong", 200
 
 
+
 @app.route("/")
 def index():
     return render_template("index.html")
 
+
+@app.route("/api/mw", methods=["POST"])
+def batch_mw():
+    """Return molecular weights for a list of SMILES."""
+    try:
+        data = request.get_json()
+        smiles_list = data.get("smiles", [])
+        results = []
+        for smi in smiles_list[:100]:
+            mol = Chem.MolFromSmiles(smi)
+            if mol:
+                results.append(round(Descriptors.MolWt(mol), 2))
+            else:
+                results.append(None)
+        return jsonify(results)
+    except Exception as err:
+        return jsonify({"error": str(err)}), 500
 
 @app.route("/download-example")
 def download_example():
@@ -514,6 +559,107 @@ def predict_stoplight(smiles: str):
                 time.sleep(2)
                 continue
             return f"Error connecting to StopLight after 3 attempts: {err}", 500
+
+
+@app.route("/predict/tox21/base64/<string:smiles>", methods=["GET"])
+def predict_tox21(smiles: str):
+    """Predict 12 Tox21 toxicity endpoints using the local Random Forest model."""
+    if TOX21_MODEL is None:
+        return jsonify({"error": "Tox21 model not loaded"}), 503
+    try:
+        # Replace %3D with = if manually encoded
+        clean_smiles = smiles.replace("%3D", "=")
+        decoded_smiles = b64decode(clean_smiles.encode("utf-8")).decode("utf-8")
+        mol = Chem.MolFromSmiles(decoded_smiles)
+        if mol is None:
+            return jsonify({"error": "Invalid SMILES"}), 400
+        
+        # Generate fingerprints (Morgan, radius 2, 1024 bits)
+        fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024)
+        arr = np.zeros((1,))
+        from rdkit import DataStructs
+        DataStructs.ConvertToNumpyArray(fp, arr)
+        
+        # Predict using the loaded MultiOutput Random Forest model
+        preds = TOX21_MODEL["model"].predict([arr])[0]
+        probs = TOX21_MODEL["model"].predict_proba([arr])
+        
+        results = []
+        for idx, task in enumerate(TOX21_MODEL["tasks"]):
+            # probs is a list of arrays (one per output), each array is [prob_0, prob_1]
+            prob_active = probs[idx][0][1] if len(probs[idx][0]) > 1 else 0.0
+            results.append({
+                "Property": task,
+                "Value": "Active" if preds[idx] == 1 else "Inactive",
+                "Probability": round(float(prob_active), 3),
+                "Unit": "Binary",
+                "Category": "Tox21 Toxicity"
+            })
+        
+        return jsonify(results)
+    except Exception as err:
+        print(f"Tox21 Prediction Error: {err}")
+        return jsonify({"error": str(err)}), 500
+
+
+# --- ADMET-AI (Chemprop) Integration ---
+ADMET_AI_MODEL = None
+try:
+    from admet_ai import ADMETModel
+    print("Initializing ADMET-AI (Chemprop D-MPNN)...")
+    ADMET_AI_MODEL = ADMETModel()
+    print("ADMET-AI initialized successfully.")
+except Exception as e:
+    print(f"Warning: Could not initialize ADMET-AI: {e}")
+
+@app.route("/deep/<path:smiles>", methods=["GET"])
+def predict_deep_admet(smiles: str):
+    """Predict 100+ ADMET properties using the Deep Learning Chemprop engine (ADMET-AI)."""
+    if ADMET_AI_MODEL is None:
+        return jsonify({"error": "Deep Engine not available"}), 503
+    try:
+        clean_smiles = smiles.replace("%3D", "=")
+        decoded_smiles = b64decode(clean_smiles.encode("utf-8")).decode("utf-8")
+        
+        # ADMET-AI handles RDKit internally
+        preds = ADMET_AI_MODEL.predict(decoded_smiles)
+        
+        # Format for SmileRender dashboard
+        results = []
+        for prop, val in preds.items():
+            # Skip percentile columns for the main view to keep it clean, 
+            # unless they are relevant.
+            if "_percentile" in prop: continue
+            
+            # Categorize based on property name (heuristic)
+            category = "General"
+            if any(x in prop for x in ["CYP", "Clearance", "Half_Life"]): category = "Metabolism/Excretion"
+            elif any(x in prop for x in ["BBB", "PPBR", "VDss", "Caco2", "HIA", "PAMPA"]): category = "Absorption/Distribution"
+            elif any(x in prop for x in ["AMES", "DILI", "ClinTox", "LD50", "hERG", "Carcinogens"]): category = "Toxicity"
+            elif prop.startswith("NR-") or prop.startswith("SR-"): category = "Tox21 (Deep)"
+            
+            # Determine Value and Unit
+            # ADMET-AI returns floats or ints. We can treat them as values.
+            # If it's a binary task (prob 0-1), we can format it.
+            # For now, just pass the value.
+            
+            results.append({
+                "Property": prop,
+                "Value": round(float(val), 4) if isinstance(val, (float, int)) else str(val),
+                "Probability": round(float(val), 3) if (isinstance(val, float) and 0 <= val <= 1) else 1.0,
+                "Unit": "Deep Pred",
+                "Category": category,
+                "Tool": "Chemprop (D-MPNN)"
+            })
+            
+        return jsonify(results)
+    except Exception as err:
+        print(f"Deep ADMET Error: {err}")
+        return jsonify({"error": str(err)}), 500
+
+
+
+
 
 @app.route("/export/report", methods=["POST"])
 def export_report():
@@ -1524,9 +1670,9 @@ def export_report_pdf():
                 else:
                     pdf.set_text_color(0)
                 
-                pdf.cell(35, 6, f" {clean_s(row['Tool'])}", 1)
-                pdf.cell(55, 6, f" {clean_s(row['Property'])}", 1)
-                pdf.cell(70, 6, f" {clean_s(row['Value'])}", 1)
+                pdf.cell(30, 6, f" {clean_s(row['Tool'])}", 1)
+                pdf.cell(75, 6, f" {clean_s(row['Property'])}", 1)
+                pdf.cell(55, 6, f" {clean_s(row['Value'])}", 1)
                 pdf.cell(30, 6, f" {clean_s(row['Unit'])}", 1)
                 pdf.set_text_color(0)
             
@@ -1545,3 +1691,185 @@ def export_report_pdf():
         import traceback
         traceback.print_exc()
         return f"Server Error: {str(err)}", 500
+
+
+def _bbb_featurize(mol):
+    """Morgan ECFP4 (2048 bits) + 9 pharmacokinetic descriptors."""
+    fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=2048)
+    fp_arr = np.zeros(2048, dtype=np.float32)
+    DataStructs.ConvertToNumpyArray(fp, fp_arr)
+    desc = np.array([
+        Descriptors.MolWt(mol),
+        Descriptors.MolLogP(mol),
+        Descriptors.TPSA(mol),
+        rdMolDescriptors.CalcNumHBD(mol),
+        rdMolDescriptors.CalcNumHBA(mol),
+        rdMolDescriptors.CalcNumRotatableBonds(mol),
+        rdMolDescriptors.CalcNumAromaticRings(mol),
+        Descriptors.RingCount(mol),
+        Descriptors.HeavyAtomCount(mol),
+    ], dtype=np.float32)
+    return np.concatenate([fp_arr, desc])
+
+
+@app.route("/predict/bbb/base64/<path:smiles>", methods=["GET"])
+def predict_bbb(smiles: str):
+    """Predict Blood-Brain Barrier permeability using local GradientBoosting model (B3DB dataset)."""
+    if BBB_MODEL is None:
+        return jsonify({"error": "BBB model not loaded"}), 503
+    try:
+        clean = smiles.replace("%3D", "=")
+        decoded = b64decode(clean.encode("utf-8")).decode("utf-8")
+        mol = Chem.MolFromSmiles(decoded)
+        if mol is None:
+            return jsonify({"error": "Invalid SMILES"}), 400
+
+        feat = _bbb_featurize(mol)
+        pred = BBB_MODEL["model"].predict([feat])[0]
+        prob = BBB_MODEL["model"].predict_proba([feat])[0]
+
+        label = BBB_MODEL["label_map"][int(pred)]
+        prob_positive = float(prob[1])
+
+        return jsonify({
+            "status": label,
+            "probability": round(prob_positive, 4),
+            "permeable": bool(pred == 1),
+        })
+    except Exception as err:
+        return jsonify({"error": str(err)}), 500
+
+# --- LibPrep Integration ---
+from libprep_engine import (
+    standardize_mol, compute_descriptors, generate_3d_block, create_export_zip
+)
+
+@app.route("/api/libprep/load", methods=["POST"])
+def libprep_load():
+    try:
+        data = request.get_json()
+        text = data.get("text", "")
+        method = data.get("method", "smiles")
+        
+        entries = []
+        if method == "smiles":
+            for i, line in enumerate(text.strip().splitlines()):
+                line = line.strip()
+                if not line or line.startswith("#"): continue
+                parts = line.split(None, 1)
+                smiles = parts[0]
+                name = parts[1].strip() if len(parts) > 1 else f"mol_{i+1}"
+                mol = Chem.MolFromSmiles(smiles)
+                if mol:
+                    entries.append({"name": name, "smiles": Chem.MolToSmiles(mol), "status": "pending"})
+                else:
+                    entries.append({"name": name, "smiles": smiles, "status": "invalid", "error": "Invalid SMILES"})
+        
+        return jsonify(entries)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/libprep/prepare", methods=["POST"])
+def libprep_prepare():
+    try:
+        data = request.get_json()
+        entries = data.get("entries", [])
+        config = data.get("config", {})
+        
+        remove_salts = config.get("remove_salts", True)
+        neutralize = config.get("neutralize", True)
+        canon_tautomer = config.get("canon_tautomer", False)
+        ff = config.get("ff", "MMFF94")
+        max_iters = config.get("max_iters", 2000)
+        
+        for e in entries:
+            if e['status'] == "invalid": continue
+            
+            mol = Chem.MolFromSmiles(e['smiles'])
+            if not mol:
+                e['status'] = "invalid"
+                e['error'] = "Invalid SMILES"
+                continue
+                
+            mol_std = standardize_mol(mol, remove_salts, neutralize, canon_tautomer)
+            if not mol_std:
+                e['status'] = "invalid"
+                e['error'] = "Standardization failed"
+                continue
+            
+            e['smiles'] = Chem.MolToSmiles(mol_std)
+            e['props'] = compute_descriptors(mol_std)
+            
+            sdf, energy, err = generate_3d_block(e['smiles'], ff=ff, max_iters=max_iters)
+            if sdf:
+                e['sdf_3d'] = sdf
+                e['energy'] = round(energy, 3) if energy is not None else None
+                e['ff_used'] = ff
+                e['status'] = "ok"
+            else:
+                e['status'] = "failed"
+                e['error'] = err
+        
+        return jsonify(entries)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/libprep/export", methods=["POST"])
+def libprep_export():
+    try:
+        data = request.get_json()
+        entries = data.get("entries", [])
+        fmt = data.get("format", "pdbqt")
+        
+        zip_data = create_export_zip(entries, format=fmt)
+        
+        import io
+        return send_file(
+            io.BytesIO(zip_data),
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name=f"libprep_export_{fmt}.zip"
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/pubchem/name-to-smiles", methods=["POST"])
+def pubchem_name_to_smiles():
+    try:
+        body = request.get_json()
+        name = (body or {}).get("name", "").strip()
+        if not name:
+            return jsonify({"error": "No name provided"}), 400
+
+        cache_key = f"pubchem_name:{hashlib.md5(name.lower().encode()).hexdigest()}"
+        if _cache_ok:
+            cached = _redis.get(cache_key)
+            if cached:
+                return cached, 200, {'Content-Type': 'application/json'}
+
+        encoded = urllib.parse.quote(name, safe='')
+        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{encoded}/property/IsomericSMILES,IUPACName,MolecularWeight/JSON"
+        import ssl
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        req = urllib.request.Request(url, headers={"User-Agent": "SmileRender/1.0"})
+        with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
+            raw = json.loads(resp.read())
+
+        props = raw["PropertyTable"]["Properties"][0]
+        result = json.dumps({
+            "smiles": props.get("IsomericSMILES", ""),
+            "iupac": props.get("IUPACName", name),
+            "mw": props.get("MolecularWeight", ""),
+            "cid": props.get("CID", ""),
+        })
+        if _cache_ok:
+            _redis.setex(cache_key, 86400, result)
+        return result, 200, {'Content-Type': 'application/json'}
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return jsonify({"error": f"Compound '{name}' not found in PubChem"}), 404
+        return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

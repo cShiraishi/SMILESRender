@@ -27,6 +27,7 @@ function PageShell({ icon, title, subtitle, accentColor = colors.blue, onBack, c
           alignItems: 'center',
           gap: '12px',
           flexWrap: 'wrap',
+          boxSizing: 'border-box',
         }}>
           <button
             onClick={onBack}
@@ -62,7 +63,7 @@ function PageShell({ icon, title, subtitle, accentColor = colors.blue, onBack, c
         </div>
       </div>
       {/* Content */}
-      <div style={{ width: '100%', padding: '20px 40px' }}>
+      <div style={{ width: '100%', padding: '20px 40px', boxSizing: 'border-box' }}>
         {children}
       </div>
     </div>

@@ -11,12 +11,13 @@ import SimilarityPage from './pages/SimilarityPage';
 import ReactionPage from './pages/ReactionPage';
 import LibraryPage from './pages/LibraryPage';
 import PeptidePage from './pages/PeptidePage';
+import DockingPage from './pages/DockingPage';
 
-type Page = 'hub' | 'renderer' | 'predict' | 'iupac' | 'descriptors' | 'similarity' | 'reaction' | 'library' | 'peptide';
+type Page = 'hub' | 'renderer' | 'predict' | 'iupac' | 'descriptors' | 'similarity' | 'reaction' | 'library' | 'peptide' | 'docking';
 
 function getPageFromHash(): Page {
   const hash = window.location.hash.replace('#', '') as Page;
-  const valid: Page[] = ['renderer', 'predict', 'iupac', 'descriptors', 'similarity', 'reaction', 'library', 'peptide'];
+  const valid: Page[] = ['renderer', 'predict', 'iupac', 'descriptors', 'similarity', 'reaction', 'library', 'peptide', 'docking'];
   return valid.includes(hash) ? hash : 'hub';
 }
 
@@ -39,12 +40,12 @@ function App() {
   const goBack = () => navigate('hub');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', minHeight: '100vh', position: 'relative' }}>
       <AtomicBackground />
       <Header />
       <main style={{ flex: 1, width: '100%', backgroundColor: 'transparent' }}>
         {page === 'hub'         && <Hub onNavigate={navigate} />}
-        {page === 'renderer'    && <RendererPage onBack={goBack} initialSmiles={sharedSmiles} />}
+        {page === 'renderer'    && <RendererPage onBack={goBack} initialSmiles={sharedSmiles} onNavigate={navigate} />}
         {page === 'predict'     && <PredictPage onBack={goBack} initialSmiles={sharedSmiles} />}
         {page === 'iupac'       && <IupacPage onBack={goBack} initialSmiles={sharedSmiles} />}
         {page === 'descriptors' && <DescriptorsPage onBack={goBack} initialSmiles={sharedSmiles} />}
@@ -52,6 +53,7 @@ function App() {
         {page === 'reaction'    && <ReactionPage onBack={goBack} initialSmiles={sharedSmiles} />}
         {page === 'library'     && <LibraryPage onBack={goBack} initialSmiles={sharedSmiles} />}
         {page === 'peptide'     && <PeptidePage onBack={goBack} />}
+        {page === 'docking'     && <DockingPage />}
       </main>
       <Footer />
     </div>

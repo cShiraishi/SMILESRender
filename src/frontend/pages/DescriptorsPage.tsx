@@ -278,7 +278,7 @@ function DescContent({ initialSmiles }: { initialSmiles?: string }) {
         <label style={{ fontSize: '12px', fontWeight: 600, color: colors.textMuted, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
           SMILES Input — one per line (max 20)
         </label>
-        <textarea rows={5} value={input} onChange={e => setInput(e.target.value)} style={{
+        <textarea className="smiles-input" rows={5} value={input} onChange={e => setInput(e.target.value)} style={{
           width: '100%', boxSizing: 'border-box', padding: '10px 12px',
           fontFamily: 'monospace', fontSize: '13px',
           border: `1px solid ${colors.border}`, borderRadius: radius.sm,

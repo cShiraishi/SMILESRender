@@ -97,6 +97,7 @@ function IupacContent({ initialSmiles }: { initialSmiles?: string }) {
           SMILES Input — one per line
         </label>
         <textarea
+          className="smiles-input"
           rows={5}
           value={input}
           onChange={e => setInput(e.target.value)}

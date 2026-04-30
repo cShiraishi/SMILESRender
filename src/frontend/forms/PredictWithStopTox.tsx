@@ -3,6 +3,9 @@ import { useState, useEffect } from 'react';
 import Prediction from '../components/Prediction';
 import StopLight from '../components/StopLight';
 import ToolErrorBoundary from '../components/ToolErrorBoundary';
+import Tox21 from '../components/Tox21';
+import DeepADMET from '../components/DeepADMET';
+import GraphB3 from '../components/GraphB3';
 import Dashboard from '../components/Dashboard';
 import MoleculeDrawerModal from '../components/MoleculeDrawerModal';
 import RDKitFilters from '../components/RDKitFilters';
@@ -14,7 +17,7 @@ const defaultSmiles = [
   'OC[C@@H](O1)[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)1',
 ];
 
-const TOOLS = ['RDKit', 'StopTox', 'StopLight'] as const;
+const TOOLS = ['RDKit', 'StopTox', 'StopLight', 'Tox21', 'Deep ADMET', 'GraphB3'] as const;
 type ToolName = typeof TOOLS[number];
 type ToolState = 'loading' | 'done' | 'error' | 'queued';
 
@@ -22,6 +25,9 @@ const TOOL_COLORS: Record<ToolName, string> = {
   RDKit:      '#0d9488',
   StopTox:    '#b45309',
   StopLight:  '#1d4ed8',
+  Tox21:      '#8b5cf6',
+  'Deep ADMET': '#ec4899',
+  GraphB3:    '#10b981',
 };
 
 
@@ -238,6 +244,7 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
                 SMILES para análise (máx. 20) — um por linha:
               </label>
               <textarea
+                className="smiles-input"
                 style={{ width: '100%', padding: '10px', fontSize: '14px', fontFamily: 'monospace', borderRadius: '6px', border: '1px solid #dee2e6' }}
                 value={smiles.join('\n')}
                 rows={7}
@@ -381,7 +388,7 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
                 {isReady ? '✅ Analysis complete' : `⏳ Analysing… ${percentage}%`}
               </span>
               <span style={{ fontSize: '13px', color: '#666' }}>
-                {uniqueSmiles.length} molécula{uniqueSmiles.length !== 1 ? 's' : ''} · 3 tools each
+                {uniqueSmiles.length} molécula{uniqueSmiles.length !== 1 ? 's' : ''} · {TOOLS.length} tools each
               </span>
             </div>
 
@@ -468,6 +475,15 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
                   </ToolErrorBoundary>
                   <ToolErrorBoundary toolName="StopLight" onError={() => updateResults(smi, 'StopLight', [])}>
                     <StopLight smiles={smi} onDataLoaded={d => updateResults(smi, 'StopLight', d)} />
+                  </ToolErrorBoundary>
+                  <ToolErrorBoundary toolName="Tox21"     onError={() => updateResults(smi, 'Tox21',     [])}>
+                    <Tox21 smiles={smi} onDataLoaded={d => updateResults(smi, 'Tox21', d)} />
+                  </ToolErrorBoundary>
+                  <ToolErrorBoundary toolName="Deep ADMET" onError={() => updateResults(smi, 'Deep ADMET', [])}>
+                    <DeepADMET smiles={smi} onDataLoaded={d => updateResults(smi, 'Deep ADMET', d)} />
+                  </ToolErrorBoundary>
+                  <ToolErrorBoundary toolName="GraphB3"   onError={() => updateResults(smi, 'GraphB3',   [])}>
+                    <GraphB3 smiles={smi} onDataLoaded={d => updateResults(smi, 'GraphB3', d)} />
                   </ToolErrorBoundary>
                 </div>
               );

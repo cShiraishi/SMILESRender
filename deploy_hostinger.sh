@@ -77,7 +77,7 @@ EOF
 
 systemctl daemon-reload
 systemctl enable smilerender
-systemctl start smilerender
+systemctl restart smilerender
 
 # 6. Configure Nginx reverse proxy
 echo "[6/7] Configuring Nginx..."

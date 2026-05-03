@@ -24,26 +24,27 @@ import numpy as np
 
 # Load Tox21 Model
 TOX21_MODEL = None
+TOX21_ERROR = None
 try:
-    # Try multiple possible locations for the model file
     possible_paths = [
         os.path.join(os.path.dirname(__file__), "tox21_model.pkl"),
         os.path.join(os.getcwd(), "tox21_model.pkl"),
         os.path.join(os.getcwd(), "src", "tox21_model.pkl"),
     ]
     model_path = next((p for p in possible_paths if os.path.exists(p)), None)
-    
     if model_path:
         with open(model_path, "rb") as f:
             TOX21_MODEL = pickle.load(f)
         print(f"Tox21 Model loaded successfully from {model_path}.")
     else:
-        print("Tox21 Model file not found in any expected location.")
+        TOX21_ERROR = "File not found"
 except Exception as e:
+    TOX21_ERROR = str(e)
     print(f"Error loading Tox21 model: {e}")
 
 # Load BBB Model (GraphB3-inspired, GradientBoosting on B3DB dataset)
 BBB_MODEL = None
+BBB_ERROR = None
 try:
     possible_paths = [
         os.path.join(os.path.dirname(__file__), "bbb_model.pkl"),
@@ -51,14 +52,14 @@ try:
         os.path.join(os.getcwd(), "src", "bbb_model.pkl"),
     ]
     bbb_model_path = next((p for p in possible_paths if os.path.exists(p)), None)
-    
     if bbb_model_path:
         with open(bbb_model_path, "rb") as f:
             BBB_MODEL = pickle.load(f)
         print(f"BBB Model loaded successfully from {bbb_model_path}.")
     else:
-        print("BBB Model file not found in any expected location.")
+        BBB_ERROR = "File not found"
 except Exception as e:
+    BBB_ERROR = str(e)
     print(f"Error loading BBB model: {e}")
 
 
@@ -124,7 +125,9 @@ def status():
     """Check the status of all local ML engines."""
     return jsonify({
         "tox21_loaded": TOX21_MODEL is not None,
+        "tox21_error": TOX21_ERROR,
         "bbb_loaded": BBB_MODEL is not None,
+        "bbb_error": BBB_ERROR,
         "deep_admet_loaded": ADMET_AI_MODEL is not None,
         "environment": "production" if os.getenv("PORT") else "development",
         "timestamp": time.time()

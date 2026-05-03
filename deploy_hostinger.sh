@@ -42,8 +42,16 @@ pip install rdkit==2024.3.6
 pip install celery==5.4.0 redis==5.2.1
 pip install reportlab==4.4.10
 pip install PepLink==0.1.0
-pip install admet-ai
-pip install scikit-learn
+
+# Install Torch CPU first to save space and avoid CUDA issues
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+pip install admet-ai chemprop
+pip install scikit-learn==1.7.2
+
+# Warm up ADMET-AI (downloads weights now so it doesn't timeout later)
+echo "Warming up ADMET-AI models (downloading weights)..."
+venv/bin/python -c "from admet_ai import ADMETModel; ADMETModel()"
 
 # 5. Create systemd service
 echo "[5/7] Creating systemd service..."

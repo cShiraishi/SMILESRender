@@ -1,3 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 blinker==1.9.0
 click==8.1.7
 Flask==3.0.3
@@ -16,3 +17,9 @@ pandas==2.2.3
 openpyxl==3.1.5
 PepLink==0.1.0
 reportlab==4.4.10
+scikit-learn
+admet-ai
+chemprop
+torch
+torchvision
+torchaudio

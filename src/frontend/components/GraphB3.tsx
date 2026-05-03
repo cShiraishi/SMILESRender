@@ -59,7 +59,16 @@ function GraphB3({ smiles, onDataLoaded }: { smiles: string; onDataLoaded?: (dat
   }, [smiles]);
 
   if (loading) return <div style={{ padding: '20px', color: '#64748b' }}>Predicting BBB permeability...</div>;
-  if (error || !result) return <div style={{ padding: '20px', color: '#ef4444' }}>BBB prediction unavailable</div>;
+  if (error || !result) return (
+    <div style={{ margin: '15px', padding: '20px', backgroundColor: '#fef2f2', borderRadius: '15px', border: '1px solid #fecaca', color: '#b91c1c' }}>
+      <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+        <i className="bi bi-shield-slash"></i> GraphB3 Model Unavailable
+      </div>
+      <div style={{ fontSize: '12px' }}>
+        The BBB prediction engine failed to load on the server. Check if 'bbb_model.pkl' is present and scikit-learn versions match.
+      </div>
+    </div>
+  );
 
   const permeable = result.permeable;
   const accent = permeable ? '#10b981' : '#ef4444';

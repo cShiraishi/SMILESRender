@@ -25,22 +25,39 @@ import numpy as np
 # Load Tox21 Model
 TOX21_MODEL = None
 try:
-    model_path = os.path.join(os.path.dirname(__file__), "tox21_model.pkl")
-    if os.path.exists(model_path):
+    # Try multiple possible locations for the model file
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), "tox21_model.pkl"),
+        os.path.join(os.getcwd(), "tox21_model.pkl"),
+        os.path.join(os.getcwd(), "src", "tox21_model.pkl"),
+    ]
+    model_path = next((p for p in possible_paths if os.path.exists(p)), None)
+    
+    if model_path:
         with open(model_path, "rb") as f:
             TOX21_MODEL = pickle.load(f)
-        print("Tox21 Model loaded successfully.")
+        print(f"Tox21 Model loaded successfully from {model_path}.")
+    else:
+        print("Tox21 Model file not found in any expected location.")
 except Exception as e:
     print(f"Error loading Tox21 model: {e}")
 
 # Load BBB Model (GraphB3-inspired, GradientBoosting on B3DB dataset)
 BBB_MODEL = None
 try:
-    bbb_model_path = os.path.join(os.path.dirname(__file__), "bbb_model.pkl")
-    if os.path.exists(bbb_model_path):
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), "bbb_model.pkl"),
+        os.path.join(os.getcwd(), "bbb_model.pkl"),
+        os.path.join(os.getcwd(), "src", "bbb_model.pkl"),
+    ]
+    bbb_model_path = next((p for p in possible_paths if os.path.exists(p)), None)
+    
+    if bbb_model_path:
         with open(bbb_model_path, "rb") as f:
             BBB_MODEL = pickle.load(f)
-        print("BBB Model loaded successfully.")
+        print(f"BBB Model loaded successfully from {bbb_model_path}.")
+    else:
+        print("BBB Model file not found in any expected location.")
 except Exception as e:
     print(f"Error loading BBB model: {e}")
 
@@ -101,6 +118,17 @@ def set_security_headers(response):
 @app.route("/ping")
 def ping():
     return "pong", 200
+
+@app.route("/api/status")
+def status():
+    """Check the status of all local ML engines."""
+    return jsonify({
+        "tox21_loaded": TOX21_MODEL is not None,
+        "bbb_loaded": BBB_MODEL is not None,
+        "deep_admet_loaded": ADMET_AI_MODEL is not None,
+        "environment": "production" if os.getenv("PORT") else "development",
+        "timestamp": time.time()
+    })
 
 
 
@@ -640,12 +668,17 @@ def predict_tox21(smiles: str):
 # --- ADMET-AI (Chemprop) Integration ---
 ADMET_AI_MODEL = None
 try:
+    import torch
+    print(f"Torch version: {torch.__version__} (CPU: {not torch.cuda.is_available()})")
     from admet_ai import ADMETModel
     print("Initializing ADMET-AI (Chemprop D-MPNN)...")
+    # Set cache_dir to a local directory to avoid permission issues on VPS
     ADMET_AI_MODEL = ADMETModel()
     print("ADMET-AI initialized successfully.")
 except Exception as e:
-    print(f"Warning: Could not initialize ADMET-AI: {e}")
+    import traceback
+    print(f"CRITICAL: Could not initialize ADMET-AI: {e}")
+    traceback.print_exc()
 
 @app.route("/deep/<path:smiles>", methods=["GET"])
 def predict_deep_admet(smiles: str):

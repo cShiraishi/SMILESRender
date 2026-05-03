@@ -21,7 +21,12 @@ function DeepADMET(props: { smiles: string; onDataLoaded?: (data: any[]) => void
       try {
         const b64 = btoa(props.smiles);
         const res = await fetch(`/deep/${b64}`);
-        if (!res.ok) throw new Error('Fetch failed');
+        
+        if (res.status === 503) {
+          throw new Error('Engine initializing or unavailable on VPS');
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        
         const data = await res.json();
         setResults(data);
         if (props.onDataLoaded) {
@@ -30,9 +35,9 @@ function DeepADMET(props: { smiles: string; onDataLoaded?: (data: any[]) => void
             SMILES: props.smiles
           })));
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error(err);
-        setIsError(true);
+        setIsError(err.message || true);
       } finally {
         setIsLoading(false);
       }
@@ -40,12 +45,26 @@ function DeepADMET(props: { smiles: string; onDataLoaded?: (data: any[]) => void
     fetchData();
   }, [props.smiles]);
 
-  if (isLoading) return <div style={{ padding: '20px', color: '#666' }}>
-    <div className="spinner-border spinner-border-sm me-2" role="status"></div>
-    Running Deep Learning Engine (Chemprop D-MPNN)...
+  if (isLoading) return <div style={{ padding: '20px', color: '#666', backgroundColor: '#f8f9fa', borderRadius: '12px', border: '1px dashed #cbd5e1', margin: '15px 0' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div className="spinner-border spinner-border-sm text-primary" role="status"></div>
+      <span>Running Deep Learning Engine (Chemprop D-MPNN)...</span>
+    </div>
+    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '8px', marginLeft: '24px' }}>
+      This may take up to 20s on first run as the model loads into memory.
+    </div>
   </div>;
   
-  if (isError) return <div style={{ padding: '20px', color: 'red' }}>Error loading Deep ADMET data.</div>;
+  if (isError) return (
+    <div style={{ padding: '20px', color: '#b91c1c', backgroundColor: '#fef2f2', borderRadius: '12px', border: '1px solid #fecaca', margin: '15px 0' }}>
+      <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <i className="bi bi-exclamation-triangle-fill"></i> Deep Engine Unavailable
+      </div>
+      <div style={{ fontSize: '12px', marginTop: '4px' }}>
+        {typeof isError === 'string' ? isError : 'Internal server error during prediction.'}
+      </div>
+    </div>
+  );
 
   const categories = Array.from(new Set(results.map(r => r.Category)));
 

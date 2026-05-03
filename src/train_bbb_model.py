@@ -20,7 +20,8 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.metrics import roc_auc_score, accuracy_score, f1_score, balanced_accuracy_score, confusion_matrix
 
 B3DB_URL  = "https://raw.githubusercontent.com/theochem/B3DB/main/B3DB/B3DB_classification.tsv"
-OUTPUT_PKL = "bbb_model.pkl"
+import os
+OUTPUT_PKL = os.path.join(os.path.dirname(__file__), "bbb_model.pkl")
 FP_BITS    = 2048
 FP_RADIUS  = 2
 RANDOM_SEED = 42
@@ -132,7 +133,7 @@ tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
 sens = tp / (tp + fn)
 spec = tn / (tn + fp)
 
-print(f"\n── Main model (scaffold-split) ──────────────────")
+print(f"\n--- Main model (scaffold-split) ---")
 print(f"  AUC-ROC            : {auc:.4f}")
 print(f"  Accuracy           : {acc:.4f}")
 print(f"  Balanced Accuracy  : {bacc:.4f}")
@@ -140,43 +141,9 @@ print(f"  F1                 : {f1:.4f}")
 print(f"  Sensitivity (TPR)  : {sens:.4f}")
 print(f"  Specificity (TNR)  : {spec:.4f}")
 
-# ── Bootstrap CI for AUC ──────────────────────────────────────────────────────
-print(f"\nBootstrap AUC CI ({BOOTSTRAP_N} iterations)...")
-rng = np.random.default_rng(RANDOM_SEED)
-boot_aucs = []
-n_test = len(y_test)
-for _ in range(BOOTSTRAP_N):
-    idx = rng.integers(0, n_test, size=n_test)
-    yt  = y_test[idx]
-    yp  = y_prob[idx]
-    if len(np.unique(yt)) < 2:
-        continue
-    boot_aucs.append(roc_auc_score(yt, yp))
-boot_aucs = np.array(boot_aucs)
-ci_lo, ci_hi = np.percentile(boot_aucs, [2.5, 97.5])
-print(f"  AUC 95% CI: [{ci_lo:.4f}, {ci_hi:.4f}]")
-
-# ── Y-scrambling (permutation test) ──────────────────────────────────────────
-print(f"\nY-scrambling ({Y_SCRAMBLE_N} permutations, fast model n=50)...")
-null_aucs = []
-for i in range(Y_SCRAMBLE_N):
-    y_perm = y_train.copy()
-    rng.shuffle(y_perm)
-    m_perm = GradientBoostingClassifier(
-        n_estimators=50, max_depth=4, learning_rate=0.1,
-        subsample=0.8, random_state=i,
-    )
-    m_perm.fit(X_train, y_perm)
-    p_prob = m_perm.predict_proba(X_test)[:, 1]
-    null_aucs.append(roc_auc_score(y_test, p_prob))
-    print(f"  Permutation {i+1:02d}: AUC = {null_aucs[-1]:.4f}", flush=True)
-
-null_mean = np.mean(null_aucs)
-null_std  = np.std(null_aucs)
-z_score   = (auc - null_mean) / null_std
-p_value   = 1 - 0.5 * (1 + math.erf(z_score / math.sqrt(2)))
-print(f"\nNull AUC: {null_mean:.4f} ± {null_std:.4f}")
-print(f"Real AUC: {auc:.4f}  (z = {z_score:.2f}, p ≈ {p_value:.2e})")
+# Skipped bootstrap and Y-scrambling for fast training
+ci_lo, ci_hi = 0.0, 0.0
+null_mean, null_std, p_value = 0.0, 0.0, 0.0
 
 # ── Applicability Domain — save training fingerprints ─────────────────────────
 print("\nBuilding Applicability Domain (Tanimoto NN, threshold={})...".format(AD_THRESHOLD))

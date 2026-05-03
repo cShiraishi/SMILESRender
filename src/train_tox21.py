@@ -46,7 +46,8 @@ multi_target_rf = MultiOutputClassifier(base_rf, n_jobs=-1)
 multi_target_rf.fit(X, Y)
 
 print("Saving model to tox21_model.pkl...")
-with open("tox21_model.pkl", "wb") as f:
+output_pkl = os.path.join(os.path.dirname(__file__), "tox21_model.pkl")
+with open(output_pkl, "wb") as f:
     pickle.dump({
         "model": multi_target_rf,
         "tasks": tasks

@@ -22,7 +22,7 @@ apt install -y python3 python3-pip python3-venv python3-dev \
 echo "[2/7] Cloning SmileRender..."
 cd /opt
 if [ -d "SmileRender" ]; then
-  cd SmileRender && git pull origin main
+  cd SmileRender && git pull origin master
 else
   git clone https://github.com/cShiraishi/SMILESRender.git SmileRender
   cd SmileRender

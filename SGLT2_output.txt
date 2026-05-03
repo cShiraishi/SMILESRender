@@ -1,0 +1,262 @@
+[09:07:10] DEPRECATION WARNING: please use MorganGenerator
+[09:07:10] DEPRECATION WARNING: please use MorganGenerator
+BBB model  : loaded
+Tox21 model: loaded
+admet_ai   : loaded
+
+======================================================================
+SGLT2 Approved Inhibitors — Full ADMET Analysis
+======================================================================
+SMILES to Mol:   0%|          | 0/1 [00:00<?, ?it/s]SMILES to Mol: 100%|##########| 1/1 [00:00<00:00, 998.88it/s]
+Computing physchem properties:   0%|          | 0/1 [00:00<?, ?it/s]Computing physchem properties: 100%|##########| 1/1 [00:00<00:00, 142.45it/s]
+Dropping last batch of size 1 to avoid issues with batch normalization     (dataset size = 1, batch_size = 64)
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+\U0001f4a1 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles:  50%|#####     | 1/2 [00:00<00:00,  9.50it/s]GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+\U0001f4a1 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|##########| 2/2 [00:00<00:00,  9.38it/s]model ensembles: 100%|##########| 2/2 [00:00<00:00,  9.40it/s]
+[09:07:11] DEPRECATION WARNING: please use MorganGenerator
+[09:07:11] DEPRECATION WARNING: please use MorganGenerator
+
+------------------------------------------------------------
+  Canagliflozin
+------------------------------------------------------------
+  MW=444.52  LogP=2.97  TPSA=90.2  HBD=4  HBA=6
+  QED=0.486  Ro5=Pass
+  ESOL logS=-4.54 -> Poorly soluble
+  BBB: BBB+ (prob=0.597)  AD: In AD
+  Tox21 active (>=0.5): None active
+  Alerts: PAINS=0, BRENK=0, NIH=0
+  admet_ai  hERG=0.747  DILI=0.691  HIA=0.956  CYP3A4_inh=0.138  CYP3A4_sub=0.74  PPBR=99.215%  VDss=5.015  F_oral=0.759
+SMILES to Mol:   0%|          | 0/1 [00:00<?, ?it/s]SMILES to Mol: 100%|##########| 1/1 [00:00<00:00, 1980.31it/s]
+Computing physchem properties:   0%|          | 0/1 [00:00<?, ?it/s]Computing physchem properties: 100%|##########| 1/1 [00:00<00:00, 127.79it/s]
+Dropping last batch of size 1 to avoid issues with batch normalization     (dataset size = 1, batch_size = 64)
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+\U0001f4a1 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+\U0001f4a1 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|##########| 2/2 [00:00<00:00,  9.52it/s]model ensembles: 100%|##########| 2/2 [00:00<00:00,  9.52it/s]
+[09:07:11] DEPRECATION WARNING: please use MorganGenerator
+[09:07:11] DEPRECATION WARNING: please use MorganGenerator
+
+------------------------------------------------------------
+  Dapagliflozin
+------------------------------------------------------------
+  MW=408.88  LogP=1.84  TPSA=99.4  HBD=4  HBA=6
+  QED=0.582  Ro5=Pass
+  ESOL logS=-3.46 -> Moderately soluble
+  BBB: BBB- (prob=0.455)  AD: In AD
+  Tox21 active (>=0.5): None active
+  Alerts: PAINS=0, BRENK=0, NIH=0
+  admet_ai  hERG=0.621  DILI=0.509  HIA=0.915  CYP3A4_inh=0.12  CYP3A4_sub=0.687  PPBR=90.009%  VDss=7.549  F_oral=0.742
+SMILES to Mol:   0%|          | 0/1 [00:00<?, ?it/s]SMILES to Mol: 100%|##########| 1/1 [00:00<00:00, 991.56it/s]
+Computing physchem properties:   0%|          | 0/1 [00:00<?, ?it/s]Computing physchem properties: 100%|##########| 1/1 [00:00<00:00, 103.39it/s]
+Dropping last batch of size 1 to avoid issues with batch normalization     (dataset size = 1, batch_size = 64)
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+\U0001f4a1 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+\U0001f4a1 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|##########| 2/2 [00:00<00:00,  9.66it/s]model ensembles: 100%|##########| 2/2 [00:00<00:00,  9.66it/s]
+[09:07:12] DEPRECATION WARNING: please use MorganGenerator
+[09:07:12] DEPRECATION WARNING: please use MorganGenerator
+
+------------------------------------------------------------
+  Tofogliflozin
+------------------------------------------------------------
+  MW=386.44  LogP=1.0  TPSA=99.4  HBD=4  HBA=6
+  QED=0.626  Ro5=Pass
+  ESOL logS=-2.92 -> Moderately soluble
+  BBB: BBB+ (prob=0.548)  AD: In AD
+  Tox21 active (>=0.5): None active
+  Alerts: PAINS=0, BRENK=0, NIH=0
+  admet_ai  hERG=0.52  DILI=0.535  HIA=0.895  CYP3A4_inh=0.046  CYP3A4_sub=0.603  PPBR=89.005%  VDss=3.393  F_oral=0.752
+SMILES to Mol:   0%|          | 0/1 [00:00<?, ?it/s]SMILES to Mol: 100%|##########| 1/1 [00:00<?, ?it/s]
+Computing physchem properties:   0%|          | 0/1 [00:00<?, ?it/s]Computing physchem properties: 100%|##########| 1/1 [00:00<00:00, 132.92it/s]
+Dropping last batch of size 1 to avoid issues with batch normalization     (dataset size = 1, batch_size = 64)
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+\U0001f4a1 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles:  50%|#####     | 1/2 [00:00<00:00,  9.84it/s]GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+\U0001f4a1 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|##########| 2/2 [00:00<00:00,  9.54it/s]model ensembles: 100%|##########| 2/2 [00:00<00:00,  9.58it/s]
+[09:07:12] DEPRECATION WARNING: please use MorganGenerator
+[09:07:12] DEPRECATION WARNING: please use MorganGenerator
+
+------------------------------------------------------------
+  Ipragliflozin
+------------------------------------------------------------
+  MW=404.46  LogP=2.15  TPSA=90.2  HBD=4  HBA=6
+  QED=0.535  Ro5=Pass
+  ESOL logS=-3.83 -> Moderately soluble
+  BBB: BBB+ (prob=0.532)  AD: In AD
+  Tox21 active (>=0.5): None active
+  Alerts: PAINS=0, BRENK=0, NIH=0
+  admet_ai  hERG=0.654  DILI=0.605  HIA=0.904  CYP3A4_inh=0.097  CYP3A4_sub=0.623  PPBR=96.244%  VDss=4.459  F_oral=0.735
+SMILES to Mol:   0%|          | 0/1 [00:00<?, ?it/s]SMILES to Mol: 100%|##########| 1/1 [00:00<?, ?it/s]
+Computing physchem properties:   0%|          | 0/1 [00:00<?, ?it/s]Computing physchem properties: 100%|##########| 1/1 [00:00<00:00, 94.29it/s]
+Dropping last batch of size 1 to avoid issues with batch normalization     (dataset size = 1, batch_size = 64)
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+\U0001f4a1 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+\U0001f4a1 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|##########| 2/2 [00:00<00:00,  9.89it/s]model ensembles: 100%|##########| 2/2 [00:00<00:00,  9.89it/s]
+[09:07:13] DEPRECATION WARNING: please use MorganGenerator
+[09:07:13] DEPRECATION WARNING: please use MorganGenerator
+
+------------------------------------------------------------
+  Empagliflozin
+------------------------------------------------------------
+  MW=450.92  LogP=1.61  TPSA=108.6  HBD=4  HBA=7
+  QED=0.529  Ro5=Pass
+  ESOL logS=-3.54 -> Moderately soluble
+  BBB: BBB+ (prob=0.545)  AD: In AD
+  Tox21 active (>=0.5): None active
+  Alerts: PAINS=0, BRENK=0, NIH=0
+  admet_ai  hERG=0.683  DILI=0.486  HIA=0.911  CYP3A4_inh=0.15  CYP3A4_sub=0.67  PPBR=90.49%  VDss=8.224  F_oral=0.747
+SMILES to Mol:   0%|          | 0/1 [00:00<?, ?it/s]SMILES to Mol: 100%|##########| 1/1 [00:00<?, ?it/s]
+Computing physchem properties:   0%|          | 0/1 [00:00<?, ?it/s]Computing physchem properties: 100%|##########| 1/1 [00:00<00:00, 95.20it/s]
+Dropping last batch of size 1 to avoid issues with batch normalization     (dataset size = 1, batch_size = 64)
+model ensembles:   0%|          | 0/2 [00:00<?, ?it/s]GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+\U0001f4a1 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+\U0001f4a1 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+Predicting ----------------------------------- 1/1 0:00:00 • 0:00:00 0.00it/s 
+model ensembles: 100%|##########| 2/2 [00:00<00:00,  9.72it/s]model ensembles: 100%|##########| 2/2 [00:00<00:00,  9.72it/s]
+
+------------------------------------------------------------
+  Sotagliflozin
+------------------------------------------------------------
+  MW=424.95  LogP=3.17  TPSA=79.2  HBD=3  HBA=6
+  QED=0.661  Ro5=Pass
+  ESOL logS=-4.39 -> Poorly soluble
+  BBB: BBB+ (prob=0.579)  AD: In AD
+  Tox21 active (>=0.5): None active
+  Alerts: PAINS=0, BRENK=0, NIH=0
+  admet_ai  hERG=0.619  DILI=0.663  HIA=0.977  CYP3A4_inh=0.142  CYP3A4_sub=0.743  PPBR=98.923%  VDss=6.125  F_oral=0.831
+
+
+Saved: C:\Users\ruiab\Documents\SmileRender\SGLT2_ADMET_Results.xlsx
+
+
+======================================================================
+PAPER TABLE: Physicochemical + BBB + Solubility
+======================================================================
+Drug                     MW   LogP   TPSA   QED Ro5            ESOL logS Solubility             BBB BBB prob AD
+---------------------------------------------------------------------------------------------------------------
+Canagliflozin        444.52   2.97   90.2 0.486 Pass               -4.54 Poorly soluble        BBB+    0.597  In AD
+Dapagliflozin        408.88   1.84   99.4 0.582 Pass               -3.46 Moderately soluble    BBB-    0.455  In AD
+Tofogliflozin        386.44    1.0   99.4 0.626 Pass               -2.92 Moderately soluble    BBB+    0.548  In AD
+Ipragliflozin        404.46   2.15   90.2 0.535 Pass               -3.83 Moderately soluble    BBB+    0.532  In AD
+Empagliflozin        450.92   1.61  108.6 0.529 Pass               -3.54 Moderately soluble    BBB+    0.545  In AD
+Sotagliflozin        424.95   3.17   79.2 0.661 Pass               -4.39 Poorly soluble        BBB+    0.579  In AD
+
+
+======================================================================
+PAPER TABLE: Tox21 12-endpoint panel (probability or 0/1)
+======================================================================
+Drug                       AR   AR-LBD      AhR Aromatase       ER   ER-LBD PPAR-gamma      ARE    ATAD5      HSE      MMP      p53
+--------------------------------------------------------------------------------------------------------------------------------
+Canagliflozin           0.023    0.027     0.17    0.029    0.097    0.021    0.118    0.141    0.035    0.036    0.152    0.066
+Dapagliflozin           0.034    0.023     0.11    0.044    0.091    0.019    0.066    0.155    0.018    0.034    0.119    0.122
+Tofogliflozin           0.024    0.006    0.085    0.069     0.12     0.03     0.01    0.119    0.014    0.026    0.091    0.047
+Ipragliflozin            0.04     0.03    0.175    0.061    0.102    0.024    0.098    0.121    0.022    0.036    0.128    0.139
+Empagliflozin           0.023    0.025    0.121     0.08      0.1    0.041    0.102     0.16    0.057    0.032    0.156     0.14
+Sotagliflozin           0.041    0.011    0.135    0.071    0.098    0.022    0.036    0.157    0.014    0.058    0.158    0.101
+
+
+======================================================================
+PAPER TABLE: Structural Alerts
+======================================================================
+Drug                  PAINS  BRENK   NIH Alert names
+----------------------------------------------------------------------
+Canagliflozin             0      0     0  None
+Dapagliflozin             0      0     0  None
+Tofogliflozin             0      0     0  None
+Ipragliflozin             0      0     0  None
+Empagliflozin             0      0     0  None
+Sotagliflozin             0      0     0  None
+
+
+======================================================================
+PAPER TABLE: admet_ai key endpoints
+======================================================================
+Drug                   hERG   DILI    HIA  BioAv  CYP1A2  CYP2C9  CYP2D6  CYP3A4  3A4sub  PPBR%   VDss  t1/2h
+----------------------------------------------------------------------------------------------------
+Canagliflozin         0.747  0.691  0.956  0.759   0.041   0.093   0.085   0.138    0.74 99.215  5.015 37.853
+Dapagliflozin         0.621  0.509  0.915  0.742   0.012   0.045    0.06    0.12   0.687 90.009  7.549 30.174
+Tofogliflozin          0.52  0.535  0.895  0.752   0.002   0.021   0.037   0.046   0.603 89.005  3.393 14.989
+Ipragliflozin         0.654  0.605  0.904  0.735   0.092   0.077   0.123   0.097   0.623 96.244  4.459 33.377
+Empagliflozin         0.683  0.486  0.911  0.747   0.005   0.023   0.068    0.15    0.67  90.49  8.224 38.561
+Sotagliflozin         0.619  0.663  0.977  0.831    0.01   0.057   0.034   0.142   0.743 98.923  6.125  30.95
+
+Done.

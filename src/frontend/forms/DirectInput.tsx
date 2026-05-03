@@ -46,7 +46,9 @@ function DirectInput({ initialSmiles, onNavigate }: { initialSmiles?: string; on
 
   const [mols, setMols] = useState<MolData[]>(initialData);
   const [molsToRender, setMolsToRender] = useState<MolData[]>(initialData);
-  const [displayMode, setDisplayMode] = useState<'grid' | 'paper'>('grid');
+  const [displayMode, setDisplayMode] = useState<'grid' | 'paper' | 'scaffold'>('grid');
+  const [scaffolds, setScaffolds] = useState<{ smiles: string; count: number }[]>([]);
+  const [analyzingScaffolds, setAnalyzingScaffolds] = useState(false);
   const [paperOpts, setPaperOpts] = useState<PaperOptions>(defaultPaperOptions);
   const [error, setError] = useState(false);
   const [history] = useState(loadHistory);
@@ -144,6 +146,27 @@ function DirectInput({ initialSmiles, onNavigate }: { initialSmiles?: string; on
   const sendToADMET = () => {
     if (onNavigate) {
       onNavigate('predict', mols.map(m => m.smiles).join('\n'));
+    }
+  };
+
+  const handleScaffoldAnalysis = async () => {
+    if (mols.length === 0) return;
+    setAnalyzingScaffolds(true);
+    try {
+      const res = await fetch('/api/scaffolds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ smiles: mols.map(m => m.smiles) }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setScaffolds(data);
+        setDisplayMode('scaffold');
+      }
+    } catch (err) {
+      console.error("Scaffold analysis error:", err);
+    } finally {
+      setAnalyzingScaffolds(false);
     }
   };
 
@@ -254,6 +277,15 @@ function DirectInput({ initialSmiles, onNavigate }: { initialSmiles?: string; on
                 → Predict ADMET
               </button>
             )}
+            {mols.length > 0 && (
+              <button 
+                onClick={handleScaffoldAnalysis} 
+                disabled={analyzingScaffolds}
+                style={{ ...btnBase, backgroundColor: colors.surface, color: colors.blue, border: `1px solid ${colors.blue}44` }}
+              >
+                {analyzingScaffolds ? <><i className="bi bi-hourglass-split me-1"></i> Analyzing...</> : <><i className="bi bi-diagram-3 me-1"></i> Scaffold Analysis</>}
+              </button>
+            )}
             {molsToRender.length > 0 && (
               <span style={{ fontSize: '11px', color: colors.textMuted, backgroundColor: colors.bg, padding: '4px 10px', borderRadius: radius.md, border: `1px solid ${colors.border}`, fontWeight: 600 }}>
                 {molsToRender.length} molecule{molsToRender.length !== 1 ? 's' : ''}
@@ -283,6 +315,19 @@ function DirectInput({ initialSmiles, onNavigate }: { initialSmiles?: string; on
             >
               <i className="bi bi-file-earmark-medical me-1"></i> Paper
             </button>
+            {scaffolds.length > 0 && (
+              <button 
+                onClick={() => setDisplayMode('scaffold')}
+                style={{ 
+                  ...btnBase, padding: '4px 10px', border: 'none', borderRadius: radius.sm,
+                  backgroundColor: displayMode === 'scaffold' ? colors.surface : 'transparent',
+                  boxShadow: displayMode === 'scaffold' ? shadow.sm : 'none',
+                  color: displayMode === 'scaffold' ? colors.blue : colors.textMuted
+                }}
+              >
+                <i className="bi bi-diagram-3-fill me-1"></i> Scaffolds
+              </button>
+            )}
           </div>
         </div>
 
@@ -372,7 +417,30 @@ function DirectInput({ initialSmiles, onNavigate }: { initialSmiles?: string; on
           padding: displayMode === 'paper' ? '20px' : '0',
           borderRadius: displayMode === 'paper' ? radius.md : '0',
         }}>
-          {molsToRender.map((m, i) => <SmilesCard key={i} smiles={m.smiles} name={m.name} mw={m.mw} mode={displayMode} index={i + 1} paperOptions={paperOpts} />)}
+          {displayMode === 'scaffold' ? (
+            <div style={{ width: '100%' }}>
+              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                <h3 style={{ margin: 0, color: colors.text }}>Bemis-Murcko Scaffold Analysis</h3>
+                <p style={{ color: colors.textMuted, fontSize: '14px' }}>Found {scaffolds.length} unique scaffolds in the library</p>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '15px' }}>
+                {scaffolds.map((s, i) => (
+                  <div key={i} style={{ backgroundColor: colors.surface, padding: '15px', borderRadius: radius.md, border: `1px solid ${colors.border}`, textAlign: 'center', width: '220px', boxShadow: shadow.sm }}>
+                    <SmilesCard smiles={s.smiles} mode="grid" />
+                    <div style={{ marginTop: '10px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: colors.textMuted }}>SMILES: </span>
+                      <code style={{ fontSize: '10px', wordBreak: 'break-all', display: 'block', color: colors.blue }}>{s.smiles}</code>
+                    </div>
+                    <div style={{ marginTop: '8px', backgroundColor: colors.blue + '11', padding: '4px', borderRadius: radius.sm }}>
+                      <span style={{ fontSize: '14px', fontWeight: 700, color: colors.blue }}>{s.count} molecules</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            molsToRender.map((m, i) => <SmilesCard key={i} smiles={m.smiles} name={m.name} mw={m.mw} mode={displayMode === 'paper' ? 'paper' : 'grid'} index={i + 1} paperOptions={paperOpts} />)
+          )}
         </div>
       </>
     </Section>

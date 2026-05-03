@@ -109,6 +109,8 @@ def index():
     return render_template("index.html")
 
 
+from rdkit.Chem.Scaffolds import MurckoScaffold
+
 @app.route("/api/mw", methods=["POST"])
 def batch_mw():
     """Return molecular weights for a list of SMILES."""
@@ -123,6 +125,39 @@ def batch_mw():
             else:
                 results.append(None)
         return jsonify(results)
+    except Exception as err:
+        return jsonify({"error": str(err)}), 500
+
+@app.route("/api/scaffolds", methods=["POST"])
+def batch_scaffolds():
+    """Analyze Murcko scaffolds for a list of SMILES."""
+    try:
+        data = request.get_json()
+        smiles_list = data.get("smiles", [])
+        scaffold_counts = {}
+        
+        for smi in smiles_list:
+            mol = Chem.MolFromSmiles(smi)
+            if mol:
+                try:
+                    scaf_mol = MurckoScaffold.GetScaffoldForMol(mol)
+                    scaf_smi = Chem.MolToSmiles(scaf_mol)
+                    if scaf_smi:
+                        scaffold_counts[scaf_smi] = scaffold_counts.get(scaf_smi, 0) + 1
+                    else:
+                        scaffold_counts["No scaffold"] = scaffold_counts.get("No scaffold", 0) + 1
+                except:
+                    scaffold_counts["Error"] = scaffold_counts.get("Error", 0) + 1
+            else:
+                scaffold_counts["Invalid"] = scaffold_counts.get("Invalid", 0) + 1
+                
+        # Sort by frequency descending
+        sorted_scaffolds = sorted(
+            [{"smiles": s, "count": c} for s, c in scaffold_counts.items()],
+            key=lambda x: x["count"],
+            reverse=True
+        )
+        return jsonify(sorted_scaffolds)
     except Exception as err:
         return jsonify({"error": str(err)}), 500
 

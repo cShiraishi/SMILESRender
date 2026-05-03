@@ -74,7 +74,15 @@
       "Bash(git *)",
       "Bash(C:/Users/ruiab/AppData/Local/Programs/Python/Python312/python.exe *)",
       "Bash(\"C:/Users/ruiab/AppData/Local/Programs/Python/Python312/python.exe\" -m pip install python-docx --quiet)",
-      "Bash(\"C:/Users/ruiab/AppData/Local/Programs/Python/Python312/python.exe\" -W ignore train_bbb_model.py)"
+      "Bash(\"C:/Users/ruiab/AppData/Local/Programs/Python/Python312/python.exe\" -W ignore train_bbb_model.py)",
+      "Bash(grep -v \"^$\")",
+      "WebFetch(domain:www.nature.com)",
+      "WebFetch(domain:doi.org)",
+      "Bash(iconv -f utf-8 -t utf-8//IGNORE)",
+      "Bash(findstr /V \"DEPRECATION\\\\|model ensemble\\\\|Predicting\\\\|GPU\\\\|TPU\\\\|Tip\\\\|litlogger\\\\|it/s\\\\|Dropping\\\\|batch_size\\\\|physchem\\\\|SMILES to\")",
+      "Bash(py -3 analyze_sglt2.py)",
+      "Bash(echo \"exit code: $?\")",
+      "Bash(attrib -R \"C:\\\\Users\\\\ruiab\\\\Documents\\\\SmileRender\\\\JCheminform_SmileRender_SciRep_v1.md\")"
     ]
   }
 }

@@ -65,8 +65,8 @@ def add_body(doc, text):
 
 
 def _add_inline(para, text):
-    """Parse **bold** and *italic* and superscript-like ¹²³ markers into runs."""
-    # Normalise superscript Unicode digits to a marker we can detect
+    """Parse **bold** and *italic* and superscript markers into runs."""
+    # Unicode superscript digits 0-9 in order
     sup_chars = "⁰¹²³⁴⁵⁶⁷⁸⁹"
     sup_map = {c: str(i) for i, c in enumerate(sup_chars)}
 
@@ -225,7 +225,7 @@ def build_document():
         "12 minutes, compared with approximately three hours for the equivalent manual multi-tool "
         "workflow. SMILESRender is freely available under the MIT licence at "
         "https://github.com/rubithedev/smiles-render-web, with a public cloud instance at "
-        "https://smiles-render.onrender.com and a Docker Compose image for local deployment."
+        "https://www.smilesrender.com and a Docker Compose image for local deployment."
     )
     add_body(doc, abstract_text)
 
@@ -237,7 +237,7 @@ def build_document():
     intro_paras = [
         ("Attrition due to unfavourable pharmacokinetics and toxicity remains the leading cause of "
          "failure in pharmaceutical development, responsible for 30–40% of clinical trial terminations "
-         "even after decades of ADMET-guided lead optimisation¹². Computational prediction of ADMET "
+         "even after decades of ADMET-guided lead optimisation⁶. Computational prediction of ADMET "
          "properties has become indispensable for candidate prioritisation before synthesis, enabling "
          "researchers to screen large chemical libraries at a fraction of the cost of experimental "
          "assays³. The five ADMET categories — Absorption, Distribution, Metabolism, Excretion, and "
@@ -246,11 +246,11 @@ def build_document():
          "the patient."),
 
         ("The cheminformatics community has responded to this need with a rich ecosystem of specialised "
-         "tools. Web-based services such as SwissADME⁴, pkCSM⁵, ADMETlab 3.0⁶, and the *admet_ai* "
-         "Python library⁷ each cover a distinct subset of ADMET properties with high predictive "
-         "performance. Structure-focused desktop platforms such as DataWarrior⁸ and MarvinSketch "
+         "tools. Web-based services such as SwissADME⁴, ADMETlab 3.0⁵, and the *admet_ai* "
+         "Python library⁶ each cover a distinct subset of ADMET properties with high predictive "
+         "performance. Structure-focused desktop platforms such as DataWarrior⁶ and MarvinSketch "
          "provide excellent molecular visualisation and drug-likeness computation. Workflow platforms "
-         "such as KNIME⁹ with RDKit nodes and Galaxy cheminformatics tools¹⁰ allow construction of "
+         "such as KNIME⁶ with RDKit nodes and Galaxy cheminformatics tools⁶ allow construction of "
          "custom analysis pipelines. Together, these tools represent a powerful and largely open "
          "computational resource for medicinal chemistry."),
 
@@ -298,8 +298,8 @@ def build_document():
         "The backend maintains two computation pathways. The **local pathway** runs three embedded "
         "ML models and all RDKit operations entirely in-process, requiring no network access and "
         "providing 100% uptime independent of external service availability. The **external pathway** "
-        "orchestrates asynchronous queries to three prediction servers — StopTox¹¹, StopLight¹², "
-        "and ProTox 3.0¹³ — through a fault-isolation layer (ToolErrorBoundary) that preserves "
+        "orchestrates asynchronous queries to three prediction servers — StopTox⁶, StopLight⁶, "
+        "and ProTox 3.0⁶ — through a fault-isolation layer (ToolErrorBoundary) that preserves "
         "results from functioning services when any upstream server is unavailable. Together, the "
         "two pathways cover 85+ ADMET endpoints. A Redis cache (24-hour TTL, keyed by MD5 of "
         "canonical SMILES) reduces redundant external queries by 60–80% in iterative workflows. "
@@ -319,7 +319,7 @@ def build_document():
         "via rdkit.Chem.Draw.ReactionToImage with atom-mapping support."
     ))
     add_body(doc, (
-        "Interactive structure drawing is provided through the JSME Molecular Editor¹⁴, embedded "
+        "Interactive structure drawing is provided through the JSME Molecular Editor⁶, embedded "
         "as a browser-native JavaScript component requiring no plugin installation. Users can draw "
         "structures from scratch or modify existing SMILES, with JSME exporting canonical SMILES "
         "that feed directly into all downstream prediction modules. A custom benzene-ring cursor is "
@@ -340,15 +340,15 @@ def build_document():
         "Oral absorption is governed by intestinal permeability and first-pass metabolism. "
         "SMILESRender covers absorption through: (i) human intestinal absorption (HIA) — the "
         "fraction absorbed via passive and active transport, predicted by the Chemprop D-MPNN via "
-        "*admet_ai*⁷ (AUC-ROC 0.98 on TDC benchmark⁷); (ii) Caco-2 permeability — transcellular "
+        "*admet_ai*⁶ (AUC-ROC 0.98 on TDC benchmark⁶); (ii) Caco-2 permeability — transcellular "
         "permeability through the Caco-2 cell monolayer, the standard in vitro surrogate for "
-        "intestinal permeability (Pearson r = 0.60 on TDC⁷); (iii) PAMPA permeability for passive "
+        "intestinal permeability (Pearson r = 0.60 on TDC⁶); (iii) PAMPA permeability for passive "
         "transcellular transport; (iv) P-glycoprotein substrate and inhibitor predictions, critical "
         "because P-gp actively effluxes numerous drug candidates from the intestinal epithelium and "
         "the blood-brain barrier; and (v) oral bioavailability estimates (F20%, F30%). "
         "Complementing these ML-based predictions, the local RDKit engine computes TPSA and flags "
-        "values > 140 Å² (reduced oral absorption, Veber et al.¹⁵) and violations of the Lipinski "
-        "Rule of Five¹⁶, Veber, Ghose, Egan, and Muegge drug-likeness filters."
+        "values > 140 Å² (reduced oral absorption, Veber et al.⁶) and violations of the Lipinski "
+        "Rule of Five⁶, Veber, Ghose, Egan, and Muegge drug-likeness filters."
     ))
 
     # Distribution
@@ -358,12 +358,12 @@ def build_document():
         "pharmacologically critical distribution endpoint is blood-brain barrier (BBB) permeability, "
         "which determines whether a drug can reach the CNS. SMILESRender provides two independent "
         "BBB predictions: a locally embedded GradientBoosting model trained on the curated B3DB "
-        "dataset¹⁷ (n = 7,643; AUC-ROC = 0.92 on stratified hold-out), and the Chemprop "
+        "dataset⁶ (n = 7,643; AUC-ROC = 0.92 on stratified hold-out), and the Chemprop "
         "BBB_Martins model via *admet_ai*. Concordant BBB− predictions from both models constitute "
         "a high-confidence CNS-impermeability signal. Each local BBB prediction is accompanied by "
         "a Tanimoto applicability domain (AD) flag: compounds with nearest-neighbour similarity to "
         "the training set below 0.30 receive an explicit uncertainty warning, following the OPERA "
-        "QSAR AD framework¹⁸."
+        "QSAR AD framework⁶."
     ))
     add_body(doc, (
         "Additional distribution endpoints from *admet_ai* include plasma protein binding (PPBR), "
@@ -410,7 +410,7 @@ def build_document():
     ))
     add_body(doc, (
         "**Hepatotoxicity (DILI):** Drug-induced liver injury is the leading cause of post-approval "
-        "drug withdrawal. The Chemprop DILI model (AUC-ROC 0.84 on TDC⁷) provides an early "
+        "drug withdrawal. The Chemprop DILI model (AUC-ROC 0.84 on TDC⁶) provides an early "
         "probabilistic screen."
     ))
     add_body(doc, (
@@ -424,7 +424,7 @@ def build_document():
     ))
     add_body(doc, (
         "**Tox21 12-endpoint panel:** A locally embedded Multi-Output Random Forest covers all "
-        "12 Tox21 Challenge bioassay endpoints¹⁹: seven nuclear receptor activity assays "
+        "12 Tox21 Challenge bioassay endpoints⁶: seven nuclear receptor activity assays "
         "(NR-AR, NR-AR-LBD, NR-AhR, NR-Aromatase, NR-ER, NR-ER-LBD, NR-PPAR-gamma) and five "
         "stress response pathway assays (SR-ARE, SR-ATAD5, SR-HSE, SR-MMP, SR-p53). These "
         "endpoints are directly relevant to endocrine disruption screening under REACH and EPA "
@@ -434,11 +434,11 @@ def build_document():
     add_body(doc, (
         "**Acute systemic toxicity (StopTox):** Six endpoints — oral LD50, dermal LD50, "
         "inhalation LC50, eye irritation, skin sensitisation, and aquatic toxicity — from "
-        "NIH/NTP QSAR models¹¹, classified according to GHS thresholds."
+        "NIH/NTP QSAR models⁶, classified according to GHS thresholds."
     ))
     add_body(doc, (
         "**Organ toxicity (ProTox 3.0):** Twelve organ-specific endpoints from the Charité "
-        "ProTox server¹³ — hepatotoxicity, neurotoxicity, nephrotoxicity, cardiotoxicity, "
+        "ProTox server⁶ — hepatotoxicity, neurotoxicity, nephrotoxicity, cardiotoxicity, "
         "carcinogenicity, mutagenicity, immunotoxicity, cytotoxicity, BBB, respiratory toxicity, "
         "ecotoxicity, and clinical toxicity — extending coverage to regulatory toxicology organ systems."
     ))
@@ -510,7 +510,7 @@ def build_document():
     ))
     add_body(doc, (
         "Threshold provenance is fully documented: GHS classification for LD50, ICH E14 for hERG, "
-        "Veber criteria for TPSA, and Baell–Holloway definitions for PAINS²⁰. The engine explicitly "
+        "Veber criteria for TPSA, and Baell–Holloway definitions for PAINS⁶. The engine explicitly "
         "communicates that ML probability outputs are relative discriminative scores, not calibrated "
         "absolute risk estimates."
     ))
@@ -520,7 +520,7 @@ def build_document():
     add_body(doc, (
         "The ADMET Dashboard (Figure 3) provides real-time visual aggregation of all prediction "
         "outputs as they resolve. The layout consists of six panels: (i) **Summary metric cards** — "
-        "mean molecular weight, LogP, QED²¹, oral bioavailability, and Lipinski compliance rate "
+        "mean molecular weight, LogP, QED⁶, oral bioavailability, and Lipinski compliance rate "
         "across the submitted batch; (ii) **Safety Flags** — progress bars showing the proportion "
         "of compounds flagging hERG cardiotoxicity, DILI, PAINS alerts, BRENK alerts, and predicted "
         "BBB permeability; (iii) **Toxicity distribution** (StopTox); (iv) **Solubility distribution** "
@@ -535,18 +535,18 @@ def build_document():
     add_body(doc, (
         "Over 60 physicochemical and topological descriptors are computed locally via RDKit, "
         "covering constitutional properties (MW, FractionCSP3, Labute ASA, MolMR), drug-likeness "
-        "metrics (QED²¹, five filter rule sets), topological indices (Balaban J, BertzCT, Kappa "
+        "metrics (QED⁶, five filter rule sets), topological indices (Balaban J, BertzCT, Kappa "
         "1–3, Chi series), electronic/VSA descriptors (PEOE_VSA, SMR_VSA, SlogP_VSA), and "
         "structural alerts. Four molecular fingerprint protocols are exported in QSAR-ready column "
         "format for direct use in scikit-learn or DeepChem: RDKit (1,024 bits), Morgan/ECFP4 "
         "(2,048 bits, radius 2), MACCS keys (167 bits), and Atom Pairs (2,048 bits)."
     ))
     add_body(doc, (
-        "Aqueous solubility is estimated via the ESOL QSAR model²²: "
+        "Aqueous solubility is estimated via the ESOL QSAR model⁶: "
         "log S = 0.16 − 0.63·cLogP − 0.0062·MW + 0.066·RotB − 0.74·AP, "
         "where AP is the aromatic atom fraction. ESOL provides four-category BCS-aligned solubility "
         "classification with ±1 log-unit uncertainty — appropriate for rapid first-pass screening; "
-        "higher-accuracy models such as OPERA²³ are recommended for lead optimisation."
+        "higher-accuracy models such as OPERA⁶ are recommended for lead optimisation."
     ))
 
     # --- Batch ---
@@ -727,7 +727,7 @@ def build_document():
         "their structural properties — moderate LogP (1.0-3.2), TPSA 79-109 Angstrom2, "
         "MW 386-451 Da — are consistent with passive transcellular CNS permeability. Emerging "
         "evidence places SGLT2 expression in brain vasculature and neurons, and empagliflozin is "
-        "under active investigation for neurodegenerative diseases³¹. The Automated Interpretation "
+        "under active investigation for neurodegenerative diseases³⁰. The Automated Interpretation "
         "Engine flags these as 'moderate BBB penetration signal' with explicit AD status and "
         "probability confidence."
     ))
@@ -771,7 +771,7 @@ def build_document():
     ))
 
     add_body(doc, (
-        "Compared to web-based ADMET services — SwissADME⁴, pkCSM⁵, ADMETlab 3.0⁶ — "
+        "Compared to web-based ADMET services — SwissADME⁴, ADMETlab 3.0⁵ — "
         "SMILESRender's key differentiators are: (i) full offline capability through locally "
         "embedded ML models; (ii) cross-tool ADMET aggregation within a single session; "
         "(iii) automated interpretation translating numerical outputs into narratives; and "
@@ -783,7 +783,7 @@ def build_document():
     add_body(doc, (
         "**Limitations.** The BBB and Tox21 embedded models have been validated on stratified "
         "random hold-out partitions; scaffold-disjoint evaluation — the more rigorous benchmark "
-        "for generalisation to structurally novel chemotypes²⁴ — is in preparation. ESOL "
+        "for generalisation to structurally novel chemotypes⁶ — is in preparation. ESOL "
         "solubility estimates carry ±1 log-unit uncertainty and should be treated as first-pass "
         "screens. Predicted hERG and DILI probabilities from Chemprop are relative discriminative "
         "scores and have not been calibrated against clinical outcome registries; they should not "
@@ -794,11 +794,11 @@ def build_document():
 
     add_body(doc, (
         "**Future developments.** Planned extensions include: a 3D conformer generation endpoint "
-        "(RDKit ETKDG²⁵) feeding into a protein–ligand docking interface (AutoDock Vina²⁶ + "
-        "3Dmol.js browser visualisation) benchmarked on CASF-2016 re-docking tasks²⁷; "
+        "(RDKit ETKDG⁶) feeding into a protein–ligand docking interface (AutoDock Vina⁶ + "
+        "3Dmol.js browser visualisation) benchmarked on CASF-2016 re-docking tasks⁶; "
         "scaffold-disjoint BBB validation with bootstrap confidence intervals; consensus Tox21 "
         "modelling combining the RF with Chemprop multi-task predictions; and integration of the "
-        "OPERA solubility model²³ as a higher-accuracy ESOL alternative."
+        "OPERA solubility model⁶ as a higher-accuracy ESOL alternative."
     ))
 
     doc.add_paragraph("─" * 80)
@@ -820,7 +820,7 @@ def build_document():
 
     add_heading(doc, "Data Curation", level=2)
     add_body(doc, (
-        "**B3DB (BBB model):** The raw B3DB classification dataset²⁸ (n = 7,807) was curated "
+        "**B3DB (BBB model):** The raw B3DB classification dataset⁶ (n = 7,807) was curated "
         "as follows: invalid SMILES removed (n = 2); canonical SMILES generated via RDKit; salts "
         "and fragments stripped using RDKit SaltRemover (n = 38 modified); MW > 900 Da entries "
         "removed (n = 4); exact duplicates with conflicting BBB labels discarded (n = 16 pairs); "
@@ -844,7 +844,7 @@ def build_document():
         "5-fold stratified CV (AUC = 0.91 ± 0.02). AUC-ROC = 0.92, 95% bootstrap CI "
         "[0.90, 0.94] (1,000 iterations). Scaffold-disjoint evaluation in preparation. "
         "**Applicability domain:** maximum Tanimoto similarity to training set via "
-        "DataStructs.BulkTanimotoSimilarity; threshold 0.30 (OPERA framework¹⁸); coverage "
+        "DataStructs.BulkTanimotoSimilarity; threshold 0.30 (OPERA framework⁶); coverage "
         "at threshold: 94.1% of hold-out."
     ))
 
@@ -859,16 +859,16 @@ def build_document():
 
     add_heading(doc, "Deep ADMET (admet_ai / Chemprop D-MPNN)", level=2)
     add_body(doc, (
-        "SMILESRender integrates admet_ai ≥ 1.0⁷ using pre-trained Chemprop Directed Message "
-        "Passing Neural Network weights⁸ trained on TDC benchmark datasets. No model retraining "
-        "or fine-tuning is performed. Performance is as reported by Swanson et al.⁷: median "
+        "SMILESRender integrates admet_ai ≥ 1.0⁶ using pre-trained Chemprop Directed Message "
+        "Passing Neural Network weights⁶ trained on TDC benchmark datasets. No model retraining "
+        "or fine-tuning is performed. Performance is as reported by Swanson et al.⁶: median "
         "AUC-ROC = 0.894 (28 classification tasks), mean RMSE = 0.47 (25 regression tasks). "
         "Mean inference: 280 ± 30 ms per compound on a 4-core Intel i7 CPU without GPU acceleration."
     ))
 
     add_heading(doc, "ESOL Solubility", level=2)
     add_body(doc, (
-        "Implemented as a local function applying the Delaney equation²²: "
+        "Implemented as a local function applying the Delaney equation⁶: "
         "log S = 0.16 − 0.63·cLogP − 0.0062·MW + 0.066·RotB − 0.74·AP. "
         "cLogP computed via RDKit Descriptors.MolLogP; AP (aromatic proportion) = "
         "aromatic heavy atoms / total heavy atoms."
@@ -898,7 +898,7 @@ def build_document():
     add_body(doc, (
         "The full source code, Docker Compose configuration, ML model training scripts, and .pkl "
         "model bundles are available at https://github.com/rubithedev/smiles-render-web (MIT "
-        "licence). The B3DB dataset used for BBB model training is available from Meng et al.²⁸. "
+        "licence). The B3DB dataset used for BBB model training is available from Meng et al.⁶. "
         "The Tox21 10K dataset is available from the NIH National Center for Advancing "
         "Translational Sciences (https://tripod.nih.gov/tox21)."
     ))
@@ -913,33 +913,32 @@ def build_document():
         "2. Paul SM, et al. How to improve R&D productivity: the pharmaceutical industry's grand challenge. Nat Rev Drug Discov. 2010;9:203–214.",
         "3. Muratov EN, et al. QSAR without borders. Chem Soc Rev. 2020;49:3525–3564.",
         "4. Daina A, Michielin O, Zoete V. SwissADME: a free web tool to evaluate pharmacokinetics, drug-likeness and medicinal chemistry friendliness of small molecules. Sci Rep. 2017;7:42717.",
-        "5. Pires DEV, Blundell TL, Ascher DB. pkCSM: predicting small-molecule pharmacokinetic and toxicity properties using graph-based signatures. J Med Chem. 2015;58:4066–4072.",
-        "6. Gui C, et al. ADMETlab 3.0: an updated comprehensive online ADMET prediction tool. Nucleic Acids Res. 2024;52:W197–W204.",
-        "7. Swanson K, et al. ADMET-AI: a machine learning ADMET platform for evaluation of large-scale chemical libraries. Bioinformatics. 2024;40:btae416.",
-        "8. Yang K, et al. Analyzing learned molecular representations for property prediction. J Chem Inf Model. 2019;59:3370–3388.",
-        "9. Berthold MR, et al. KNIME — the Konstanz information miner. ACM SIGKDD Explor Newsl. 2009;11:26–31.",
-        "10. Afgan E, et al. The Galaxy platform for accessible, reproducible and collaborative biomedical analyses: 2018 update. Nucleic Acids Res. 2018;46:W537–W544.",
-        "11. Borrel A, et al. StopTox: an in silico alternative to animal acute systemic toxicity tests. Environ Health Perspect. 2022;130:027014.",
-        "12. Borrel A, et al. High-throughput screening to predict chemical-assay interference. Sci Rep. 2020;10:3986.",
-        "13. Banerjee P, Dehnbostel FO, Preissner R. ProTox-3.0: a webserver for the prediction of toxicity of chemicals. Nucleic Acids Res. 2024;52:W513–W520.",
-        "14. Ertl P, Bienfait B. JSME: a free molecule editor in JavaScript. J Cheminform. 2013;5:24.",
-        "15. Veber DF, et al. Molecular properties that influence the oral bioavailability of drug candidates. J Med Chem. 2002;45:2615–2623.",
-        "16. Lipinski CA, et al. Experimental and computational approaches to estimate solubility and permeability in drug discovery. Adv Drug Deliv Rev. 2001;46:3–26.",
-        "17. Meng F, et al. A curated diverse molecular database of blood-brain barrier permeability. Sci Data. 2021;8:289.",
-        "18. Mansouri K, et al. OPERA models for predicting physicochemical properties and environmental fate endpoints. J Cheminform. 2018;10:10.",
-        "19. Tice RR, et al. Improving the human hazard characterization of chemicals: a Tox21 update. Environ Health Perspect. 2013;121:756–765.",
-        "20. Baell JB, Holloway GA. New substructure filters for removal of pan assay interference compounds (PAINS). J Med Chem. 2010;53:2719–2740.",
-        "21. Bickerton GR, et al. Quantifying the chemical beauty of drugs. Nat Chem. 2012;4:90–98.",
-        "22. Delaney JS. ESOL: estimating aqueous solubility directly from molecular structure. J Chem Inf Comput Sci. 2004;44:1000–1005.",
-        "23. Mansouri K, et al. OPERA models for predicting physicochemical properties. J Cheminform. 2018;10:10.",
-        "24. Muratov EN, et al. QSAR without borders. Chem Soc Rev. 2020;49:3525–3564.",
-        "25. Riniker S, Landrum GA. Better informed distance geometry: using what we know to improve conformation generation. J Chem Inf Model. 2015;55:2562–2574.",
-        "26. Eberhardt J, et al. AutoDock Vina 1.2.0. J Chem Inf Model. 2021;61:3891–3898.",
-        "27. Su M, et al. Comparative assessment of scoring functions: the CASF-2016 benchmark. J Chem Inf Model. 2019;59:895–913.",
-        "28. Meng F, et al. B3DB: a multitasking dataset for blood-brain barrier permeability. Sci Data. 2021;8:289.",
-        "29. Sander T, et al. DataWarrior: an open-source program for chemistry aware data visualization. J Chem Inf Model. 2015;55:460–473.",
-        "30. Dhanjal JK, et al. GraphB3: an explainable GCN approach for BBB permeability prediction. J Cheminform. 2024;16:34.",
-        "31. Hierro-Bujalance C, et al. Empagliflozin reduces vascular damage and cognitive impairment in a mixed murine model of Alzheimer's disease and type 2 diabetes. Alzheimers Res Ther. 2020;12:40.",
+        "5. Gui C, et al. ADMETlab 3.0: an updated comprehensive online ADMET prediction tool. Nucleic Acids Res. 2024;52:W197–W204.",
+        "6. Swanson K, et al. ADMET-AI: a machine learning ADMET platform for evaluation of large-scale chemical libraries. Bioinformatics. 2024;40:btae416.",
+        "7. Yang K, et al. Analyzing learned molecular representations for property prediction. J Chem Inf Model. 2019;59:3370–3388.",
+        "8. Berthold MR, et al. KNIME — the Konstanz information miner. ACM SIGKDD Explor Newsl. 2009;11:26–31.",
+        "9. Afgan E, et al. The Galaxy platform for accessible, reproducible and collaborative biomedical analyses: 2018 update. Nucleic Acids Res. 2018;46:W537–W544.",
+        "10. Borrel A, et al. StopTox: an in silico alternative to animal acute systemic toxicity tests. Environ Health Perspect. 2022;130:027014.",
+        "11. Borrel A, et al. High-throughput screening to predict chemical-assay interference. Sci Rep. 2020;10:3986.",
+        "12. Banerjee P, Dehnbostel FO, Preissner R. ProTox-3.0: a webserver for the prediction of toxicity of chemicals. Nucleic Acids Res. 2024;52:W513–W520.",
+        "13. Ertl P, Bienfait B. JSME: a free molecule editor in JavaScript. J Cheminform. 2013;5:24.",
+        "14. Veber DF, et al. Molecular properties that influence the oral bioavailability of drug candidates. J Med Chem. 2002;45:2615–2623.",
+        "15. Lipinski CA, et al. Experimental and computational approaches to estimate solubility and permeability in drug discovery. Adv Drug Deliv Rev. 2001;46:3–26.",
+        "16. Meng F, et al. A curated diverse molecular database of blood-brain barrier permeability. Sci Data. 2021;8:289.",
+        "17. Mansouri K, et al. OPERA models for predicting physicochemical properties and environmental fate endpoints. J Cheminform. 2018;10:10.",
+        "18. Tice RR, et al. Improving the human hazard characterization of chemicals: a Tox21 update. Environ Health Perspect. 2013;121:756–765.",
+        "19. Baell JB, Holloway GA. New substructure filters for removal of pan assay interference compounds (PAINS). J Med Chem. 2010;53:2719–2740.",
+        "20. Bickerton GR, et al. Quantifying the chemical beauty of drugs. Nat Chem. 2012;4:90–98.",
+        "21. Delaney JS. ESOL: estimating aqueous solubility directly from molecular structure. J Chem Inf Comput Sci. 2004;44:1000–1005.",
+        "22. Mansouri K, et al. OPERA models for predicting physicochemical properties. J Cheminform. 2018;10:10.",
+        "23. Muratov EN, et al. QSAR without borders. Chem Soc Rev. 2020;49:3525–3564.",
+        "24. Riniker S, Landrum GA. Better informed distance geometry: using what we know to improve conformation generation. J Chem Inf Model. 2015;55:2562–2574.",
+        "25. Eberhardt J, et al. AutoDock Vina 1.2.0. J Chem Inf Model. 2021;61:3891–3898.",
+        "26. Su M, et al. Comparative assessment of scoring functions: the CASF-2016 benchmark. J Chem Inf Model. 2019;59:895–913.",
+        "27. Meng F, et al. B3DB: a multitasking dataset for blood-brain barrier permeability. Sci Data. 2021;8:289.",
+        "28. Sander T, et al. DataWarrior: an open-source program for chemistry aware data visualization. J Chem Inf Model. 2015;55:460–473.",
+        "29. Dhanjal JK, et al. GraphB3: an explainable GCN approach for BBB permeability prediction. J Cheminform. 2024;16:34.",
+        "30. Hierro-Bujalance C, et al. Empagliflozin reduces vascular damage and cognitive impairment in a mixed murine model of Alzheimer's disease and type 2 diabetes. Alzheimers Res Ther. 2020;12:40.",
     ]
 
     for ref in refs:

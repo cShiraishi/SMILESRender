@@ -419,20 +419,29 @@ function DirectInput({ initialSmiles, onNavigate }: { initialSmiles?: string; on
         }}>
           {displayMode === 'scaffold' ? (
             <div style={{ width: '100%' }}>
-              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                <h3 style={{ margin: 0, color: colors.text }}>Bemis-Murcko Scaffold Analysis</h3>
-                <p style={{ color: colors.textMuted, fontSize: '14px' }}>Found {scaffolds.length} unique scaffolds in the library</p>
+              <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+                <h3 style={{ margin: '0 0 8px 0', color: colors.text, fontSize: '24px' }}>Bemis-Murcko Scaffold Analysis</h3>
+                <p style={{ color: colors.textMuted, fontSize: '15px' }}>
+                  Identified <strong>{scaffolds.length}</strong> unique molecular skeletons in the library.
+                </p>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '15px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '20px' }}>
                 {scaffolds.map((s, i) => (
-                  <div key={i} style={{ backgroundColor: colors.surface, padding: '15px', borderRadius: radius.md, border: `1px solid ${colors.border}`, textAlign: 'center', width: '220px', boxShadow: shadow.sm }}>
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <SmilesCard smiles={s.smiles} mode="grid" />
-                    <div style={{ marginTop: '10px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: colors.textMuted }}>SMILES: </span>
-                      <code style={{ fontSize: '10px', wordBreak: 'break-all', display: 'block', color: colors.blue }}>{s.smiles}</code>
-                    </div>
-                    <div style={{ marginTop: '8px', backgroundColor: colors.blue + '11', padding: '4px', borderRadius: radius.sm }}>
-                      <span style={{ fontSize: '14px', fontWeight: 700, color: colors.blue }}>{s.count} molecules</span>
+                    <div style={{ 
+                      marginTop: '-25px', 
+                      zIndex: 5,
+                      backgroundColor: colors.blue, 
+                      color: '#fff',
+                      padding: '4px 14px', 
+                      borderRadius: radius.md,
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      boxShadow: shadow.md,
+                      border: '2px solid #fff'
+                    }}>
+                      {s.count} molecules
                     </div>
                   </div>
                 ))}

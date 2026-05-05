@@ -197,6 +197,62 @@ def init_docking_routes(app):
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/api/docking/viewer")
+    def standalone_viewer():
+        """Returns a standalone HTML page for 3D visualization."""
+        pdb_id = request.args.get("pdb")
+        cx = request.args.get("cx", "0")
+        cy = request.args.get("cy", "0")
+        cz = request.args.get("cz", "0")
+        sx = request.args.get("sx", "20")
+        sy = request.args.get("sy", "20")
+        sz = request.args.get("sz", "20")
+        
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <script src="https://unpkg.com/ngl@2.0.0-dev.37/dist/ngl.js"></script>
+            <style>body {{ margin: 0; padding: 0; overflow: hidden; background: white; }}</style>
+        </head>
+        <body>
+            <div id="v" style="width:100vw; height:100vh;"></div>
+            <script>
+                document.addEventListener("DOMContentLoaded", function() {
+                    var stage = new NGL.Stage("v", {{ backgroundColor: "white" }});
+                    var pdbId = "{pdb_id}";
+                    
+                    var loadPromise;
+                    if (pdbId && pdbId.length === 4) {{
+                        loadPromise = stage.loadFile("rcsb://" + pdbId);
+                    }} else {{
+                        // Fallback or placeholder if no ID
+                        return;
+                    }}
+
+                    loadPromise.then(function(o) {{
+                        o.addRepresentation("cartoon", {{ color: "spectrum", opacity: 0.8 }});
+                        o.autoView();
+                        
+                        var cx = parseFloat("{cx}");
+                        var cy = parseFloat("{cy}");
+                        var cz = parseFloat("{cz}");
+                        var sx = parseFloat("{sx}");
+                        var sy = parseFloat("{sy}");
+                        var sz = parseFloat("{sz}");
+                        
+                        var shape = new NGL.Shape("grid");
+                        shape.addBox([cx, cy, cz], [sx, 0, 0], [0, sy, 0], [0, 0, sz], "yellow", true);
+                        var shapeComp = stage.addComponentFromObject(shape);
+                        shapeComp.addRepresentation("buffer", {{ wireframe: true, linewidth: 2 }});
+                    }});
+                    window.addEventListener("resize", function() {{ stage.handleResize(); }});
+                });
+            </script>
+        </body>
+        </html>
+        """
+
     @app.route("/api/docking/files/<session_id>/<filename>")
     def serve_docking_file(session_id, filename):
         """Serves temporary files for the 3D viewer."""

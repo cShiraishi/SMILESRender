@@ -302,84 +302,19 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
       </div>
     );
 
-    // Final Supreme Strategy: If it's a PDB ID, use RCSB CDN. If uploaded, use Base64.
-    const isPdbId = receptor.id && receptor.id.length === 4;
-    
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <script src="https://unpkg.com/ngl@2.0.0-dev.37/dist/ngl.js"></script>
-        <style>body { margin: 0; padding: 0; overflow: hidden; background: white; }</style>
-      </head>
-      <body>
-        <div id="v" style="width:100vw; height:400px;"></div>
-        <script>
-          document.addEventListener("DOMContentLoaded", function() {
-            var stage = new NGL.Stage("v", { backgroundColor: "white" });
-            
-            var cx = ${parseFloat(String(grid.cx).replace(',', '.')) || 0};
-            var cy = ${parseFloat(String(grid.cy).replace(',', '.')) || 0};
-            var cz = ${parseFloat(String(grid.cz).replace(',', '.')) || 0};
-            var sx = ${parseFloat(String(grid.sx).replace(',', '.')) || 20};
-            var sy = ${parseFloat(String(grid.sy).replace(',', '.')) || 20};
-            var sz = ${parseFloat(String(grid.sz).replace(',', '.')) || 20};
-
-            var loadPromise;
-            if (${isPdbId}) {
-              loadPromise = stage.loadFile("rcsb://${receptor.id}");
-            } else {
-              var pdbData = \`${receptor.content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;
-              var blob = new Blob([pdbData], { type: 'text/plain' });
-              loadPromise = stage.loadFile(blob, { ext: "pdb" });
-            }
-
-            loadPromise.then(function(o) {
-              o.addRepresentation("cartoon", { color: "spectrum", opacity: 0.8 });
-              o.autoView();
-              
-              // Create the Grid Box
-              var shape = new NGL.Shape("grid");
-              // NGL addBox: position, x-vector, y-vector, z-vector, color, wireframe
-              // Vectors should be the full length of the sides
-              shape.addBox(
-                [cx, cy, cz], 
-                [sx, 0, 0], 
-                [0, sy, 0], 
-                [0, 0, sz], 
-                "yellow", 
-                true // wireframe mode
-              );
-              
-              var shapeComp = stage.addComponentFromObject(shape);
-              shapeComp.addRepresentation("buffer", { wireframe: true, linewidth: 2 });
-              
-              // If box is far away, zoom to it
-              // stage.animationControls.zoomMove(new NGL.Vector3(cx, cy, cz), -100, 1000);
-            }).catch(function(e) {
-              console.error("3D Load Error:", e);
-            });
-
-            window.addEventListener("resize", function() { stage.handleResize(); });
-          });
-        </script>
-      </body>
-      </html>
-    `;
+    // Use the dedicated viewer route
+    const viewerUrl = `/api/docking/viewer?pdb=${receptor.id}&cx=${grid.cx}&cy=${grid.cy}&cz=${grid.cz}&sx=${grid.sx}&sy=${grid.sy}&sz=${grid.sz}`.replace(/,/g, '.');
 
     return (
       <div style={{ position: 'relative' }}>
         <iframe 
-          key={receptor.id + grid.cx} // Force refresh on new receptor or grid change
-          srcDoc={html} 
-          style={{ width: '100%', height: '400px', border: `1px solid ${colors.border}`, borderRadius: radius.md }} 
+          key={receptor.id + grid.cx} // Force refresh
+          src={viewerUrl} 
+          style={{ width: '100%', height: '400px', border: `1px solid ${colors.border}`, borderRadius: radius.md, backgroundColor: 'white' }} 
         />
         <div style={{ position: 'absolute', bottom: '10px', right: '10px', display: 'flex', gap: '5px' }}>
              <button
-              onClick={() => {
-                const win = window.open("", "_blank");
-                if (win) win.document.write(html);
-              }}
+              onClick={() => window.open(viewerUrl, "_blank")}
               style={{
                 padding: '4px 8px', fontSize: '10px', fontWeight: 600,
                 backgroundColor: 'rgba(255,255,255,0.8)', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer'

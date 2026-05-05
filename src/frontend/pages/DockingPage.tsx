@@ -294,32 +294,42 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
         backgroundColor: colors.bg, borderRadius: radius.md, border: `1px dashed ${colors.border}`,
         color: colors.textMuted, fontSize: '14px'
       }}>
-        No receptor loaded.
+        No structure loaded. Use Fetch Receptor to begin.
       </div>
     );
 
-    // Use the new file serving route
-    const sessionId = receptor.path.split(/[\/\\]/).slice(-2, -1)[0];
-    const pdbFilename = receptor.path.split(/[\/\\]/).pop();
-    const pdbUrl = `/api/docking/files/${sessionId}/${pdbFilename}`;
-
+    // Final Supreme Strategy: If it's a PDB ID, use RCSB CDN. If uploaded, use Base64.
+    const isPdbId = receptor.id && receptor.id.length === 4;
+    
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
-        <script src="https://3dmol.org/build/3Dmol-min.js"></script>
+        <script src="https://unpkg.com/ngl@2.0.0-dev.37/dist/ngl.js"></script>
+        <style>body { margin: 0; padding: 0; overflow: hidden; background: white; }</style>
       </head>
-      <body style="margin:0; padding:0; overflow:hidden; background:#ffffff;">
+      <body>
         <div id="v" style="width:100vw; height:400px;"></div>
         <script>
-          $(function() {
-            var viewer = $3Dmol.createViewer($("#v"), {backgroundColor: "white"});
-            $.get("${pdbUrl}", function(data) {
-              viewer.addModel(data, "pdb");
-              viewer.setStyle({}, {cartoon: {color: "spectrum"}});
+          document.addEventListener("DOMContentLoaded", function() {
+            var stage = new NGL.Stage("v", { backgroundColor: "white" });
+            
+            var loadPromise;
+            if (${isPdbId}) {
+              // Strategy A: Direct from Global PDB Database (Fastest & Safest)
+              loadPromise = stage.loadFile("rcsb://${receptor.id}");
+            } else {
+              // Strategy B: Base64 for custom files
+              var pdbData = \`${receptor.content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;
+              var blob = new Blob([pdbData], { type: 'text/plain' });
+              loadPromise = stage.loadFile(blob, { ext: "pdb" });
+            }
+
+            loadPromise.then(function(o) {
+              o.addRepresentation("cartoon", { color: "spectrum" });
+              o.autoView();
               
-              // Add Grid Box
+              // Add Grid Box if coordinates exist
               var cx = ${parseFloat(String(grid.cx).replace(',', '.'))};
               var cy = ${parseFloat(String(grid.cy).replace(',', '.'))};
               var cz = ${parseFloat(String(grid.cz).replace(',', '.'))};
@@ -327,16 +337,17 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
               var sy = ${parseFloat(String(grid.sy).replace(',', '.'))};
               var sz = ${parseFloat(String(grid.sz).replace(',', '.'))};
               
-              viewer.addBox({
-                center: {x: cx, y: cy, z: cz},
-                dimensions: {w: sx, h: sy, d: sz},
-                color: "yellow",
-                opacity: 0.4
-              });
-              
-              viewer.zoomTo();
-              viewer.render();
+              if (cx !== 0 || sx !== 20) {
+                var shape = new NGL.Shape("grid");
+                shape.addBox([cx, cy, cz], [sx, 0, 0], [0, sy, 0], [0, 0, sz], "yellow", true);
+                var shapeComp = stage.addComponentFromObject(shape);
+                shapeComp.addRepresentation("buffer", { opacity: 0.4 });
+              }
+            }).catch(function(e) {
+              console.error("3D Load Error:", e);
             });
+
+            window.addEventListener("resize", function() { stage.handleResize(); });
           });
         </script>
       </body>
@@ -344,23 +355,26 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
     `;
 
     return (
-      <div>
+      <div style={{ position: 'relative' }}>
         <iframe 
+          key={receptor.id + grid.cx} // Force refresh on new receptor or grid change
           srcDoc={html} 
           style={{ width: '100%', height: '400px', border: `1px solid ${colors.border}`, borderRadius: radius.md }} 
         />
-        <button
-          onClick={() => {
-            const win = window.open("", "_blank");
-            if (win) win.document.write(html);
-          }}
-          style={{
-            marginTop: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: 600,
-            backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: radius.md, cursor: 'pointer'
-          }}
-        >
-          <i className="bi bi-arrows-fullscreen me-2"></i> Open 3D in New Tab (Fullscreen)
-        </button>
+        <div style={{ position: 'absolute', bottom: '10px', right: '10px', display: 'flex', gap: '5px' }}>
+             <button
+              onClick={() => {
+                const win = window.open("", "_blank");
+                if (win) win.document.write(html);
+              }}
+              style={{
+                padding: '4px 8px', fontSize: '10px', fontWeight: 600,
+                backgroundColor: 'rgba(255,255,255,0.8)', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer'
+              }}
+            >
+              <i className="bi bi-arrows-fullscreen"></i> Full View
+            </button>
+        </div>
       </div>
     );
   };

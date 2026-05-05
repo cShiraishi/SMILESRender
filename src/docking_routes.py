@@ -120,12 +120,16 @@ def init_docking_routes(app):
                         best_pose_pdbqt += line
                         if line.startswith("ENDMDL"): break
             
-            from docking_utils import merge_receptor_ligand
+            from docking_utils import merge_receptor_ligand, calculate_ligand_efficiency, generate_2d_interaction_diagram
             merge_receptor_ligand(receptor_path, best_pose_pdbqt, complex_path)
+            
+            # Calculate LE
+            le = calculate_ligand_efficiency(scores[0]['affinity'], ligand_smiles) if scores else 0
             
             return jsonify({
                 "success": True,
                 "scores": scores,
+                "le": le,
                 "outputPdbqt": output_path,
                 "complexPath": complex_path,
                 "logPath": log_path,
@@ -150,7 +154,18 @@ def init_docking_routes(app):
                 return jsonify({"error": f"PLIP failed: {result.stderr}"}), 500
                 
             plip_data = json.loads(result.stdout)
-            return jsonify(plip_data)
+            
+            # Generate 2D Diagram
+            # We need the SMILES from the session (ligand.pdbqt or just store it)
+            # For now, let's try to get it from the session directory if we had it, 
+            # but better yet, let's assume we can regenerate it or pass it.
+            # In this simple version, we'll just return the diagram if we can find the ligand info.
+            from docking_utils import generate_2d_interaction_diagram
+            # We'll need to pass the SMILES here. Let's assume the frontend sends it or we fetch it.
+            ligand_smiles = data.get("smiles", "")
+            diagram_svg = generate_2d_interaction_diagram(ligand_smiles, plip_data) if ligand_smiles else None
+            
+            return jsonify({**plip_data, "diagram": diagram_svg})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 

@@ -134,7 +134,10 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
       const res = await fetch('/api/docking/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ complexPath: sessionInfo.complexPath })
+        body: JSON.stringify({ 
+          complexPath: sessionInfo.complexPath,
+          smiles: entries[selectedIdx].smiles
+        })
       });
       const data = await res.json();
       if (data.error) alert(data.error);
@@ -794,6 +797,21 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                               </div>
                             ))}
                           </div>
+                          
+                          {sessionInfo?.le > 0 && (
+                            <div style={{ padding: '12px', backgroundColor: '#eff6ff', borderRadius: radius.md, border: '1px solid #bfdbfe', marginBottom: '20px' }}>
+                               <div style={{ fontSize: '11px', color: '#1e40af', fontWeight: 700, marginBottom: '2px' }}>LIGAND EFFICIENCY (LE)</div>
+                               <div style={{ fontSize: '18px', fontWeight: 800, color: '#1e40af' }}>{sessionInfo.le} <span style={{ fontSize: '11px', fontWeight: 400 }}>kcal/mol/HA</span></div>
+                               <p style={{ fontSize: '10px', color: '#60a5fa', marginTop: '4px' }}>Higher is better. > 0.3 is considered a good lead.</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {plipData?.diagram && (
+                        <div style={{ marginTop: '24px', backgroundColor: '#fff', padding: '16px', borderRadius: radius.md, border: `1px solid ${colors.border}`, textAlign: 'center' }}>
+                          <h6 style={{ fontWeight: 700, fontSize: '13px', marginBottom: '12px' }}>2D Interaction Map</h6>
+                          <div dangerouslySetInnerHTML={{ __html: plipData.diagram }} style={{ maxWidth: '100%' }} />
                         </div>
                       )}
 

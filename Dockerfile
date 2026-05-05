@@ -11,6 +11,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     autodock-vina \
     openbabel \
+    libopenbabel-dev \
+    swig \
     libxml2-dev \
     libxslt1-dev \
     && rm -rf /var/lib/apt/lists/*

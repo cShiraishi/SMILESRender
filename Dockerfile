@@ -30,7 +30,7 @@ COPY --from=frontend_build /frontend/src/static/build ./src/static/build
 # Install python dependencies
 RUN pip install --no-cache-dir \
     numpy==1.26.4 \
-    requests biopython meeko rdkit plip \
+    requests biopython meeko rdkit plip gemmi \
     chemprop==1.6.1 \
     -r requirements.txt
 

@@ -20,7 +20,7 @@ services:
   celery-worker:
     build: .
     container_name: smiles-render-worker
-    command: celery -A tasks worker --loglevel=info --pool=solo
+    command: celery -A src.tasks worker --loglevel=info --pool=solo
     env_file:
       - .env
     depends_on:

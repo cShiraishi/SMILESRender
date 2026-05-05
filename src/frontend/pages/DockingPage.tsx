@@ -26,7 +26,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
   const [entries, setEntries] = useState<MolEntry[]>([]);
   const [inputText, setInputText] = useState(initialSmiles || '');
   const [isPreparing, setIsPreparing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'inspector' | 'simulation'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'simulation'>('overview');
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [inputMode, setInputMode] = useState<InputMode>('smiles');
   const [nameQuery, setNameQuery] = useState('');
@@ -637,7 +637,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
         {/* Main Content */}
         <div style={{ flex: 1, minWidth: '400px' }}>
           <div style={{ display: 'flex', gap: '4px', marginBottom: '16px' }}>
-            {['overview', 'inspector', 'simulation'].map((tab: any) => (
+            {['overview', 'simulation'].map((tab: any) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -670,7 +670,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                   <tbody>
                     {entries.map((e, i) => (
                       <tr key={i}
-                        onClick={() => { setSelectedIdx(i); setActiveTab('inspector'); }}
+                        onClick={() => { setSelectedIdx(i); setActiveTab('simulation'); }}
                         style={{ borderBottom: `1px solid ${colors.borderLight}`, cursor: 'pointer', backgroundColor: selectedIdx === i ? '#f0f9ff' : 'transparent' }}
                       >
                         <td style={{ padding: '12px', fontWeight: 600 }}>{e.name}</td>

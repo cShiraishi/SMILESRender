@@ -96,15 +96,14 @@ def init_docking_routes(app):
             except:
                 return jsonify({"error": "Failed to convert receptor to PDBQT"}), 500
             
-            center = data.get("center")
-            size = data.get("size")
             exhaustiveness = data.get("exhaustiveness", 8)
             num_modes = data.get("numModes", 9)
             
             # 2. Prep ligand
             ligand_path = os.path.join(session_dir, "ligand.pdbqt")
-            success, err = prepare_ligand_pdbqt(ligand_smiles, ligand_path)
-            if not success: return jsonify({"error": f"Ligand prep failed: {err}"}), 500
+            pdbqt_content, err = prepare_ligand_pdbqt(ligand_smiles)
+            if err: return jsonify({"error": f"Ligand prep failed: {err}"}), 500
+            with open(ligand_path, "w") as f: f.write(pdbqt_content)
             
             # 3. Run Vina
             output_path = os.path.join(session_dir, "output.pdbqt")

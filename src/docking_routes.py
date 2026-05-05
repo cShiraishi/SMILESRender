@@ -87,30 +87,30 @@ def init_docking_routes(app):
                 "vina", "--receptor", receptor_pdbqt_path, "--ligand", ligand_path,
                 "--center_x", str(center['x']), "--center_y", str(center['y']), "--center_z", str(center['z']),
                 "--size_x", str(size['x']), "--size_y", str(size['y']), "--size_z", str(size['z']),
-                "--out", output_path, "--log", log_path, "--exhaustiveness", "8"
+                "--out", output_path, "--exhaustiveness", "8"
             ]
             
             try:
-                subprocess.run(vina_cmd, check=True, capture_output=True, text=True)
+                result_vina = subprocess.run(vina_cmd, check=True, capture_output=True, text=True)
+                vina_output = result_vina.stdout
             except subprocess.CalledProcessError as e:
-                return jsonify({"error": f"Vina failed: {e.stderr}"}), 500
+                return jsonify({"error": f"Vina failed: {e.stderr or e.stdout}"}), 500
             except FileNotFoundError:
                 return jsonify({"error": "Vina executable not found"}), 500
                 
             scores = []
-            if os.path.exists(log_path):
-                with open(log_path, "r") as f:
-                    lines = f.readlines()
-                    capture = False
-                    for line in lines:
-                        if "mode |   affinity | dist from rmsd" in line: capture = True; continue
-                        if capture and (line.startswith("----") or line.strip() == ""):
-                            if line.strip() == "" and len(scores) > 0: break
-                            continue
-                        if capture:
-                            parts = line.split()
-                            if len(parts) >= 2:
-                                scores.append({"mode": parts[0], "affinity": parts[1]})
+            # Parse scores from stdout
+            lines = vina_output.splitlines()
+            capture = False
+            for line in lines:
+                if "mode |   affinity | dist from rmsd" in line: capture = True; continue
+                if capture and (line.startswith("----") or line.strip() == ""):
+                    if line.strip() == "" and len(scores) > 0: break
+                    continue
+                if capture:
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        scores.append({"mode": parts[0], "affinity": parts[1]})
 
             complex_path = os.path.join(session_dir, "complex.pdb")
             best_pose_pdbqt = ""

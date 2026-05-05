@@ -54,6 +54,26 @@ def init_docking_routes(app):
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/api/docking/receptor/extract-inhibitor", methods=["POST"])
+    def extract_inhibitor():
+        try:
+            data = request.get_json()
+            pdb_id = data.get("pdbId")
+            res_name = data.get("resName")
+            chain_id = data.get("chainId")
+            
+            # Fetch PDB content
+            from docking_utils import get_pdb_from_rcsb, extract_inhibitor_smiles
+            pdb_content = get_pdb_from_rcsb(pdb_id)
+            if not pdb_content: return jsonify({"error": "PDB not found"}), 404
+            
+            smiles = extract_inhibitor_smiles(pdb_content, pdb_id, res_name, chain_id)
+            if not smiles: return jsonify({"error": "Failed to extract SMILES"}), 500
+            
+            return jsonify({"success": True, "smiles": smiles, "name": f"Inhibitor_{res_name}"})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
     @app.route("/api/docking/run", methods=["POST"])
     def run_docking():
         try:

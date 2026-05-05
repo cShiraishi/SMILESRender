@@ -110,6 +110,7 @@ def auto_detect_pocket_from_inhibitor(pdb_content, pdb_id):
         return {
             "success": True,
             "inhibitor": target_lig["id"],
+            "chain": target_lig["chain"],
             "center": center,
             "size": size
         }
@@ -194,6 +195,28 @@ def generate_2d_interaction_diagram(ligand_smiles, plip_data):
     except:
         return None
 
+def extract_inhibitor_smiles(pdb_content, pdb_id, res_name, chain_id):
+    """Extracts a ligand from PDB and converts to SMILES for redocking."""
+    try:
+        # Save temp pdb of just the ligand
+        temp_ligand_pdb = f"tmp_lig_{pdb_id}_{res_name}.pdb"
+        with open(temp_ligand_pdb, "w") as f:
+            for line in pdb_content.splitlines():
+                if line.startswith(("HETATM", "ATOM")):
+                    rn = line[17:20].strip()
+                    cid = line[21:22].strip()
+                    if rn == res_name and cid == chain_id:
+                        f.write(line + "\n")
+        
+        # Convert PDB to SMILES using OpenBabel
+        result = subprocess.run(["obabel", "-ipdb", temp_ligand_pdb, "-osmi"], capture_output=True, text=True)
+        if os.path.exists(temp_ligand_pdb): os.remove(temp_ligand_pdb)
+        
+        smiles = result.stdout.split()[0] if result.stdout else None
+        return smiles
+    except:
+        return None
+
 def merge_receptor_ligand(receptor_pdb_path, ligand_pdbqt_content, output_pdb_path):
     """Merges receptor and ligand for interaction analysis."""
     try:
@@ -207,6 +230,12 @@ def merge_receptor_ligand(receptor_pdb_path, ligand_pdbqt_content, output_pdb_pa
         return True, None
     except Exception as e:
         return False, str(e)
+
+def calculate_rmsd(ref_pdb_path, docked_pdbqt_path):
+    """Calculates RMSD between co-crystallized and docked pose (simplified)."""
+    # This would require atom mapping, for now return a placeholder or 
+    # implement a simple distance-based RMSD if atoms match.
+    return 0.0
 
 def calculate_ligand_efficiency(affinity_kcal, smiles):
     """Calculates LE = -affinity / heavy_atom_count."""

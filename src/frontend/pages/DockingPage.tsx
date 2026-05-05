@@ -81,7 +81,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
       });
       const data = await res.json();
       if (data.success) {
-        setReceptor({ id: data.pdbId, path: data.pdbPath, content: data.pdbContent });
+        setReceptor({ id: data.pdbId, path: data.pdbPath, content: data.pdbContent, pocket: data.pocket });
         if (data.pocket && data.pocket.success) {
           setGrid({
             cx: data.pocket.center.x, cy: data.pocket.center.y, cz: data.pocket.center.z,
@@ -95,6 +95,29 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
       alert('Network error loading receptor');
     } finally {
       setIsLoadingReceptor(false);
+    }
+  };
+  const handleAddInhibitorForRedocking = async () => {
+    if (!receptor || !receptor.pocket?.inhibitor) return;
+    try {
+      const res = await fetch('/api/docking/receptor/extract-inhibitor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          pdbId: receptor.id, 
+          resName: receptor.pocket.inhibitor,
+          chainId: receptor.pocket.chain
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        appendSmiles(data.smiles, data.name);
+        alert(`Added ${data.name} to library for Redocking!`);
+      } else {
+        alert(data.error || 'Failed to extract inhibitor');
+      }
+    } catch (err) {
+      alert('Network error extracting inhibitor');
     }
   };
 
@@ -725,8 +748,22 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                     </div>
                   </div>
                   {receptor && (
-                    <div style={{ padding: '10px', backgroundColor: colors.successBg, border: `1px solid ${colors.success}`, borderRadius: radius.md, fontSize: '12px', color: colors.success }}>
-                      <i className="bi bi-check-circle-fill me-2"></i> Receptor <b>{receptor.id}</b> Loaded
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ padding: '10px', backgroundColor: colors.successBg, border: `1px solid ${colors.success}`, borderRadius: radius.md, fontSize: '12px', color: colors.success }}>
+                        <i className="bi bi-check-circle-fill me-2"></i> Receptor <b>{receptor.id}</b> Loaded
+                      </div>
+                      {receptor.pocket?.inhibitor && (
+                        <button
+                          onClick={handleAddInhibitorForRedocking}
+                          style={{
+                            padding: '8px 12px', backgroundColor: '#fef3c7', color: '#92400e',
+                            border: '1px solid #fde68a', borderRadius: radius.md, fontSize: '11px',
+                            fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+                          }}
+                        >
+                          <i className="bi bi-magic"></i> Add Inhibitor ({receptor.pocket.inhibitor}) for Redocking
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

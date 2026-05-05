@@ -48,7 +48,7 @@ def featurize(mol):
     return fp_arr.astype(np.float32), np.concatenate([fp_arr.astype(np.float32), desc])
 
 
-# ── Load dataset ─────────────────────────────────────────────────────────────
+# -- Load dataset -------------------------------------------------------------
 print("Downloading B3DB classification dataset...")
 with urllib.request.urlopen(B3DB_URL) as r:
     content = r.read().decode("utf-8")

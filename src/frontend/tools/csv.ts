@@ -18,6 +18,9 @@ export function parseCSV(text: string, delimiter?: string): string[][] {
   let currentField = '';
   let insideQuotes = false;
   
+  // Remove BOM if present
+  text = text.replace(/^\ufeff/, '');
+  
   // Normalize line endings
   text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
 
@@ -60,5 +63,43 @@ export function getCSVColumn(csvData: string[][], name: string): string[] {
 }
 
 export function autoDetect(headers: string[], pattern: RegExp): string {
-  return headers.find(h => pattern.test(h)) ?? '';
+  return headers.find(h => pattern.test(h.replace(/^\ufeff/, '').trim())) ?? '';
+}
+
+export function detectSmilesColumn(rows: string[][]): number {
+  if (rows.length < 1) return -1;
+  const headers = rows[0].map(h => h.replace(/^\ufeff/, '').trim().toLowerCase());
+  
+  // 1. Try headers first
+  const pattern = /smiles|smi|canonical|structure/i;
+  const hIndex = headers.findIndex(h => pattern.test(h));
+  if (hIndex !== -1) return hIndex;
+  
+  // 2. Look at data (sample first 5 rows)
+  const sampleRows = rows.slice(1, 6);
+  if (sampleRows.length === 0) return 0; // Fallback to first col
+  
+  const colScores = new Array(rows[0].length).fill(0);
+  const smilesPattern = /^([^J][0-9BCEFHIKNPRSUVWYZabcefhikmnprsuvwzy]*)((@|@@)?[0-9BCEFHIKNPRSUVWYZabcefhikmnprsuvwzy]*)*$/;
+  // A very loose SMILES-like regex just to rank columns
+  
+  for (const row of sampleRows) {
+    row.forEach((cell, i) => {
+      const c = cell.trim();
+      if (c.length > 3 && (c.includes('=') || c.includes('(') || c.includes(')') || c.includes('[') || c.includes('c1'))) {
+         colScores[i]++;
+      }
+    });
+  }
+  
+  let bestIdx = 0;
+  let maxScore = -1;
+  colScores.forEach((score, i) => {
+    if (score > maxScore) {
+      maxScore = score;
+      bestIdx = i;
+    }
+  });
+  
+  return bestIdx;
 }

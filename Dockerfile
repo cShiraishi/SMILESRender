@@ -28,7 +28,9 @@ COPY . .
 COPY --from=frontend_build /frontend/src/static/build ./src/static/build
 
 # Install python dependencies
-RUN pip install --no-cache-dir -r requirements.txt \
-    requests biopython meeko rdkit plip
+RUN pip install --no-cache-dir \
+    requests biopython meeko rdkit plip \
+    chemprop==1.6.1 \
+    -r requirements.txt
 
 CMD [ "python3", "src/main.py" ]

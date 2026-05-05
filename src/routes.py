@@ -48,12 +48,12 @@ try:
     if model_path:
         with open(model_path, "rb") as f:
             TOX21_MODEL = pickle.load(f)
-        print(f"Tox21 Model loaded successfully from {model_path}.")
+        print("Tox21 Model loaded successfully from {}.".format(model_path))
     else:
         TOX21_ERROR = "File not found"
 except Exception as e:
     TOX21_ERROR = str(e)
-    print(f"Error loading Tox21 model: {e}")
+    print("Error loading Tox21 model: {}".format(e))
 
 # Load BBB Model (GraphB3-inspired, GradientBoosting on B3DB dataset)
 BBB_MODEL = None
@@ -68,12 +68,12 @@ try:
     if bbb_model_path:
         with open(bbb_model_path, "rb") as f:
             BBB_MODEL = pickle.load(f)
-        print(f"BBB Model loaded successfully from {bbb_model_path}.")
+        print("BBB Model loaded successfully from {}.".format(bbb_model_path))
     else:
         BBB_ERROR = "File not found"
 except Exception as e:
     BBB_ERROR = str(e)
-    print(f"Error loading BBB model: {e}")
+    print("Error loading BBB model: {}".format(e))
 
 
 # Limite de concorrência: apenas 1 processamento pesado por vez (Otimizado para Render Free)
@@ -90,13 +90,13 @@ except Exception:
     _redis = None
     _cache_ok = False
 
-def _cache_get(key: str):
+def _cache_get(key):
     if _cache_ok:
         try: return _redis.get(key)
         except Exception: pass
     return None
 
-def _cache_set(key: str, value: bytes, ttl: int = 86400):
+def _cache_set(key, value, ttl=86400):
     if _cache_ok:
         try: _redis.setex(key, ttl, value)
         except Exception: pass
@@ -113,9 +113,9 @@ app = Flask(__name__)
 def set_security_headers(response):
     response.headers['Content-Security-Policy'] = (
         "default-src 'self' https://jsme-editor.github.io; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://jsme-editor.github.io https://unpkg.com https://3dmol.org; "
+        "script-src 'sel' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://jsme-editor.github.io https://unpkg.com https://3dmol.org; "
         "worker-src 'self' blob:; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://jsme-editor.github.io; "
+        "style-src 'sel' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://jsme-editor.github.io; "
         "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; "
         "img-src 'self' data: blob: https://jsme-editor.github.io https://cdn.rcsb.org; "
         "connect-src 'self' https://jsme-editor.github.io https://unpkg.com https://files.rcsb.org; "
@@ -227,11 +227,11 @@ def render_by_json():
             if not smiles:
                 return 'Missing "smiles" parameter', 400
             image = convert_smiles(smiles, format.lower())
-            return send_file(image, f"image/{format}"), 200
+            return send_file(image, "image/{}".format(format)), 200
 
         data = request.get_json()
-        format: str = data["format"] if "format" in list(data) else "png"
-        keep_duplicates: bool = (
+        format = data["format"] if "format" in list(data) else "png"
+        keep_duplicates = (
             data["keep-duplicates"] if "keep-duplicates" in list(data) else False
         )
         smiles = data["smiles"] if "smiles" in list(data) else None
@@ -241,16 +241,16 @@ def render_by_json():
 
         elif type(smiles) == str:
             image = convert_smiles(smiles, format.lower())
-            return send_file(image, f"image/{format}"), 200
+            return send_file(image, "image/{}".format(format)), 200
 
         if type(smiles) == list:
             if len(smiles) > MAX_SMILES:
-                return f"Exceeded the limit of {MAX_SMILES} SMILES per request!", 413
+                return "Exceeded the limit of {} SMILES per request!".format(MAX_SMILES), 413
 
             ## If it is only a list of strings
             ## If it is only a list of strings
-            smiles_to_convert: list[tuple[str, str, str]] = []
-            registered_smiles: list[str] = []
+            smiles_to_convert[tuple[str, str, str]] = []
+            registered_smiles[str] = []
 
             for item in smiles:
                 if type(item) == str:
@@ -292,20 +292,20 @@ def render_by_json():
 
     except Exception as err:
         print(err)
-        return f'Could not convert smiles: "{err}"', 412
+        return 'Could not convert smiles: "{}"'.format(err), 412
 
 
 @app.route("/render/<string:smiles>", methods=["GET"])
-def render_smiles(smiles: str):
+def render_smiles(smiles):
     try:
         format = request.args.get("format") or "png"
         image = convert_smiles(smiles, format.lower())
 
-        return send_file(image, f"image/{format}"), 200
+        return send_file(image, "image/{}".format(format)), 200
 
     except Exception as err:
         print(err)
-        return f'Could not convert smiles: "{err}"', 412
+        return 'Could not convert smiles: "{}"'.format(err), 412
 
 
 @app.route("/render/csv", methods=["POST"])
@@ -337,7 +337,7 @@ def render_by_csv():
         )
 
         if len(data) > MAX_SMILES:
-            return f"Exceeded the limit of {MAX_SMILES} SMILES per request in CSV!", 413
+            return "Exceeded the limit of {} SMILES per request in CSV!".format(MAX_SMILES), 413
 
         with processing_semaphore:
             zip_file = convert_many_smiles_and_zip(data)
@@ -354,21 +354,21 @@ def render_by_csv():
 
     except Exception as err:
         print(err)
-        return f'Could not convert smiles: "{err}"', 412
+        return 'Could not convert smiles: "{}"'.format(err), 412
 
 
 @app.route("/render/base64/<string:smiles>", methods=["GET"])
-def render_base64_smiles(smiles: str):
+def render_base64_smiles(smiles):
     try:
         decoded_smiles = b64decode(smiles.encode("utf-8")).decode("utf-8")
         format = request.args.get("format") or "png"
         image = convert_smiles(decoded_smiles, format.lower())
 
-        return send_file(image, f"image/{format}"), 200
+        return send_file(image, "image/{}".format(format)), 200
 
     except Exception as err:
         print(err)
-        return f'Could not convert smiles: "{err}"', 412
+        return 'Could not convert smiles: "{}"'.format(err), 412
 
 
 PROTOX_MODELS = {
@@ -387,13 +387,13 @@ PROTOX_MODELS = {
 }
 
 @app.route("/predict/protox/base64/<string:smiles>", methods=["GET"])
-def predict_protox(smiles: str):
+def predict_protox(smiles):
     try:
         from rdkit import Chem
         from rdkit.Chem import AllChem
 
         decoded = b64decode(smiles.encode()).decode()
-        cache_key = f"smilerender:protox:{hashlib.md5(decoded.encode()).hexdigest()}"
+        cache_key = "smilerender:protox:{}".format(hashlib.md5(decoded.encode()).hexdigest())
         cached = _cache_get(cache_key)
         if cached:
             return cached, 200, {'Content-Type': 'application/json'}
@@ -459,12 +459,12 @@ def predict_protox(smiles: str):
         return out, 200, {'Content-Type': 'application/json'}
 
     except Exception as err:
-        print(f"ProTox Error: {err}")
+        print("ProTox Error: {}".format(err))
         return jsonify({"error": str(err)}), 500
 
 
 @app.route("/predict/rdkit-filters/base64/<string:smiles>", methods=["GET"])
-def rdkit_filters(smiles: str):
+def rdkit_filters(smiles):
     try:
         from rdkit import Chem
         from rdkit.Chem import Descriptors, rdMolDescriptors, Crippen, Lipinski
@@ -510,33 +510,33 @@ def rdkit_filters(smiles: str):
         def viol(cond, msg): return [msg] if cond else []
 
         # Lipinski Ro5 (≤1 violation = pass)
-        lip_v = (viol(mw   > 500,  f"MW {mw} Da > 500")
-               + viol(logp > 5,    f"LogP {logp} > 5")
-               + viol(hbd  > 5,    f"HBD {hbd} > 5")
-               + viol(hba  > 10,   f"HBA {hba} > 10"))
+        lip_v = (viol(mw   > 500,  "MW {} Da > 500".format(mw))
+               + viol(logp > 5,    "LogP {} > 5".format(logp))
+               + viol(hbd  > 5,    "HBD {} > 5".format(hbd))
+               + viol(hba  > 10,   "HBA {} > 10".format(hba)))
 
         # Ghose (all must pass)
-        ghose_v = (viol(not 160<=mw<=480,       f"MW {mw} not in [160–480]")
-                 + viol(not -0.4<=logp<=5.6,    f"LogP {logp} not in [-0.4–5.6]")
-                 + viol(not 40<=mr<=130,         f"MR {mr} not in [40–130]")
-                 + viol(not 20<=n_atoms<=70,     f"Atoms {n_atoms} not in [20–70]"))
+        ghose_v = (viol(not 160<=mw<=480,       "MW {} not in [160–480]".format(mw))
+                 + viol(not -0.4<=logp<=5.6,    "LogP {} not in [-0.4–5.6]".format(logp))
+                 + viol(not 40<=mr<=130,         "MR {} not in [40–130]".format(mr))
+                 + viol(not 20<=n_atoms<=70,     "Atoms {} not in [20–70]".format(n_atoms)))
 
         # Veber (oral bioavailability)
-        veber_v = (viol(rotb > 10,  f"RotBonds {rotb} > 10")
-                 + viol(tpsa > 140, f"TPSA {tpsa} > 140 Å²"))
+        veber_v = (viol(rotb > 10,  "RotBonds {} > 10".format(rotb))
+                 + viol(tpsa > 140, "TPSA {} > 140 Å²".format(tpsa)))
 
         # Egan (passive intestinal absorption)
-        egan_v = (viol(logp > 5.88,  f"LogP {logp} > 5.88")
-                + viol(tpsa > 131.6, f"TPSA {tpsa} > 131.6 Å²"))
+        egan_v = (viol(logp > 5.88,  "LogP {} > 5.88".format(logp))
+                + viol(tpsa > 131.6, "TPSA {} > 131.6 Å²".format(tpsa)))
 
         # Muegge (lead-like)
-        muegge_v = (viol(not 200<=mw<=600,     f"MW {mw} not in [200–600]")
-                  + viol(not -2<=logp<=5,       f"LogP {logp} not in [-2–5]")
-                  + viol(tpsa > 150,            f"TPSA {tpsa} > 150 Å²")
-                  + viol(rotb > 15,             f"RotBonds {rotb} > 15")
-                  + viol(hbd > 5,               f"HBD {hbd} > 5")
-                  + viol(hba > 10,              f"HBA {hba} > 10")
-                  + viol(n_atoms < 10,          f"Heavy atoms {n_atoms} < 10"))
+        muegge_v = (viol(not 200<=mw<=600,     "MW {} not in [200–600]".format(mw))
+                  + viol(not -2<=logp<=5,       "LogP {} not in [-2–5]".format(logp))
+                  + viol(tpsa > 150,            "TPSA {} > 150 Å²".format(tpsa))
+                  + viol(rotb > 15,             "RotBonds {} > 15".format(rotb))
+                  + viol(hbd > 5,               "HBD {} > 5".format(hbd))
+                  + viol(hba > 10,              "HBA {} > 10".format(hba))
+                  + viol(n_atoms < 10,          "Heavy atoms {} < 10".format(n_atoms)))
 
         return jsonify({
             "smiles": decoded,
@@ -560,16 +560,16 @@ def rdkit_filters(smiles: str):
             }
         })
     except Exception as err:
-        print(f"RDKit Filters Error: {err}")
+        print("RDKit Filters Error: {}".format(err))
         return jsonify({"error": str(err)}), 500
 
 
 @app.route("/predict/base64/<string:smiles>", methods=["GET"])
-def predict(smiles: str):
+def predict(smiles):
     if not smiles:
         return "No Smile to predict", 400
     decoded_smiles = b64decode(smiles.encode("utf-8")).decode("utf-8")
-    cache_key = f"smilerender:stoptox:{hashlib.md5(decoded_smiles.encode()).hexdigest()}"
+    cache_key = "smilerender:stoptox:{}".format(hashlib.md5(decoded_smiles.encode()).hexdigest())
     cached = _cache_get(cache_key)
     if cached:
         return cached
@@ -588,7 +588,7 @@ def predict(smiles: str):
         opener.open(urllib.request.Request("https://stoptox.mml.unc.edu/", headers=headers), timeout=30)
         
         # Step 2: GET request for prediction
-        url = f"https://stoptox.mml.unc.edu/predict?smiles={urllib.parse.quote(decoded_smiles)}"
+        url = "https://stoptox.mml.unc.edu/predict?smiles={}".format(urllib.parse.quote(decoded_smiles))
         req = urllib.request.Request(url, headers=headers)
         with opener.open(req, timeout=120) as response:
             result = response.read()
@@ -596,15 +596,15 @@ def predict(smiles: str):
                 _cache_set(cache_key, result)
                 return result
     except Exception as e:
-        print(f"StopTox Error: {e}")
+        print("StopTox Error: {}".format(e))
 
     return "StopTox prediction failed – service might be down or SMILES incompatible.", 503
 
 
 @app.route("/predict/stoplight/base64/<string:smiles>", methods=["GET"])
-def predict_stoplight(smiles: str):
+def predict_stoplight(smiles):
     decoded_smiles = b64decode(smiles.encode("utf-8")).decode("utf-8")
-    cache_key = f"smilerender:stoplight:{hashlib.md5(decoded_smiles.encode()).hexdigest()}"
+    cache_key = "smilerender:stoplight:{}".format(hashlib.md5(decoded_smiles.encode()).hexdigest())
     cached = _cache_get(cache_key)
     if cached: return cached
 
@@ -638,15 +638,15 @@ def predict_stoplight(smiles: str):
             _cache_set(cache_key, result)
             return result
         except Exception as err:
-            print(f"StopLight Attempt {attempt+1} Error: {err}")
+            print("StopLight Attempt {} Error: {}".format(attempt+1, err))
             if attempt < 2:
                 time.sleep(2)
                 continue
-            return f"Error connecting to StopLight after 3 attempts: {err}", 500
+            return "Error connecting to StopLight after 3 attempts: {}".format(err), 500
 
 
 @app.route("/predict/tox21/base64/<string:smiles>", methods=["GET"])
-def predict_tox21(smiles: str):
+def predict_tox21(smiles):
     """Predict 12 Tox21 toxicity endpoints using the local Random Forest model."""
     if TOX21_MODEL is None:
         return jsonify({"error": "Tox21 model not loaded"}), 503
@@ -682,7 +682,7 @@ def predict_tox21(smiles: str):
         
         return jsonify(results)
     except Exception as err:
-        print(f"Tox21 Prediction Error: {err}")
+        print("Tox21 Prediction Error: {}".format(err))
         return jsonify({"error": str(err)}), 500
 
 
@@ -690,7 +690,7 @@ def predict_tox21(smiles: str):
 ADMET_AI_MODEL = None
 try:
     import torch
-    print(f"Torch version: {torch.__version__} (CPU: {not torch.cuda.is_available()})")
+    print("Torch version: {} (CPU: {})".format(torch.__version__, not torch.cuda.is_available()))
     from admet_ai import ADMETModel
     print("Initializing ADMET-AI (Chemprop D-MPNN)...")
     # Set cache_dir to a local directory to avoid permission issues on VPS
@@ -698,11 +698,11 @@ try:
     print("ADMET-AI initialized successfully.")
 except Exception as e:
     import traceback
-    print(f"CRITICAL: Could not initialize ADMET-AI: {e}")
+    print("CRITICAL: Could not initialize ADMET-AI: {}".format(e))
     traceback.print_exc()
 
 @app.route("/deep/<path:smiles>", methods=["GET"])
-def predict_deep_admet(smiles: str):
+def predict_deep_admet(smiles):
     """Predict 100+ ADMET properties using the Deep Learning Chemprop engine (ADMET-AI)."""
     if ADMET_AI_MODEL is None:
         return jsonify({"error": "Deep Engine not available"}), 503
@@ -743,7 +743,7 @@ def predict_deep_admet(smiles: str):
             
         return jsonify(results)
     except Exception as err:
-        print(f"Deep ADMET Error: {err}")
+        print("Deep ADMET Error: {}".format(err))
         return jsonify({"error": str(err)}), 500
 
 
@@ -849,7 +849,7 @@ def export_report():
                 mol_names[smi] = name
 
         # ── Run interpretation for every molecule ──────────────────────────────
-        profiles = {smi: interpret(smi, tools) for smi, tools in organised.items()}
+        profiles = {smierpret(smi, tools) for smi, tools in organised.items()}
 
         now      = datetime.datetime.now()
         story    = []
@@ -871,7 +871,7 @@ def export_report():
         # ── Helper: data table ─────────────────────────────────────────────────
         def data_table(rows, tool_name):
             col = TOOL_COLORS.get(tool_name, BRAND_BLUE)
-            hdr = [Paragraph(h, ps(f"th{tool_name}", fontSize=8, textColor=colors.white,
+            hdr = [Paragraph(h, ps("th{}".format(tool_name), fontSize=8, textColor=colors.white,
                                    fontName="Helvetica-Bold"))
                    for h in ["Property", "Value", "Unit"]]
             data = [hdr]
@@ -879,7 +879,7 @@ def export_report():
                 data.append([
                     Paragraph(str(r.get("Property", "")), sBody),
                     Paragraph(str(r.get("Value", "")),
-                              ps(f"tv{tool_name}", fontSize=8, textColor=TEXT_DARK,
+                              ps("tv{}".format(tool_name), fontSize=8, textColor=TEXT_DARK,
                                  fontName="Helvetica-Bold")),
                     Paragraph(str(r.get("Unit", "-")), sSmall),
                 ])
@@ -911,10 +911,10 @@ def export_report():
                 return None
 
         # ── Helper: risk badge (small coloured pill) ───────────────────────────
-        def risk_badge(level: str):
+        def risk_badge(level):
             label = RISK_LABEL.get(level, level.title())
             col   = FLAG_COLORS.get(level, BRAND_BLUE)
-            t = Table([[Paragraph(label, ps(f"rb{level}", fontSize=9, textColor=colors.white,
+            t = Table([[Paragraph(label, ps("rb{}".format(level), fontSize=9, textColor=colors.white,
                                             fontName="Helvetica-Bold", alignment=TA_CENTER))]],
                       colWidths=[3.5 * cm])
             t.setStyle(TableStyle([
@@ -926,7 +926,7 @@ def export_report():
             ]))
             return t
 
-        # ── Helper: interpretation block ───────────────────────────────────────
+        # ── Helpererpretation block ───────────────────────────────────────
         def interpretation_block(profile):
             """Returns a list of flowables for the Interpretation section."""
             blk = []
@@ -934,9 +934,9 @@ def export_report():
 
             # Header bar with risk level
             hdr_col = FLAG_COLORS.get(lvl, BRAND_BLUE)
-            hdr_txt = f"Interpretation  ·  {RISK_LABEL.get(lvl, lvl.title())}"
+            hdr_txt = "Interpretation  ·  {}".format(RISK_LABEL.get(lvl, lvl.title()))
             hdr_tbl = Table(
-                [[Paragraph(hdr_txt, ps(f"ih{lvl}", fontSize=10, textColor=colors.white,
+                [[Paragraph(hdr_txt, ps("ih{}".format(lvl), fontSize=10, textColor=colors.white,
                                         fontName="Helvetica-Bold"))],],
                 colWidths=[usable_w]
             )
@@ -979,11 +979,11 @@ def export_report():
                     fcol  = FLAG_COLORS.get(f.level, TEXT_DARK)
                     bg    = FLAG_BG.get(f.level, colors.white)
                     flag_data.append([
-                        Paragraph(f"{icon} {f.level.upper()}",
-                                  ps(f"fl{i}", fontSize=7, textColor=fcol,
+                        Paragraph("{} {}".format(icon, f.level.upper()),
+                                  ps("fl{}".format(i), fontSize=7, textColor=fcol,
                                      fontName="Helvetica-Bold")),
-                        Paragraph(f.tool, ps(f"fs{i}", fontSize=7, textColor=TEXT_MID)),
-                        Paragraph(f.text, ps(f"ff{i}", fontSize=7.5, textColor=TEXT_DARK,
+                        Paragraph(f.tool, ps("fs{}".format(i), fontSize=7, textColor=TEXT_MID)),
+                        Paragraph(f.text, ps("ff{}".format(i), fontSize=7.5, textColor=TEXT_DARK,
                                              leading=10)),
                     ])
                     style_cmds.append(("BACKGROUND", (0,i), (-1,i), bg))
@@ -997,12 +997,12 @@ def export_report():
             # Positive findings summary (condensed)
             if positives:
                 pos_text = "  ·  ".join(
-                    f"[OK] {f.text}" for f in positives[:6]
+                    "[OK] {}".format(f.text) for f in positives[:6]
                 )
                 if len(positives) > 6:
-                    pos_text += f"  ·  (+{len(positives)-6} more)"
+                    pos_text += "  ·  (+{} more)".format(len(positives)-6)
                 blk.append(Paragraph(pos_text,
-                                     ps("posf", fontSize=7, textColor=colors.HexColor("#15803d"),
+                                     ps("pos", fontSize=7, textColor=colors.HexColor("#15803d"),
                                         leading=11)))
                 blk.append(Spacer(1, 0.15 * cm))
 
@@ -1018,15 +1018,15 @@ def export_report():
         story.append(HRFlowable(width=usable_w, thickness=2, color=BRAND_BLUE))
         story.append(Spacer(1, 0.4 * cm))
         story.append(Paragraph(
-            f"Generated: {now.strftime('%B %d, %Y  |  %H:%M')}  ·  "
-            f"Molecules: {len(organised)}  ·  "
+            "Generated: {}  ·  ".format(now.strftime('%B %d, %Y  |  %H:%M')) +
+            "Molecules: {}  ·  ".format(len(organised)) +
             "Tools: RDKit Filters · StopTox · StopLight",
             sMeta
         ))
         story.append(Spacer(1, 1.2 * cm))
 
         # Tool legend
-        leg_data = [[Paragraph(t, ps(f"leg{t}", fontSize=9, textColor=colors.white,
+        leg_data = [[Paragraph(t, ps("leg{}".format(t), fontSize=9, textColor=colors.white,
                                       alignment=TA_CENTER, fontName="Helvetica-Bold"))
                      for t in ["RDKit Filters", "StopTox", "StopLight"]]]
         leg = Table(leg_data, colWidths=[usable_w / 3] * 3)
@@ -1046,7 +1046,7 @@ def export_report():
         has_names = bool(mol_names)
         exec_cols = ["#", "Name", "SMILES", "Overall Risk", "Critical", "High", "Medium"] if has_names \
                     else ["#", "SMILES", "Overall Risk", "Critical", "High", "Medium"]
-        exec_hdr = [Paragraph(h, ps(f"eh{h}", fontSize=8, textColor=colors.white,
+        exec_hdr = [Paragraph(h, ps("eh{}".format(h), fontSize=8, textColor=colors.white,
                                      fontName="Helvetica-Bold"))
                     for h in exec_cols]
         exec_rows = [exec_hdr]
@@ -1064,18 +1064,18 @@ def export_report():
             base_row += [
                 Paragraph(smi[:45] + ("…" if len(smi) > 45 else ""), sSmall),
                 Paragraph(RISK_LABEL.get(rlvl, rlvl.title()),
-                          ps(f"rl{n}", fontSize=8, textColor=colors.white,
+                          ps("rl{}".format(n), fontSize=8, textColor=colors.white,
                              fontName="Helvetica-Bold", alignment=TA_CENTER)),
                 Paragraph(str(nc) if nc else "—",
-                          ps(f"nc{n}", fontSize=8, fontName="Helvetica-Bold",
+                          ps("nc{}".format(n), fontSize=8, fontName="Helvetica-Bold",
                              textColor=FLAG_COLORS["critical"] if nc else TEXT_MID,
                              alignment=TA_CENTER)),
                 Paragraph(str(nh) if nh else "—",
-                          ps(f"nh{n}", fontSize=8, fontName="Helvetica-Bold",
+                          ps("nh{}".format(n), fontSize=8, fontName="Helvetica-Bold",
                              textColor=FLAG_COLORS["high"] if nh else TEXT_MID,
                              alignment=TA_CENTER)),
                 Paragraph(str(nm) if nm else "—",
-                          ps(f"nm{n}", fontSize=8,
+                          ps("nm{}".format(n), fontSize=8,
                              textColor=FLAG_COLORS["medium"] if nm else TEXT_MID,
                              alignment=TA_CENTER)),
             ]
@@ -1112,8 +1112,8 @@ def export_report():
         legend_row = []
         for lvl in ("critical", "high", "medium", "low"):
             legend_row.append(
-                Paragraph(f"{FLAG_ICON[lvl]}  {RISK_LABEL[lvl]}",
-                          ps(f"ll{lvl}", fontSize=7, textColor=FLAG_COLORS[lvl],
+                Paragraph("{}  {}".format(FLAG_ICON[lvl], RISK_LABEL[lvl]),
+                          ps("ll{}".format(lvl), fontSize=7, textColor=FLAG_COLORS[lvl],
                              alignment=TA_CENTER))
             )
         lt = Table([legend_row], colWidths=[usable_w / 4] * 4)
@@ -1133,7 +1133,7 @@ def export_report():
             # Molecule heading + 2D structure
             img = mol_image(smi)
             mol_label = mol_names.get(smi, "")
-            heading_title = f"Molecule {mol_idx}" + (f"  —  {mol_label}" if mol_label else "")
+            heading_title = "Molecule {}".format(mol_idx) + ("  —  {}".format(mol_label) if mol_label else "")
             heading_paras = [
                 Paragraph(heading_title, sSection),
                 Paragraph(smi, ps("smilesCode", fontSize=8.5, textColor=TEXT_MID,
@@ -1189,7 +1189,7 @@ def export_report():
         ]
         for tool, desc in methods:
             col = TOOL_COLORS.get(tool, BRAND_BLUE)
-            t = Table([[Paragraph(f"<b>{tool}</b> — {desc}", sBody)]], colWidths=[usable_w])
+            t = Table([[Paragraph("<b>{}</b> — {}".format(tool, desc), sBody)]], colWidths=[usable_w])
             t.setStyle(TableStyle([
                 ("LEFTBORDERPADDING", (0,0), (-1,-1), 4),
                 ("LEFTPADDING",       (0,0), (-1,-1), 8),
@@ -1210,7 +1210,7 @@ def export_report():
         ))
         story.append(Spacer(1, 0.3*cm))
         story.append(Paragraph(
-            f"Report generated by SmileRender · {now.strftime('%Y-%m-%d %H:%M')}",
+            "Report generated by SmileRender · {}".format(now.strftime('%Y-%m-%d %H:%M')),
             sFooter
         ))
 
@@ -1223,7 +1223,7 @@ def export_report():
             canvas.setFillColor(TEXT_MID)
             canvas.drawCentredString(
                 W / 2, 1.2*cm,
-                f"SmileRender · ADMET Report · {now.strftime('%Y-%m-%d')} · Page {doc.page}"
+                "SmileRender · ADMET Report · {} · Page {}".format(now.strftime('%Y-%m-%d'), doc.page)
             )
             canvas.restoreState()
 
@@ -1237,14 +1237,14 @@ def export_report():
         doc.build(story, onFirstPage=footer_canvas, onLaterPages=footer_canvas)
         buf.seek(0)
 
-        filename = f"ADMET_Report_{now.strftime('%Y%m%d_%H%M')}.pdf"
+        filename = "ADMET_Report_{}.pdf".format(now.strftime('%Y%m%d_%H%M'))
         return send_file(buf, mimetype="application/pdf",
                          as_attachment=True, download_name=filename)
 
     except Exception as err:
-        print(f"Report Export Error: {err}")
+        print("Report Export Error: {}".format(err))
         import traceback; traceback.print_exc()
-        return f"Error generating report: {err}", 500
+        return "Error generating report: {}".format(err), 500
 
 
 @app.route("/export/excel", methods=["POST"])
@@ -1262,7 +1262,7 @@ def export_excel():
         df_detailed = pd.DataFrame(data)
 
         if len(df_detailed["SMILES"].unique()) > MAX_SMILES:
-             return f"Exceeded the limit of {MAX_SMILES} unique SMILES for export!", 413
+             return "Exceeded the limit of {} unique SMILES for export!".format(MAX_SMILES), 413
         
         # Garantir colunas padrão
         base_cols = ["SMILES", "Tool", "Category", "Property", "Value", "Unit"]
@@ -1285,7 +1285,7 @@ def export_excel():
                 aggfunc='first'
             ).reset_index()
         except Exception as pivot_err:
-            print(f"Excel pivot failed (sheet will be empty): {pivot_err}")
+            print("Excel pivot failed (sheet will be empty): {}".format(pivot_err))
             df_pivot = pd.DataFrame()
 
         # Criar buffer para o Excel
@@ -1318,11 +1318,11 @@ def export_excel():
             output,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             as_attachment=True,
-            download_name=f"Molecule_Analysis_{int(pd.Timestamp.now().timestamp())}.xlsx"
+            download_name="Molecule_Analysis_{}.xlsx".format(int(pd.Timestamp.now().timestamp()))
         )
     except Exception as err:
-        print(f"Excel Export Error: {err}")
-        return f"Error generating Excel: {err}", 500
+        print("Excel Export Error: {}".format(err))
+        return "Error generating Excel: {}".format(err), 500
 
 @app.route("/convert/iupac", methods=["POST"])
 def convert_iupac():
@@ -1332,13 +1332,13 @@ def convert_iupac():
         if not smiles:
             return jsonify({"error": "No SMILES provided"}), 400
 
-        cache_key = f"smilerender:iupac:{hashlib.md5(smiles.encode()).hexdigest()}"
+        cache_key = "smilerender:iupac:{}".format(hashlib.md5(smiles.encode()).hexdigest())
         cached = _cache_get(cache_key)
         if cached:
             return cached, 200, {'Content-Type': 'application/json'}
 
         encoded = urllib.parse.quote(smiles, safe='')
-        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{encoded}/property/IUPACName,InChI,InChIKey,MolecularFormula,MolecularWeight/JSON"
+        url = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{}/property/IUPACName,InChI,InChIKey,MolecularFormula,MolecularWeight/JSON".format(encoded)
         import ssl
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
@@ -1354,9 +1354,9 @@ def convert_iupac():
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return jsonify({"error": "Compound not found in PubChem"}), 404
-        return jsonify({"error": f"PubChem error: {e.code}"}), 500
+        return jsonify({"error": "PubChem error: {}".format(e.code)}), 500
     except Exception as err:
-        print(f"IUPAC Convert Error: {err}")
+        print("IUPAC Convert Error: {}".format(err))
         return jsonify({"error": str(err)}), 500
 
 
@@ -1472,7 +1472,7 @@ def calc_descriptors():
 
         return jsonify(results)
     except Exception as err:
-        print(f"Descriptors Error: {err}")
+        print("Descriptors Error: {}".format(err))
         return jsonify({"error": str(err)}), 500
 
 
@@ -1510,10 +1510,10 @@ def descriptors_excel():
                     bits = r.get(fp_key, "")
                     row = {"SMILES": r.get("smiles", "")}
                     for i, b in enumerate(bits):
-                        row[f"b{i}"] = int(b)
+                        row["b{}".format(i)] = int(b)
                     rows_fp.append(row)
                 if rows_fp:
-                    pd.DataFrame(rows_fp).to_excel(writer, index=False, sheet_name=f"FP_{fp_name[:25]}")
+                    pd.DataFrame(rows_fp).to_excel(writer, index=False, sheet_name="FP_{}".format(fp_name))
 
             # Auto-width for Descriptors sheet
             ws = writer.sheets["Descriptors"]
@@ -1526,10 +1526,10 @@ def descriptors_excel():
             output,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             as_attachment=True,
-            download_name=f"descriptors_qsar.xlsx"
+            download_name="descriptors_qsar.xlsx"
         )
     except Exception as err:
-        print(f"Descriptors Excel Error: {err}")
+        print("Descriptors Excel Error: {}".format(err))
         return str(err), 500
 
 
@@ -1562,7 +1562,7 @@ def calc_similarity():
         results.sort(key=lambda x: x["tanimoto"] if x["tanimoto"] is not None else -1, reverse=True)
         return jsonify(results)
     except Exception as err:
-        print(f"Similarity Error: {err}")
+        print("Similarity Error: {}".format(err))
         return jsonify({"error": str(err)}), 500
 
 
@@ -1586,12 +1586,12 @@ def render_reaction():
         buf.seek(0)
         return send_file(buf, mimetype="image/png")
     except Exception as err:
-        print(f"Reaction Render Error: {err}")
-        return f"Error rendering reaction: {err}", 500
+        print("Reaction Render Error: {}".format(err))
+        return "Error rendering reaction: {}".format(err), 500
 
 
 @app.route("/task/status/<string:task_id>", methods=["GET"])
-def get_task_status(task_id: str):
+def get_task_status(task_id):
     """Check the status of a background task."""
     result = AsyncResult(task_id)
     return jsonify({
@@ -1635,7 +1635,7 @@ def predict_peplink():
         })
         
     except Exception as err:
-        print(f"PepLink Error: {err}")
+        print("PepLink Error: {}".format(err))
         return jsonify({"error": str(err)}), 500
 
 @app.route("/predict/smiles-to-peptide", methods=["POST"])
@@ -1660,7 +1660,7 @@ def predict_smiles_to_peptide():
             return jsonify({"error": result.unsupported_reason or "Conversion failed"}), 422
         
     except Exception as err:
-        print(f"PepLink Reverse Error: {err}")
+        print("PepLink Reverse Error: {}".format(err))
         return jsonify({"error": str(err)}), 500
 @app.route("/export/grid", methods=["POST"])
 def export_grid():
@@ -1678,9 +1678,9 @@ def export_grid():
             
         buf = create_mols_grid(smiles, labels, mols_per_row, format=fmt)
         ext = "jpg" if fmt == "JPEG" else "png"
-        return send_file(buf, mimetype=f"image/{fmt.lower()}", as_attachment=True, download_name=f"molecules_grid.{ext}")
+        return send_file(buf, mimetype="image/{}".format(fmt.lower()), as_attachment=True, download_name="molecules_grid.{}".format(ext))
     except Exception as err:
-        print(f"Grid Export Error: {err}")
+        print("Grid Export Error: {}".format(err))
         return str(err), 500
 @app.route("/export/excel", methods=["POST"])
 def export_excel_all():
@@ -1689,7 +1689,7 @@ def export_excel_all():
         import pandas as pd
         import io
         data = request.get_json()
-        print(f"DEBUG: Exporting Excel with {len(data) if data else 0} rows")
+        print("DEBUG: Exporting Excel with {} rows".format(len(data) if data else 0))
         if not data: return "No data provided", 400
         
         df = pd.DataFrame(data)
@@ -1699,7 +1699,7 @@ def export_excel_all():
         output.seek(0)
         return send_file(output, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", as_attachment=True, download_name="ADMET_Analysis.xlsx")
     except Exception as err:
-        print(f"CRITICAL: Excel Export Error: {err}")
+        print("CRITICAL: Excel Export Error: {}".format(err))
         import traceback
         traceback.print_exc()
         return str(err), 500
@@ -1713,7 +1713,7 @@ def export_report_pdf():
         import io
         
         data = request.get_json()
-        print(f"DEBUG: Generating PDF with {len(data) if data else 0} rows")
+        print("DEBUG: Generating PDF with {} rows".format(len(data) if data else 0))
         if not data: return "No data provided", 400
         
         df = pd.DataFrame(data)
@@ -1730,7 +1730,7 @@ def export_report_pdf():
             def footer(self):
                 self.set_y(-15)
                 self.set_font('Arial', 'I', 8)
-                self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
+                self.cell(0, 10, 'Page {}'.format(self.page_no()), 0, 0, 'C')
 
         pdf = PDF()
         pdf.set_auto_page_break(auto=True, margin=15)
@@ -1744,7 +1744,7 @@ def export_report_pdf():
             pdf.set_fill_color(245, 247, 250)
             pdf.set_font('Arial', 'B', 10)
             # Use multi_cell for long SMILES
-            pdf.multi_cell(0, 8, f" Molecule: {clean_s(smiles)}", 1, 'L', fill=True)
+            pdf.multi_cell(0, 8, " Molecule: {}".format(clean_s(smiles)), 1, 'L', fill=True)
             pdf.ln(2)
             
             # Table Header
@@ -1764,10 +1764,10 @@ def export_report_pdf():
                 else:
                     pdf.set_text_color(0)
                 
-                pdf.cell(30, 6, f" {clean_s(row['Tool'])}", 1)
-                pdf.cell(75, 6, f" {clean_s(row['Property'])}", 1)
-                pdf.cell(55, 6, f" {clean_s(row['Value'])}", 1)
-                pdf.cell(30, 6, f" {clean_s(row['Unit'])}", 1)
+                pdf.cell(30, 6, " {}".format(clean_s(row['Tool'])), 1)
+                pdf.cell(75, 6, " {}".format(clean_s(row['Property'])), 1)
+                pdf.cell(55, 6, " {}".format(clean_s(row['Value'])), 1)
+                pdf.cell(30, 6, " {}".format(clean_s(row['Unit'])), 1)
                 pdf.set_text_color(0)
             
             pdf.ln(8)
@@ -1781,10 +1781,10 @@ def export_report_pdf():
             download_name="ADMET_Report.pdf"
         )
     except Exception as err:
-        print(f"CRITICAL: PDF Export Error: {err}")
+        print("CRITICAL: PDF Export Error: {}".format(err))
         import traceback
         traceback.print_exc()
-        return f"Server Error: {str(err)}", 500
+        return "Server Error: {}".format(str(err)), 500
 
 
 def _bbb_featurize(mol):
@@ -1807,7 +1807,7 @@ def _bbb_featurize(mol):
 
 
 @app.route("/predict/bbb/base64/<path:smiles>", methods=["GET"])
-def predict_bbb(smiles: str):
+def predict_bbb(smiles):
     """Predict Blood-Brain Barrier permeability using local GradientBoosting model (B3DB dataset)."""
     if BBB_MODEL is None:
         return jsonify({"error": "BBB model not loaded"}), 503
@@ -1852,7 +1852,7 @@ def libprep_load():
                 if not line or line.startswith("#"): continue
                 parts = line.split(None, 1)
                 smiles = parts[0]
-                name = parts[1].strip() if len(parts) > 1 else f"mol_{i+1}"
+                name = parts[1].strip() if len(parts) > 1 else "mol_{}".format(i+1)
                 mol = Chem.MolFromSmiles(smiles)
                 if mol:
                     entries.append({"name": name, "smiles": Chem.MolToSmiles(mol), "status": "pending"})
@@ -1873,7 +1873,7 @@ def libprep_prepare():
         remove_salts = config.get("remove_salts", True)
         neutralize = config.get("neutralize", True)
         canon_tautomer = config.get("canon_tautomer", False)
-        ff = config.get("ff", "MMFF94")
+        ff = config.get("f", "MMFF94")
         max_iters = config.get("max_iters", 2000)
         
         for e in entries:
@@ -1922,7 +1922,7 @@ def libprep_export():
             io.BytesIO(zip_data),
             mimetype="application/zip",
             as_attachment=True,
-            download_name=f"libprep_export_{fmt}.zip"
+            download_name="libprep_export_{}.zip".format(fmt)
         )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1935,14 +1935,14 @@ def pubchem_name_to_smiles():
         if not name:
             return jsonify({"error": "No name provided"}), 400
 
-        cache_key = f"pubchem_name:{hashlib.md5(name.lower().encode()).hexdigest()}"
+        cache_key = "pubchem_name:{}".format(hashlib.md5(name.lower().encode()).hexdigest())
         if _cache_ok:
             cached = _redis.get(cache_key)
             if cached:
                 return cached, 200, {'Content-Type': 'application/json'}
 
         encoded = urllib.parse.quote(name, safe='')
-        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{encoded}/property/IsomericSMILES,IUPACName,MolecularWeight/JSON"
+        url = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{}/property/IsomericSMILES,IUPACName,MolecularWeight/JSON".format(encoded)
         import ssl
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
@@ -1963,7 +1963,8 @@ def pubchem_name_to_smiles():
         return result, 200, {'Content-Type': 'application/json'}
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            return jsonify({"error": f"Compound '{name}' not found in PubChem"}), 404
+            return jsonify({"error": "Compound '{}' not found in PubChem".format(name)}), 404
         return jsonify({"error": str(e)}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+

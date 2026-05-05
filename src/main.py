@@ -21,7 +21,7 @@ def main():
     host = "0.0.0.0"
     port = int(getenv("PORT") or 3000)
     threads = int(getenv("THREADS") or 4)
-    print(f"smiles-render-web running at {host}:{port} with {threads} threads (Render Free Optimized)")
+    print("smiles-render-web running at {}:{} with {} threads (Render Free Optimized)".format(host, port, threads))
     serve(app, host=host, port=port, threads=threads)
 
 

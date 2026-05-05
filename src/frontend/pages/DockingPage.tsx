@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import PageShell from '../components/PageShell';
 import MoleculeDrawerModal from '../components/MoleculeDrawerModal';
 import { colors, radius, shadow, font } from '../styles/themes';
+import { parseCSV, autoDetect, detectSmilesColumn } from '../tools/csv';
 
 interface MolEntry {
   name: string;
@@ -14,13 +15,18 @@ interface MolEntry {
   props: any;
 }
 
-type InputMode = 'smiles' | 'name' | 'draw';
+type InputMode = 'smiles' | 'name' | 'draw' | 'csv';
 
-const DockingPage: React.FC = () => {
+interface DockingPageProps {
+  onBack: () => void;
+  initialSmiles?: string;
+}
+
+const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
   const [entries, setEntries] = useState<MolEntry[]>([]);
-  const [inputText, setInputText] = useState('');
+  const [inputText, setInputText] = useState(initialSmiles || '');
   const [isPreparing, setIsPreparing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'inspector'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'inspector' | 'simulation'>('overview');
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [inputMode, setInputMode] = useState<InputMode>('smiles');
   const [nameQuery, setNameQuery] = useState('');
@@ -28,6 +34,16 @@ const DockingPage: React.FC = () => {
   const [nameResult, setNameResult] = useState<{ smiles: string; iupac: string; mw: string } | null>(null);
   const [nameError, setNameError] = useState('');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // Docking Simulation State
+  const [receptor, setReceptor] = useState<{ id: string, path: string, content: string } | null>(null);
+  const [isLoadingReceptor, setIsLoadingReceptor] = useState(false);
+  const [grid, setGrid] = useState({ cx: 0, cy: 0, cz: 0, sx: 20, sy: 20, sz: 20 });
+  const [dockingResults, setDockingResults] = useState<any[]>([]);
+  const [isDocking, setIsDocking] = useState(false);
+  const [sessionInfo, setSessionInfo] = useState<any>(null);
+  const [plipData, setPlipData] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const [config, setConfig] = useState({
     remove_salts: true,
@@ -37,12 +53,14 @@ const DockingPage: React.FC = () => {
     max_iters: 2000
   });
 
-  const handleLoad = async () => {
+  const handleLoad = async (textToLoad?: string) => {
+    const text = textToLoad || inputText;
+    if (!text.trim()) return;
     try {
       const res = await fetch('/api/libprep/load', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: inputText, method: 'smiles' })
+        body: JSON.stringify({ text, method: 'smiles' })
       });
       const data = await res.json();
       setEntries(data);
@@ -51,6 +69,93 @@ const DockingPage: React.FC = () => {
       alert('Error loading library');
     }
   };
+
+  const handleLoadReceptor = async (id: string) => {
+    if (!id || id.length !== 4) return;
+    setIsLoadingReceptor(true);
+    try {
+      const res = await fetch('/api/docking/receptor/load-pdb-id', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pdbId: id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setReceptor({ id: data.pdbId, path: data.pdbPath, content: data.pdbContent });
+        if (data.pocket && data.pocket.success) {
+          setGrid({
+            cx: data.pocket.center.x, cy: data.pocket.center.y, cz: data.pocket.center.z,
+            sx: data.pocket.size.x, sy: data.pocket.size.y, sz: data.pocket.size.z
+          });
+        }
+      } else {
+        alert(data.error || 'Failed to load receptor');
+      }
+    } catch (err) {
+      alert('Network error loading receptor');
+    } finally {
+      setIsLoadingReceptor(false);
+    }
+  };
+
+  const runDocking = async (idx: number) => {
+    if (!receptor || !entries[idx]) return;
+    setIsDocking(true);
+    try {
+      const res = await fetch('/api/docking/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          receptorPath: receptor.path,
+          smiles: entries[idx].smiles,
+          center: { x: grid.cx, y: grid.cy, z: grid.cz },
+          size: { x: grid.sx, y: grid.sy, z: grid.sz }
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDockingResults(data.scores);
+        setSessionInfo(data);
+        setPlipData(null);
+      } else {
+        alert(data.error || 'Docking failed');
+      }
+    } catch (err) {
+      alert('Network error during docking');
+    } finally {
+      setIsDocking(false);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!sessionInfo?.complexPath) return;
+    setIsAnalyzing(true);
+    try {
+      const res = await fetch('/api/docking/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ complexPath: sessionInfo.complexPath })
+      });
+      const data = await res.json();
+      if (data.error) alert(data.error);
+      else setPlipData(data);
+    } catch (err) {
+      alert('Error running PLIP analysis');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleDownloadResults = () => {
+    if (!sessionInfo?.sessionId) return;
+    window.location.href = `/api/docking/download?session=${sessionInfo.sessionId}`;
+  };
+
+  React.useEffect(() => {
+    if (initialSmiles) {
+      handleLoad(initialSmiles);
+    }
+  }, [initialSmiles]);
 
   const handleNameSearch = async () => {
     if (!nameQuery.trim()) return;
@@ -80,6 +185,43 @@ const DockingPage: React.FC = () => {
     const line = label ? `${smiles} ${label}` : smiles;
     setInputText(prev => prev ? `${prev.trim()}\n${line}` : line);
     setInputMode('smiles');
+  };
+
+  const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const rows = parseCSV(content);
+        if (rows.length < 2) return;
+
+        const smilesIndex = detectSmilesColumn(rows);
+        if (smilesIndex === -1) { alert("SMILES column not found in CSV."); return; }
+
+        const headers = rows[0].map((h: string) => h.replace(/^\ufeff/, '').trim().toLowerCase());
+        const nameCol = autoDetect(headers, /name|nome|id|label|drug|molecule/i);
+        const nameIndex = nameCol ? headers.indexOf(nameCol) : -1;
+
+        const formattedStr = rows.slice(1)
+          .map((r: string[]) => {
+            const s = (r[smilesIndex] || '').trim();
+            const n = nameIndex !== -1 ? (r[nameIndex] || '').trim().replace(/\n/g, ' ') : '';
+            return s ? `${s} ${n}`.trim() : '';
+          })
+          .filter((s: string) => s.length > 0)
+          .join('\n');
+
+        setInputText(formattedStr);
+        handleLoad(formattedStr);
+        setInputMode('smiles');
+      } catch (err) {
+        alert("Failed to parse CSV file.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const handlePrepare = async () => {
@@ -119,18 +261,19 @@ const DockingPage: React.FC = () => {
     }
   };
 
-  const render3D = (sdf: string) => {
+  const render3D = (sdf: string, ligandSdf?: string, box?: any) => {
     if (!sdf) return (
       <div style={{
         height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center',
         backgroundColor: colors.bg, borderRadius: radius.md, border: `1px dashed ${colors.border}`,
         color: colors.textMuted, fontSize: '14px'
       }}>
-        No 3D structure. Please click "Prepare Library" first.
+        No structure loaded.
       </div>
     );
 
-    const b64 = btoa(sdf);
+    const mainJs = btoa(sdf);
+    const ligJs = ligandSdf ? btoa(ligandSdf) : null;
     const html = `
       <!DOCTYPE html>
       <html>
@@ -143,11 +286,17 @@ const DockingPage: React.FC = () => {
         <script>
           $(function() {
             const viewer = $3Dmol.createViewer($('#v'), {backgroundColor: '#ffffff'});
-            viewer.addModel(atob("${b64}"), "sdf");
-            viewer.setStyle({}, {stick:{radius:0.15, colorscheme:'default'}, sphere:{radius:0.4, colorscheme:'default'}});
+            viewer.addModel(atob("${mainJs}"), "pdb");
+            viewer.setStyle({}, {cartoon:{color:'spectrum'}});
+            ${ligJs ? `
+              viewer.addModel(atob("${ligJs}"), "sdf");
+              viewer.setStyle({model:-1}, {stick:{colorscheme:'greenCarbon'}});
+            ` : ''}
+            ${box ? `
+              viewer.addBox({center:{x:${box.cx},y:${box.cy},z:${box.cz}}, dimensions:{w:${box.sx},h:${box.sy},d:${box.sz}}, color:'green', opacity:0.3});
+            ` : ''}
             viewer.zoomTo();
             viewer.render();
-            viewer.setHoverable({}, true, function(atom){}, function(atom){});
           });
         </script>
       </body>
@@ -176,7 +325,7 @@ const DockingPage: React.FC = () => {
       title="Docking LibPrep"
       subtitle="Prepare molecular libraries for virtual screening"
       accentColor="#14b8a6"
-      onBack={() => window.location.hash = 'hub'}
+      onBack={onBack}
     >
       <MoleculeDrawerModal
         isOpen={isDrawerOpen}
@@ -195,6 +344,7 @@ const DockingPage: React.FC = () => {
             {/* Input mode switcher */}
             <div style={{ display: 'flex', gap: '4px', marginBottom: '14px', backgroundColor: colors.bg, padding: '4px', borderRadius: radius.md }}>
               {inputModeBtn('smiles', 'bi-code', 'SMILES')}
+              {inputModeBtn('csv', 'bi-file-earmark-spreadsheet', 'CSV/Excel')}
               {inputModeBtn('name', 'bi-search', 'Name')}
               {inputModeBtn('draw', 'bi-pencil', 'Draw')}
             </div>
@@ -217,14 +367,74 @@ const DockingPage: React.FC = () => {
                     width: '100%', padding: '10px', backgroundColor: colors.blue, color: '#fff', border: 'none',
                     borderRadius: radius.md, fontWeight: 600, cursor: 'pointer', marginBottom: '24px'
                   }}
-                  onClick={handleLoad}
+                  onClick={() => handleLoad()}
                 >
                   Load SMILES
                 </button>
               </>
             )}
 
-            {/* Name search mode */}
+            {inputMode === 'csv' && (
+              <div style={{ marginBottom: '24px' }}>
+                <div
+                  style={{
+                    padding: '32px 16px', backgroundColor: colors.bg, borderRadius: radius.lg,
+                    border: `2px dashed ${colors.border}`, marginBottom: '16px', cursor: 'pointer',
+                    textAlign: 'center', transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.borderColor = '#14b8a6'}
+                  onMouseOut={e => e.currentTarget.style.borderColor = colors.border}
+                  onClick={() => document.getElementById('csv-file-input')?.click()}
+                >
+                  <i className="bi bi-file-earmark-arrow-up" style={{ fontSize: '32px', color: '#14b8a6', display: 'block', marginBottom: '8px' }}></i>
+                  <p style={{ fontSize: '13px', fontWeight: 700, color: colors.navy, marginBottom: '4px' }}>Upload Molecule Library</p>
+                  <p style={{ fontSize: '11px', color: colors.textMuted, marginBottom: '16px' }}>
+                    Supports <b>.csv, .txt, .smi</b><br />
+                    Auto-detects SMILES and Names
+                  </p>
+                  <button
+                    style={{
+                      padding: '8px 20px', backgroundColor: '#14b8a6', color: '#fff', border: 'none',
+                      borderRadius: radius.md, fontWeight: 700, cursor: 'pointer', fontSize: '12px'
+                    }}
+                  >
+                    Browse Files
+                  </button>
+                  <input
+                    id="csv-file-input"
+                    type="file"
+                    accept=".csv,.txt,.smi"
+                    style={{ display: 'none' }}
+                    onChange={handleCSVUpload}
+                  />
+                </div>
+
+                {inputText && (
+                  <div style={{
+                    padding: '12px', backgroundColor: '#f0fdf4', borderRadius: radius.md,
+                    border: '1px solid #bbf7d0', fontSize: '12px', color: '#166534'
+                  }}>
+                    <div style={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span><i className="bi bi-check-circle-fill" style={{ marginRight: '6px' }}></i> File loaded</span>
+                      <span>{inputText.trim().split('\n').length} mols</span>
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#15803d', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {inputText.split('\n')[0]}...
+                    </div>
+                    <button
+                      onClick={() => handleLoad()}
+                      style={{
+                        width: '100%', marginTop: '10px', padding: '8px',
+                        backgroundColor: '#166534', color: '#fff', border: 'none',
+                        borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '11px'
+                      }}
+                    >
+                      Process Now
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             {inputMode === 'name' && (
               <div style={{ marginBottom: '24px' }}>
                 <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
@@ -358,7 +568,7 @@ const DockingPage: React.FC = () => {
               <select
                 style={{ width: '100%', padding: '8px', borderRadius: radius.md, border: `1px solid ${colors.border}`, fontSize: '13px' }}
                 value={config.ff}
-                onChange={e => setConfig({...config, ff: e.target.value})}
+                onChange={e => setConfig({ ...config, ff: e.target.value })}
               >
                 <option value="MMFF94">MMFF94 (Best for Drugs)</option>
                 <option value="MMFF94s">MMFF94s</option>
@@ -409,28 +619,20 @@ const DockingPage: React.FC = () => {
         {/* Main Content */}
         <div style={{ flex: 1, minWidth: '400px' }}>
           <div style={{ display: 'flex', gap: '4px', marginBottom: '16px' }}>
-            <button
-              onClick={() => setActiveTab('overview')}
-              style={{
-                padding: '8px 20px', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: 700,
-                backgroundColor: activeTab === 'overview' ? colors.navy : 'transparent',
-                color: activeTab === 'overview' ? '#fff' : colors.textMuted,
-                transition: 'all 0.2s ease'
-              }}
-            >
-              📊 Overview
-            </button>
-            <button
-              onClick={() => setActiveTab('inspector')}
-              style={{
-                padding: '8px 20px', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: 700,
-                backgroundColor: activeTab === 'inspector' ? colors.navy : 'transparent',
-                color: activeTab === 'inspector' ? '#fff' : colors.textMuted,
-                transition: 'all 0.2s ease'
-              }}
-            >
-              🔍 Inspector
-            </button>
+            {['overview', 'inspector', 'simulation'].map((tab: any) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: '8px 20px', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: 700,
+                  backgroundColor: activeTab === tab ? colors.navy : 'transparent',
+                  color: activeTab === tab ? '#fff' : colors.textMuted,
+                  transition: 'all 0.2s ease', textTransform: 'capitalize'
+                }}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
 
           <div style={{ backgroundColor: colors.surface, padding: '32px', borderRadius: radius.lg, boxShadow: shadow.lg, border: `1px solid ${colors.border}`, minHeight: '500px' }}>
@@ -482,34 +684,132 @@ const DockingPage: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'inspector' && entries[selectedIdx] && (
-              <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 400px' }}>
-                  <h5 style={{ fontWeight: 700, marginBottom: '20px', fontSize: '16px', display: 'flex', justifyContent: 'space-between' }}>
-                    3D Visualization
-                    <span style={{ color: colors.textMuted, fontSize: '12px' }}>{entries[selectedIdx].name}</span>
-                  </h5>
-                  {render3D(entries[selectedIdx].sdf_3d)}
-                  {entries[selectedIdx].energy && (
-                    <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: radius.md, fontSize: '12px', color: colors.textMuted }}>
-                      <i className="bi bi-lightning-fill" style={{ color: colors.warning }}></i> Energy: <strong>{entries[selectedIdx].energy}</strong> kcal/mol ({entries[selectedIdx].ff_used})
+            {activeTab === 'simulation' && (
+              <div>
+                <div style={{ display: 'flex', gap: '20px', marginBottom: '24px', alignItems: 'flex-end' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>Receptor PDB ID</label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        id="pdb-id-input"
+                        type="text"
+                        placeholder="e.g. 5KIR"
+                        style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border}` }}
+                        onKeyDown={e => e.key === 'Enter' && handleLoadReceptor(e.currentTarget.value)}
+                      />
+                      <button
+                        onClick={() => handleLoadReceptor((document.getElementById('pdb-id-input') as HTMLInputElement).value)}
+                        disabled={isLoadingReceptor}
+                        style={{ padding: '10px 20px', backgroundColor: colors.navy, color: '#fff', border: 'none', borderRadius: radius.md, fontWeight: 700 }}
+                      >
+                        {isLoadingReceptor ? 'Loading...' : 'Fetch Receptor'}
+                      </button>
+                    </div>
+                  </div>
+                  {receptor && (
+                    <div style={{ padding: '10px', backgroundColor: colors.successBg, border: `1px solid ${colors.success}`, borderRadius: radius.md, fontSize: '12px', color: colors.success }}>
+                      <i className="bi bi-check-circle-fill me-2"></i> Receptor <b>{receptor.id}</b> Loaded
                     </div>
                   )}
                 </div>
-                <div style={{ flex: '0 0 300px' }}>
-                  <h5 style={{ fontWeight: 700, marginBottom: '20px', fontSize: '16px' }}>Properties</h5>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-                    {entries[selectedIdx].props && Object.entries(entries[selectedIdx].props).map(([k, v]: [string, any]) => (
-                      <div key={k} style={{
-                        display: 'flex', justifyContent: 'space-between', padding: '10px 0',
-                        borderBottom: `1px solid ${colors.borderLight}`, fontSize: '13px'
-                      }}>
-                        <span style={{ color: colors.textMuted }}>{k.replace(/_/g, ' ')}</span>
-                        <span style={{ fontWeight: 700, color: colors.navy }}>{v.toString()}</span>
+
+                {receptor && (
+                  <div style={{ display: 'flex', gap: '24px' }}>
+                    <div style={{ flex: '1 1 500px' }}>
+                      <h6 style={{ fontWeight: 700, marginBottom: '12px' }}>Grid Box Configuration</h6>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+                        {['cx', 'cy', 'cz'].map(k => (
+                          <div key={k}>
+                            <label style={{ fontSize: '11px', color: colors.textMuted }}>Center {k.slice(1).toUpperCase()}</label>
+                            <input type="number" step="0.1" value={(grid as any)[k]} onChange={e => setGrid({ ...grid, [k]: parseFloat(e.target.value) })}
+                              style={{ width: '100%', padding: '8px', borderRadius: radius.md, border: `1px solid ${colors.border}` }} />
+                          </div>
+                        ))}
+                        {['sx', 'sy', 'sz'].map(k => (
+                          <div key={k}>
+                            <label style={{ fontSize: '11px', color: colors.textMuted }}>Size {k.slice(1).toUpperCase()}</label>
+                            <input type="number" step="1" value={(grid as any)[k]} onChange={e => setGrid({ ...grid, [k]: parseFloat(e.target.value) })}
+                              style={{ width: '100%', padding: '8px', borderRadius: radius.md, border: `1px solid ${colors.border}` }} />
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                      {render3D(receptor.content, undefined, grid)}
+                    </div>
+                    <div style={{ flex: '0 0 300px' }}>
+                      <h6 style={{ fontWeight: 700, marginBottom: '12px' }}>Docking Controls</h6>
+                      <p style={{ fontSize: '12px', color: colors.textMuted, marginBottom: '16px' }}>
+                        Selected: <b>{entries[selectedIdx]?.name || 'None'}</b>
+                      </p>
+                      <button
+                        onClick={() => runDocking(selectedIdx)}
+                        disabled={isDocking || !receptor || entries.length === 0}
+                        style={{ width: '100%', padding: '12px', backgroundColor: colors.success, color: '#fff', border: 'none', borderRadius: radius.md, fontWeight: 700, fontSize: '14px', marginBottom: '12px' }}
+                      >
+                        {isDocking ? 'Simulating...' : '▶ Run AutoDock Vina'}
+                      </button>
+
+                      {sessionInfo && (
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                          <button
+                            onClick={handleAnalyze}
+                            disabled={isAnalyzing}
+                            style={{ flex: 1, padding: '8px', backgroundColor: colors.navy, color: '#fff', border: 'none', borderRadius: radius.md, fontSize: '11px', fontWeight: 700 }}
+                          >
+                            {isAnalyzing ? 'Analyzing...' : '🔍 PLIP Analysis'}
+                          </button>
+                          <button
+                            onClick={handleDownloadResults}
+                            style={{ flex: 1, padding: '8px', backgroundColor: colors.blue, color: '#fff', border: 'none', borderRadius: radius.md, fontSize: '11px', fontWeight: 700 }}
+                          >
+                            <i className="bi bi-download me-1"></i> Results.zip
+                          </button>
+                        </div>
+                      )}
+
+                      {dockingResults.length > 0 && (
+                        <div style={{ marginTop: '0' }}>
+                          <h6 style={{ fontWeight: 700, fontSize: '13px', marginBottom: '10px' }}>Results (Scores)</h6>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+                            {dockingResults.map((r, i) => (
+                              <div key={i} style={{ padding: '10px', backgroundColor: i === 0 ? '#f0fdf4' : colors.bg, border: `1px solid ${i === 0 ? colors.success : colors.border}`, borderRadius: radius.md, display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ fontWeight: 700 }}>Pose {r.mode}</span>
+                                <span style={{ color: colors.danger, fontWeight: 700 }}>{r.affinity} kcal/mol</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {plipData && (
+                        <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: radius.md, border: `1px solid ${colors.border}` }}>
+                          <h6 style={{ fontWeight: 700, fontSize: '12px', marginBottom: '10px' }}>Structural Interactions</h6>
+                          {plipData.interactions.hbonds.length > 0 && (
+                            <div style={{ marginBottom: '10px' }}>
+                              <p style={{ fontSize: '10px', fontWeight: 700, color: colors.success, marginBottom: '4px' }}>Hydrogen Bonds</p>
+                              {plipData.interactions.hbonds.map((h: any, i: number) => (
+                                <div key={i} style={{ fontSize: '10px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', padding: '2px 0' }}>
+                                  <span>{h.residue}</span>
+                                  <span>{h.dist} Å</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {plipData.interactions.hydrophobic.length > 0 && (
+                            <div>
+                              <p style={{ fontSize: '10px', fontWeight: 700, color: colors.navy, marginBottom: '4px' }}>Hydrophobic</p>
+                              {plipData.interactions.hydrophobic.map((h: any, i: number) => (
+                                <div key={i} style={{ fontSize: '10px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', padding: '2px 0' }}>
+                                  <span>{h.residue}</span>
+                                  <span>{h.dist} Å</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
           </div>

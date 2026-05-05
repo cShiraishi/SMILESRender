@@ -52,8 +52,8 @@ function App() {
         {page === 'similarity'  && <SimilarityPage onBack={goBack} initialSmiles={sharedSmiles} />}
         {page === 'reaction'    && <ReactionPage onBack={goBack} initialSmiles={sharedSmiles} />}
         {page === 'library'     && <LibraryPage onBack={goBack} initialSmiles={sharedSmiles} />}
-        {page === 'peptide'     && <PeptidePage onBack={goBack} />}
-        {page === 'docking'     && <DockingPage />}
+        {page === 'peptide'     && <PeptidePage onBack={goBack} initialSmiles={sharedSmiles} />}
+        {page === 'docking'     && <DockingPage onBack={goBack} initialSmiles={sharedSmiles} />}
       </main>
       <Footer />
     </div>

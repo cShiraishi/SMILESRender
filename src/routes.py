@@ -1,5 +1,16 @@
 from io import TextIOWrapper
 from flask import Flask, render_template, request, send_file, jsonify
+import torch
+import argparse
+import numpy
+
+# PyTorch 2.6+ compatibility patch: force weights_only=False by default
+original_load = torch.load
+def patched_load(*args, **kwargs):
+    if 'weights_only' not in kwargs:
+        kwargs['weights_only'] = False
+    return original_load(*args, **kwargs)
+torch.load = patched_load
 from converter import (
     convert_many_smiles_and_zip,
     convert_smiles,
@@ -16,11 +27,13 @@ import hashlib
 import os
 import subprocess
 from PepLink import aa_seqs_to_smiles, smiles_to_aa_seqs
+from peptide_utils import get_peptide_metrics
 from admet_interpreter import interpret, RISK_LABEL
 import pickle
 from rdkit import Chem, DataStructs
 from rdkit.Chem import AllChem, Descriptors, rdMolDescriptors
 import numpy as np
+from docking_routes import init_docking_routes
 
 # Load Tox21 Model
 TOX21_MODEL = None
@@ -138,6 +151,8 @@ def status():
 @app.route("/")
 def index():
     return render_template("index.html")
+
+init_docking_routes(app)
 
 
 from rdkit.Chem.Scaffolds import MurckoScaffold
@@ -1551,8 +1566,7 @@ def calc_similarity():
 @app.route("/render/reaction", methods=["POST"])
 def render_reaction():
     try:
-        from rdkit.Chem import AllChem, Draw, rdChemReactions
-        from PIL import Image
+        from rdkit.Chem import AllChem, Draw
         import io as _io
         body   = request.get_json()
         rxn_smi = body.get("smarts", "")
@@ -1611,7 +1625,11 @@ def predict_peplink():
         if not smiles:
              return jsonify({"error": "Conversion failed"}), 500
              
-        return jsonify({"smiles": smiles})
+        metrics = get_peptide_metrics(sequence)
+        return jsonify({
+            "smiles": smiles,
+            "metrics": metrics
+        })
         
     except Exception as err:
         print(f"PepLink Error: {err}")
@@ -1628,10 +1646,12 @@ def predict_smiles_to_peptide():
             
         result = smiles_to_aa_seqs(smiles)
         if result.sequence:
+            metrics = get_peptide_metrics(result.sequence)
             return jsonify({
                 "sequence": result.sequence,
                 "is_cyclic": result.is_cyclic,
-                "cyclization": result.cyclization
+                "cyclization": result.cyclization,
+                "metrics": metrics
             })
         else:
             return jsonify({"error": result.unsupported_reason or "Conversion failed"}), 422

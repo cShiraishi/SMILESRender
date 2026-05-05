@@ -4,6 +4,7 @@ import AtomicBackground from '../components/AtomicBackground';
 import AppleDock from '../components/AppleDock';
 import DiscoverGrid from '../components/DiscoverGrid';
 import MoleculeDrawerModal from '../components/MoleculeDrawerModal';
+import { parseCSV, autoDetect, detectSmilesColumn } from '../tools/csv';
 
 interface HubApp {
   id: string;
@@ -51,6 +52,45 @@ const Hub: React.FC<Props> = ({ onNavigate }) => {
     setTimeout(() => {
       onNavigate(id, heroSmiles);
     }, 600); // iOS style transition time
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        if (file.name.toLowerCase().endsWith('.csv')) {
+          const rows = parseCSV(content);
+          if (rows.length < 2) return;
+          
+          const smilesIndex = detectSmilesColumn(rows);
+          if (smilesIndex === -1) { alert("SMILES column not found in CSV."); return; }
+
+          const headers = rows[0].map((h: string) => h.replace(/^\ufeff/, '').trim().toLowerCase());
+          const nameCol = autoDetect(headers, /name|nome|id|label|drug|molecule/i);
+          const nameIndex = nameCol ? headers.indexOf(nameCol) : -1;
+          const formattedStr = rows.slice(1)
+            .map((r: string[]) => {
+              const s = (r[smilesIndex] || '').trim();
+              const n = nameIndex !== -1 ? (r[nameIndex] || '').trim().replace(/\n/g, ' ') : '';
+              return s ? `${s} ${n}`.trim() : '';
+            })
+            .filter((s: string) => s.length > 0)
+            .join('\n');
+          setHeroSmiles(formattedStr);
+        } else {
+          // txt or smi
+          setHeroSmiles(content.trim());
+        }
+      } catch (err) {
+        console.error("Upload error:", err);
+        alert("Failed to parse file.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // reset
   };
 
   return (
@@ -141,6 +181,17 @@ const Hub: React.FC<Props> = ({ onNavigate }) => {
                     el.style.height = (el.scrollHeight) + 'px';
                   }}
                 />
+                <label 
+                  title="Upload CSV"
+                  style={{
+                    backgroundColor: 'transparent', color: colors.blue, border: 'none', padding: '12px',
+                    borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease',
+                    marginRight: '2px', display: 'flex', alignItems: 'center'
+                  }}
+                >
+                  <i className="bi bi-file-earmark-arrow-up" style={{ fontSize: '20px' }}></i>
+                  <input type="file" accept=".csv,.txt,.smi" style={{ display: 'none' }} onChange={handleFileUpload} />
+                </label>
                 <button 
                   onClick={() => setIsDrawerOpen(true)}
                   title="Draw Molecule"

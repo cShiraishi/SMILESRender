@@ -314,35 +314,44 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
           document.addEventListener("DOMContentLoaded", function() {
             var stage = new NGL.Stage("v", { backgroundColor: "white" });
             
+            var cx = ${parseFloat(String(grid.cx).replace(',', '.')) || 0};
+            var cy = ${parseFloat(String(grid.cy).replace(',', '.')) || 0};
+            var cz = ${parseFloat(String(grid.cz).replace(',', '.')) || 0};
+            var sx = ${parseFloat(String(grid.sx).replace(',', '.')) || 20};
+            var sy = ${parseFloat(String(grid.sy).replace(',', '.')) || 20};
+            var sz = ${parseFloat(String(grid.sz).replace(',', '.')) || 20};
+
             var loadPromise;
             if (${isPdbId}) {
-              // Strategy A: Direct from Global PDB Database (Fastest & Safest)
               loadPromise = stage.loadFile("rcsb://${receptor.id}");
             } else {
-              // Strategy B: Base64 for custom files
               var pdbData = \`${receptor.content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;
               var blob = new Blob([pdbData], { type: 'text/plain' });
               loadPromise = stage.loadFile(blob, { ext: "pdb" });
             }
 
             loadPromise.then(function(o) {
-              o.addRepresentation("cartoon", { color: "spectrum" });
+              o.addRepresentation("cartoon", { color: "spectrum", opacity: 0.8 });
               o.autoView();
               
-              // Add Grid Box if coordinates exist
-              var cx = ${parseFloat(String(grid.cx).replace(',', '.'))};
-              var cy = ${parseFloat(String(grid.cy).replace(',', '.'))};
-              var cz = ${parseFloat(String(grid.cz).replace(',', '.'))};
-              var sx = ${parseFloat(String(grid.sx).replace(',', '.'))};
-              var sy = ${parseFloat(String(grid.sy).replace(',', '.'))};
-              var sz = ${parseFloat(String(grid.sz).replace(',', '.'))};
+              // Create the Grid Box
+              var shape = new NGL.Shape("grid");
+              // NGL addBox: position, x-vector, y-vector, z-vector, color, wireframe
+              // Vectors should be the full length of the sides
+              shape.addBox(
+                [cx, cy, cz], 
+                [sx, 0, 0], 
+                [0, sy, 0], 
+                [0, 0, sz], 
+                "yellow", 
+                true // wireframe mode
+              );
               
-              if (cx !== 0 || sx !== 20) {
-                var shape = new NGL.Shape("grid");
-                shape.addBox([cx, cy, cz], [sx, 0, 0], [0, sy, 0], [0, 0, sz], "yellow", true);
-                var shapeComp = stage.addComponentFromObject(shape);
-                shapeComp.addRepresentation("buffer", { opacity: 0.4 });
-              }
+              var shapeComp = stage.addComponentFromObject(shape);
+              shapeComp.addRepresentation("buffer", { wireframe: true, linewidth: 2 });
+              
+              // If box is far away, zoom to it
+              // stage.animationControls.zoomMove(new NGL.Vector3(cx, cy, cz), -100, 1000);
             }).catch(function(e) {
               console.error("3D Load Error:", e);
             });

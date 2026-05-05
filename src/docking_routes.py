@@ -4,15 +4,14 @@ import json
 import subprocess
 import threading
 from flask import request, jsonify, send_file
-from docking_utils import get_pdb_from_rcsb, auto_detect_pocket_from_inhibitor, clean_pdb_for_docking, prepare_ligand_pdbqt
-from rdkit import Chem
 
 # Limit concurrent docking simulations to prevent RAM/CPU exhaustion on VPS
 DOCKING_LOCK = threading.Semaphore(1)
 
 # Use a session-based workspace for docking files
 DOCKING_WORKSPACE = os.path.join(os.getcwd(), "tmp", "docking_sessions")
-os.makedirs(DOCKING_WORKSPACE, exist_ok=True)
+if not os.path.exists(DOCKING_WORKSPACE):
+    os.makedirs(DOCKING_WORKSPACE)
 
 def init_docking_routes(app):
     
@@ -20,6 +19,7 @@ def init_docking_routes(app):
     def load_receptor_by_id():
         """Downloads PDB by ID, cleans it, and auto-detects the pocket."""
         try:
+            from docking_utils import get_pdb_from_rcsb, auto_detect_pocket_from_inhibitor, clean_pdb_for_docking
             data = request.get_json()
             pdb_id = data.get("pdbId", "").upper()
             if not pdb_id or len(pdb_id) != 4:
@@ -29,16 +29,13 @@ def init_docking_routes(app):
             if not pdb_content:
                 return jsonify({"error": "Could not find PDB " + str(pdb_id) + " on RCSB"}), 404
                 
-            # Auto-detect pocket based on inhibitor (Plugin logic)
             pocket_data = auto_detect_pocket_from_inhibitor(pdb_content, pdb_id)
-            
-            # Clean PDB for simulation
             cleaned_pdb = clean_pdb_for_docking(pdb_content)
             
-            # Save cleaned PDB to session workspace
             session_id = hashlib.md5(pdb_id.encode()).hexdigest()
             session_dir = os.path.join(DOCKING_WORKSPACE, session_id)
-            os.makedirs(session_dir, exist_ok=True)
+            if not os.path.exists(session_dir):
+                os.makedirs(session_dir)
             
             pdb_path = os.path.join(session_dir, str(pdb_id) + "_cleaned.pdb")
             with open(pdb_path, "w") as f:
@@ -57,13 +54,12 @@ def init_docking_routes(app):
     @app.route("/api/docking/receptor/extract-inhibitor", methods=["POST"])
     def extract_inhibitor():
         try:
+            from docking_utils import get_pdb_from_rcsb, extract_inhibitor_smiles
             data = request.get_json()
             pdb_id = data.get("pdbId")
             res_name = data.get("resName")
             chain_id = data.get("chainId")
             
-            # Fetch PDB content
-            from docking_utils import get_pdb_from_rcsb, extract_inhibitor_smiles
             pdb_content = get_pdb_from_rcsb(pdb_id)
             if not pdb_content: return jsonify({"error": "PDB not found"}), 404
             
@@ -77,97 +73,83 @@ def init_docking_routes(app):
     @app.route("/api/docking/run", methods=["POST"])
     def run_docking():
         try:
+            from docking_utils import prepare_ligand_pdbqt, merge_receptor_ligand, calculate_ligand_efficiency
             with DOCKING_LOCK:
                 data = request.get_json()
                 receptor_path = data.get("receptorPath")
-            ligand_smiles = data.get("smiles")
-            center = data.get("center")
-            size = data.get("size")
-            
-            if not all([receptor_path, ligand_smiles, center, size]):
-                return jsonify({"error": "Missing parameters"}), 400
-            
-            from docking_utils import prepare_ligand_pdbqt
-            
-            session_dir = os.path.dirname(receptor_path)
-            receptor_pdbqt_path = receptor_path.replace(".pdb", ".pdbqt")
-            try:
-                subprocess.run(["obabel", "-ipdb", receptor_path, "-opdbqt", "-O", receptor_pdbqt_path, "-xr", "-h"], check=True)
-            except:
-                return jsonify({"error": "Failed to convert receptor to PDBQT"}), 500
-            
-            exhaustiveness = data.get("exhaustiveness", 8)
-            num_modes = data.get("numModes", 9)
-            
-            # 2. Prep ligand
-            ligand_path = os.path.join(session_dir, "ligand.pdbqt")
-            pdbqt_content, err = prepare_ligand_pdbqt(ligand_smiles)
-            if err: return jsonify({"error": "Ligand prep failed: " + str(err)}), 500
-            with open(ligand_path, "w") as f: f.write(pdbqt_content)
-            
-            # 3. Run Vina
-            output_path = os.path.join(session_dir, "output.pdbqt")
-            log_path = os.path.join(session_dir, "vina.log")
-            
-            vina_cmd = [
-                "vina", "--receptor", receptor_pdbqt_path, "--ligand", ligand_path,
-                "--center_x", str(center['x']), "--center_y", str(center['y']), "--center_z", str(center['z']),
-                "--size_x", str(size['x']), "--size_y", str(size['y']), "--size_z", str(size['z']),
-                "--out", output_path, "--exhaustiveness", str(exhaustiveness),
-                "--num_modes", str(num_modes)
-            ]
-            
-            try:
+                ligand_smiles = data.get("smiles")
+                center = data.get("center")
+                size = data.get("size")
+                
+                if not all([receptor_path, ligand_smiles, center, size]):
+                    return jsonify({"error": "Missing parameters"}), 400
+                
+                session_dir = os.path.dirname(receptor_path)
+                receptor_pdbqt_path = receptor_path.replace(".pdb", ".pdbqt")
+                try:
+                    subprocess.run(["obabel", "-ipdb", receptor_path, "-opdbqt", "-O", receptor_pdbqt_path, "-xr", "-h"], check=True)
+                except:
+                    return jsonify({"error": "Failed to convert receptor to PDBQT"}), 500
+                
+                exhaustiveness = data.get("exhaustiveness", 8)
+                num_modes = data.get("numModes", 9)
+                
+                ligand_path = os.path.join(session_dir, "ligand.pdbqt")
+                pdbqt_content, err = prepare_ligand_pdbqt(ligand_smiles)
+                if err: return jsonify({"error": "Ligand prep failed: " + str(err)}), 500
+                with open(ligand_path, "w") as f: f.write(pdbqt_content)
+                
+                output_path = os.path.join(session_dir, "output.pdbqt")
+                vina_cmd = [
+                    "vina", "--receptor", receptor_pdbqt_path, "--ligand", ligand_path,
+                    "--center_x", str(center['x']), "--center_y", str(center['y']), "--center_z", str(center['z']),
+                    "--size_x", str(size['x']), "--size_y", str(size['y']), "--size_z", str(size['z']),
+                    "--out", output_path, "--exhaustiveness", str(exhaustiveness),
+                    "--num_modes", str(num_modes)
+                ]
+                
                 result_vina = subprocess.run(vina_cmd, check=True, capture_output=True, text=True)
                 vina_output = result_vina.stdout
-            except subprocess.CalledProcessError as e:
-                return jsonify({"error": "Vina failed: " + str(e.stderr or e.stdout)}), 500
-            except FileNotFoundError:
-                return jsonify({"error": "Vina executable not found"}), 500
                 
-            scores = []
-            # Parse scores from stdout
-            lines = vina_output.splitlines()
-            capture = False
-            for line in lines:
-                if "mode |   affinity | dist from rmsd" in line: capture = True; continue
-                if capture and (line.startswith("----") or line.strip() == ""):
-                    if line.strip() == "" and len(scores) > 0: break
-                    continue
-                if capture:
-                    parts = line.split()
-                    if len(parts) >= 2:
-                        scores.append({"mode": parts[0], "affinity": parts[1]})
+                scores = []
+                lines = vina_output.splitlines()
+                capture = False
+                for line in lines:
+                    if "mode |   affinity | dist from rmsd" in line: capture = True; continue
+                    if capture and (line.startswith("----") or line.strip() == ""):
+                        if line.strip() == "" and len(scores) > 0: break
+                        continue
+                    if capture:
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            scores.append({"mode": parts[0], "affinity": parts[1]})
 
-            complex_path = os.path.join(session_dir, "complex.pdb")
-            best_pose_pdbqt = ""
-            if os.path.exists(output_path):
-                with open(output_path, "r") as f:
-                    for line in f:
-                        best_pose_pdbqt += line
-                        if line.startswith("ENDMDL"): break
-            
-            from docking_utils import merge_receptor_ligand, calculate_ligand_efficiency
-            merge_receptor_ligand(receptor_path, best_pose_pdbqt, complex_path)
-            
-            # Calculate LE
-            le = calculate_ligand_efficiency(scores[0]['affinity'], ligand_smiles) if scores else 0
-            
-            return jsonify({
-                "success": True,
-                "scores": scores,
-                "le": le,
-                "outputPdbqt": output_path,
-                "complexPath": complex_path,
-                "logPath": log_path,
-                "sessionId": os.path.basename(session_dir)
-            })
+                complex_path = os.path.join(session_dir, "complex.pdb")
+                best_pose_pdbqt = ""
+                if os.path.exists(output_path):
+                    with open(output_path, "r") as f:
+                        for line in f:
+                            best_pose_pdbqt += line
+                            if line.startswith("ENDMDL"): break
+                
+                merge_receptor_ligand(receptor_path, best_pose_pdbqt, complex_path)
+                le = calculate_ligand_efficiency(scores[0]['affinity'], ligand_smiles) if scores else 0
+                
+                return jsonify({
+                    "success": True,
+                    "scores": scores,
+                    "le": le,
+                    "outputPdbqt": output_path,
+                    "complexPath": complex_path,
+                    "sessionId": os.path.basename(session_dir)
+                })
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
     @app.route("/api/docking/analyze", methods=["POST"])
     def analyze_interactions():
         try:
+            from docking_utils import generate_2d_interaction_diagram
             data = request.get_json()
             complex_path = data.get("complexPath")
             if not complex_path or not os.path.exists(complex_path):
@@ -181,12 +163,9 @@ def init_docking_routes(app):
                 return jsonify({"error": "PLIP failed: " + str(result.stderr)}), 500
                 
             plip_data = json.loads(result.stdout)
-            
-            from docking_utils import generate_2d_interaction_diagram
             ligand_smiles = data.get("smiles", "")
             diagram_svg = generate_2d_interaction_diagram(ligand_smiles, plip_data) if ligand_smiles else None
             
-            # Manual dictionary update for old Python compatibility
             plip_data["diagram"] = diagram_svg
             return jsonify(plip_data)
         except Exception as e:
@@ -194,7 +173,6 @@ def init_docking_routes(app):
 
     @app.route("/api/docking/viewer")
     def standalone_viewer():
-        """Returns a standalone HTML page for 3D visualization."""
         pdb_id = request.args.get("pdb")
         cx = request.args.get("cx", "0")
         cy = request.args.get("cy", "0")
@@ -249,7 +227,6 @@ def init_docking_routes(app):
 
     @app.route("/api/docking/files/<session_id>/<filename>")
     def serve_docking_file(session_id, filename):
-        """Serves temporary files for the 3D viewer."""
         try:
             safe_filename = os.path.basename(filename)
             path = os.path.join(DOCKING_WORKSPACE, session_id, safe_filename)

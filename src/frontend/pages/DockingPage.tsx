@@ -261,8 +261,8 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
     }
   };
 
-  const render3D = (sdf: string, ligandSdf?: string, box?: any) => {
-    if (!sdf) return (
+  const render3D = (pdbContent: string, ligandSdf?: string, box?: any) => {
+    if (!pdbContent) return (
       <div style={{
         height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center',
         backgroundColor: colors.bg, borderRadius: radius.md, border: `1px dashed ${colors.border}`,
@@ -272,31 +272,48 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
       </div>
     );
 
-    const mainJs = btoa(sdf);
-    const ligJs = ligandSdf ? btoa(ligandSdf) : null;
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
-        <script src="https://3dmol.org/build/3Dmol-min.js"></script>
+        <script src="https://unpkg.com/ngl@2.0.0-dev.37/dist/ngl.js"></script>
+        <style>
+          body { margin: 0; padding: 0; overflow: hidden; background-color: #ffffff; }
+          #viewport { width: 100vw; height: 100vh; }
+        </style>
       </head>
-      <body style="margin:0; background:#ffffff; overflow:hidden;">
-        <div id="v" style="width:100%; height:400px;"></div>
+      <body>
+        <div id="viewport"></div>
         <script>
-          $(function() {
-            const viewer = $3Dmol.createViewer($('#v'), {backgroundColor: '#ffffff'});
-            viewer.addModel(atob("${mainJs}"), "pdb");
-            viewer.setStyle({}, {cartoon:{color:'spectrum'}});
-            ${ligJs ? `
-              viewer.addModel(atob("${ligJs}"), "sdf");
-              viewer.setStyle({model:-1}, {stick:{colorscheme:'greenCarbon'}});
-            ` : ''}
-            ${box ? `
-              viewer.addBox({center:{x:${box.cx},y:${box.cy},z:${box.cz}}, dimensions:{w:${box.sx},h:${box.sy},d:${box.sz}}, color:'green', opacity:0.3});
-            ` : ''}
-            viewer.zoomTo();
-            viewer.render();
+          document.addEventListener("DOMContentLoaded", function () {
+            var stage = new NGL.Stage("viewport", { backgroundColor: "white" });
+            
+            // Load Receptor
+            var pdbBlob = new Blob([ \`${pdbContent.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\` ], { type: 'text/plain' });
+            stage.loadFile(pdbBlob, { ext: "pdb" }).then(function (o) {
+              o.addRepresentation("cartoon", { color: "chainname" });
+              o.autoView();
+
+              // Add Grid Box if available
+              if (${box ? 'true' : 'false'}) {
+                var shape = new NGL.Shape("grid");
+                var cx = ${box?.cx || 0};
+                var cy = ${box?.cy || 0};
+                var cz = ${box?.cz || 0};
+                var sx = ${box?.sx || 20};
+                var sy = ${box?.sy || 20};
+                var sz = ${box?.sz || 20};
+                
+                // Draw box wireframe
+                shape.addBox([cx, cy, cz], [sx, 0, 0], [0, sy, 0], [0, 0, sz], "yellow", true);
+                var shapeComp = stage.addComponentFromObject(shape);
+                shapeComp.addRepresentation("buffer", { opacity: 0.4 });
+              }
+            });
+
+            window.addEventListener("resize", function () {
+              stage.handleResize();
+            });
           });
         </script>
       </body>

@@ -189,6 +189,18 @@ def init_docking_routes(app):
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/api/docking/files/<session_id>/<filename>")
+    def serve_docking_file(session_id, filename):
+        """Serves temporary files for the 3D viewer."""
+        try:
+            safe_filename = os.path.basename(filename)
+            path = os.path.join(DOCKING_WORKSPACE, session_id, safe_filename)
+            if os.path.exists(path):
+                return send_file(path)
+            return "File not found", 404
+        except:
+            return "Error serving file", 500
+
     @app.route("/api/docking/download", methods=["GET"])
     def download_docking_results():
         session_id = request.args.get("session")

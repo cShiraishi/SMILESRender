@@ -287,62 +287,81 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
     }
   };
 
-  // Robust 3D Viewer using NGL directly in the component
-  const viewportRef = React.useRef<HTMLDivElement>(null);
-  const stageRef = React.useRef<any>(null);
-
-  React.useEffect(() => {
-    if (activeTab === 'simulation' && viewportRef.current && !stageRef.current) {
-      const NGL = (window as any).NGL;
-      if (NGL) {
-        stageRef.current = new NGL.Stage(viewportRef.current, { backgroundColor: "white" });
-      }
-    }
-    return () => {
-      if (stageRef.current) {
-        stageRef.current.dispose();
-        stageRef.current = null;
-      }
-    };
-  }, [activeTab]);
-
-  React.useEffect(() => {
-    if (receptor && stageRef.current) {
-      const NGL = (window as any).NGL;
-      stageRef.current.removeAllComponents();
-      const pdbBlob = new Blob([receptor.content], { type: 'text/plain' });
-      stageRef.current.loadFile(pdbBlob, { ext: "pdb" }).then((o: any) => {
-        o.addRepresentation("cartoon", { color: "chainname" });
-        o.autoView();
-
-        // Add Grid Box
-        const shape = new NGL.Shape("grid");
-        const cx = parseFloat(String(grid.cx).replace(',', '.'));
-        const cy = parseFloat(String(grid.cy).replace(',', '.'));
-        const cz = parseFloat(String(grid.cz).replace(',', '.'));
-        const sx = parseFloat(String(grid.sx).replace(',', '.'));
-        const sy = parseFloat(String(grid.sy).replace(',', '.'));
-        const sz = parseFloat(String(grid.sz).replace(',', '.'));
-        
-        shape.addBox([cx, cy, cz], [sx, 0, 0], [0, sy, 0], [0, 0, sz], "yellow", true);
-        const shapeComp = stageRef.current.addComponentFromObject(shape);
-        shapeComp.addRepresentation("buffer", { opacity: 0.4 });
-      });
-    }
-  }, [receptor, grid]);
-
   const render3DViewer = () => {
+    if (!receptor) return (
+      <div style={{
+        height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: colors.bg, borderRadius: radius.md, border: `1px dashed ${colors.border}`,
+        color: colors.textMuted, fontSize: '14px'
+      }}>
+        No receptor loaded.
+      </div>
+    );
+
+    // Use the new file serving route
+    const sessionId = receptor.path.split(/[\/\\]/).slice(-2, -1)[0];
+    const pdbFilename = receptor.path.split(/[\/\\]/).pop();
+    const pdbUrl = `/api/docking/files/${sessionId}/${pdbFilename}`;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
+        <script src="https://3dmol.org/build/3Dmol-min.js"></script>
+      </head>
+      <body style="margin:0; padding:0; overflow:hidden; background:#ffffff;">
+        <div id="v" style="width:100vw; height:400px;"></div>
+        <script>
+          $(function() {
+            var viewer = $3Dmol.createViewer($("#v"), {backgroundColor: "white"});
+            $.get("${pdbUrl}", function(data) {
+              viewer.addModel(data, "pdb");
+              viewer.setStyle({}, {cartoon: {color: "spectrum"}});
+              
+              // Add Grid Box
+              var cx = ${parseFloat(String(grid.cx).replace(',', '.'))};
+              var cy = ${parseFloat(String(grid.cy).replace(',', '.'))};
+              var cz = ${parseFloat(String(grid.cz).replace(',', '.'))};
+              var sx = ${parseFloat(String(grid.sx).replace(',', '.'))};
+              var sy = ${parseFloat(String(grid.sy).replace(',', '.'))};
+              var sz = ${parseFloat(String(grid.sz).replace(',', '.'))};
+              
+              viewer.addBox({
+                center: {x: cx, y: cy, z: cz},
+                dimensions: {w: sx, h: sy, d: sz},
+                color: "yellow",
+                opacity: 0.4
+              });
+              
+              viewer.zoomTo();
+              viewer.render();
+            });
+          });
+        </script>
+      </body>
+      </html>
+    `;
+
     return (
-      <div 
-        ref={viewportRef} 
-        style={{ 
-          width: '100%', 
-          height: '400px', 
-          border: `1px solid ${colors.border}`, 
-          borderRadius: radius.md,
-          overflow: 'hidden'
-        }} 
-      />
+      <div>
+        <iframe 
+          srcDoc={html} 
+          style={{ width: '100%', height: '400px', border: `1px solid ${colors.border}`, borderRadius: radius.md }} 
+        />
+        <button
+          onClick={() => {
+            const win = window.open("", "_blank");
+            if (win) win.document.write(html);
+          }}
+          style={{
+            marginTop: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: 600,
+            backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: radius.md, cursor: 'pointer'
+          }}
+        >
+          <i className="bi bi-arrows-fullscreen me-2"></i> Open 3D in New Tab (Fullscreen)
+        </button>
+      </div>
     );
   };
 

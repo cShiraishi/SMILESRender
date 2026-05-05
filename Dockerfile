@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y \
     swig \
     libxml2-dev \
     libxslt1-dev \
+    && ln -s /usr/include/openbabel3 /usr/local/include/openbabel3 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY . .

@@ -27,7 +27,7 @@ def init_docking_routes(app):
                 
             pdb_content = get_pdb_from_rcsb(pdb_id)
             if not pdb_content:
-                return jsonify({"error": f"Could not find PDB {pdb_id} on RCSB"}), 404
+                return jsonify({"error": "Could not find PDB " + str(pdb_id) + " on RCSB"}), 404
                 
             # Auto-detect pocket based on inhibitor (Plugin logic)
             pocket_data = auto_detect_pocket_from_inhibitor(pdb_content, pdb_id)
@@ -40,7 +40,7 @@ def init_docking_routes(app):
             session_dir = os.path.join(DOCKING_WORKSPACE, session_id)
             os.makedirs(session_dir, exist_ok=True)
             
-            pdb_path = os.path.join(session_dir, f"{pdb_id}_cleaned.pdb")
+            pdb_path = os.path.join(session_dir, str(pdb_id) + "_cleaned.pdb")
             with open(pdb_path, "w") as f:
                 f.write(cleaned_pdb)
                 
@@ -70,7 +70,7 @@ def init_docking_routes(app):
             smiles = extract_inhibitor_smiles(pdb_content, pdb_id, res_name, chain_id)
             if not smiles: return jsonify({"error": "Failed to extract SMILES"}), 500
             
-            return jsonify({"success": True, "smiles": smiles, "name": f"Inhibitor_{res_name}"})
+            return jsonify({"success": True, "smiles": smiles, "name": "Inhibitor_" + str(res_name)})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
@@ -102,7 +102,7 @@ def init_docking_routes(app):
             # 2. Prep ligand
             ligand_path = os.path.join(session_dir, "ligand.pdbqt")
             pdbqt_content, err = prepare_ligand_pdbqt(ligand_smiles)
-            if err: return jsonify({"error": f"Ligand prep failed: {err}"}), 500
+            if err: return jsonify({"error": "Ligand prep failed: " + str(err)}), 500
             with open(ligand_path, "w") as f: f.write(pdbqt_content)
             
             # 3. Run Vina
@@ -121,7 +121,7 @@ def init_docking_routes(app):
                 result_vina = subprocess.run(vina_cmd, check=True, capture_output=True, text=True)
                 vina_output = result_vina.stdout
             except subprocess.CalledProcessError as e:
-                return jsonify({"error": f"Vina failed: {e.stderr or e.stdout}"}), 500
+                return jsonify({"error": "Vina failed: " + str(e.stderr or e.stdout)}), 500
             except FileNotFoundError:
                 return jsonify({"error": "Vina executable not found"}), 500
                 
@@ -147,7 +147,7 @@ def init_docking_routes(app):
                         best_pose_pdbqt += line
                         if line.startswith("ENDMDL"): break
             
-            from docking_utils import merge_receptor_ligand, calculate_ligand_efficiency, generate_2d_interaction_diagram
+            from docking_utils import merge_receptor_ligand, calculate_ligand_efficiency
             merge_receptor_ligand(receptor_path, best_pose_pdbqt, complex_path)
             
             # Calculate LE
@@ -178,21 +178,17 @@ def init_docking_routes(app):
             result = subprocess.run(cmd, capture_output=True, text=True)
             
             if result.returncode != 0:
-                return jsonify({"error": f"PLIP failed: {result.stderr}"}), 500
+                return jsonify({"error": "PLIP failed: " + str(result.stderr)}), 500
                 
             plip_data = json.loads(result.stdout)
             
-            # Generate 2D Diagram
-            # We need the SMILES from the session (ligand.pdbqt or just store it)
-            # For now, let's try to get it from the session directory if we had it, 
-            # but better yet, let's assume we can regenerate it or pass it.
-            # In this simple version, we'll just return the diagram if we can find the ligand info.
             from docking_utils import generate_2d_interaction_diagram
-            # We'll need to pass the SMILES here. Let's assume the frontend sends it or we fetch it.
             ligand_smiles = data.get("smiles", "")
             diagram_svg = generate_2d_interaction_diagram(ligand_smiles, plip_data) if ligand_smiles else None
             
-            return jsonify({**plip_data, "diagram": diagram_svg})
+            # Manual dictionary update for old Python compatibility
+            plip_data["diagram"] = diagram_svg
+            return jsonify(plip_data)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
@@ -207,45 +203,44 @@ def init_docking_routes(app):
         sy = request.args.get("sy", "20")
         sz = request.args.get("sz", "20")
         
-        return f"""
+        return """
         <!DOCTYPE html>
         <html>
         <head>
             <script src="https://unpkg.com/ngl@2.0.0-dev.37/dist/ngl.js"></script>
-            <style>body {{ margin: 0; padding: 0; overflow: hidden; background: white; }}</style>
+            <style>body { margin: 0; padding: 0; overflow: hidden; background: white; }</style>
         </head>
         <body>
             <div id="v" style="width:100vw; height:100vh;"></div>
             <script>
                 document.addEventListener("DOMContentLoaded", function() {
-                    var stage = new NGL.Stage("v", {{ backgroundColor: "white" }});
-                    var pdbId = "{pdb_id}";
+                    var stage = new NGL.Stage("v", { backgroundColor: "white" });
+                    var pdbId = \"""" + str(pdb_id) + """\";
                     
                     var loadPromise;
-                    if (pdbId && pdbId.length === 4) {{
+                    if (pdbId && pdbId.length === 4) {
                         loadPromise = stage.loadFile("rcsb://" + pdbId);
-                    }} else {{
-                        // Fallback or placeholder if no ID
+                    } else {
                         return;
-                    }}
+                    }
 
-                    loadPromise.then(function(o) {{
-                        o.addRepresentation("cartoon", {{ color: "spectrum", opacity: 0.8 }});
+                    loadPromise.then(function(o) {
+                        o.addRepresentation("cartoon", { color: "spectrum", opacity: 0.8 });
                         o.autoView();
                         
-                        var cx = parseFloat("{cx}");
-                        var cy = parseFloat("{cy}");
-                        var cz = parseFloat("{cz}");
-                        var sx = parseFloat("{sx}");
-                        var sy = parseFloat("{sy}");
-                        var sz = parseFloat("{sz}");
+                        var cx = parseFloat(\"""" + str(cx) + """\");
+                        var cy = parseFloat(\"""" + str(cy) + """\");
+                        var cz = parseFloat(\"""" + str(cz) + """\");
+                        var sx = parseFloat(\"""" + str(sx) + """\");
+                        var sy = parseFloat(\"""" + str(sy) + """\");
+                        var sz = parseFloat(\"""" + str(sz) + """\");
                         
                         var shape = new NGL.Shape("grid");
                         shape.addBox([cx, cy, cz], [sx, 0, 0], [0, sy, 0], [0, 0, sz], "yellow", true);
                         var shapeComp = stage.addComponentFromObject(shape);
-                        shapeComp.addRepresentation("buffer", {{ wireframe: true, linewidth: 2 }});
-                    }});
-                    window.addEventListener("resize", function() {{ stage.handleResize(); }});
+                        shapeComp.addRepresentation("buffer", { wireframe: true, linewidth: 2 });
+                    });
+                    window.addEventListener("resize", function() { stage.handleResize(); });
                 });
             </script>
         </body>
@@ -271,9 +266,9 @@ def init_docking_routes(app):
         if not os.path.exists(session_dir): return "Session not found", 404
         
         import zipfile
-        zip_path = os.path.join(DOCKING_WORKSPACE, f"results_{session_id}.zip")
+        zip_path = os.path.join(DOCKING_WORKSPACE, "results_" + str(session_id) + ".zip")
         with zipfile.ZipFile(zip_path, 'w') as zipf:
             for root, dirs, files in os.walk(session_dir):
                 for file in files:
                     zipf.write(os.path.join(root, file), file)
-        return send_file(zip_path, as_attachment=True, download_name=f"docking_results_{session_id}.zip")
+        return send_file(zip_path, as_attachment=True, download_name="docking_results_" + str(session_id) + ".zip")

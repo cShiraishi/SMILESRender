@@ -34,6 +34,8 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
   const [nameResult, setNameResult] = useState<{ smiles: string; iupac: string; mw: string } | null>(null);
   const [nameError, setNameError] = useState('');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [exhaustiveness, setExhaustiveness] = useState(8);
+  const [numModes, setNumModes] = useState(9);
 
   // Docking Simulation State
   const [receptor, setReceptor] = useState<{ id: string, path: string, content: string } | null>(null);
@@ -132,7 +134,9 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
           receptorPath: receptor.path,
           smiles: entries[idx].smiles,
           center: { x: grid.cx, y: grid.cy, z: grid.cz },
-          size: { x: grid.sx, y: grid.sy, z: grid.sz }
+          size: { x: grid.sx, y: grid.sy, z: grid.sz },
+          exhaustiveness,
+          numModes
         })
       });
       const data = await res.json();
@@ -837,10 +841,22 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                       <p style={{ fontSize: '12px', color: colors.textMuted, marginBottom: '16px' }}>
                         Selected: <b>{entries[selectedIdx]?.name || 'None'}</b>
                       </p>
-                      <button
+                      <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: colors.textMuted, marginBottom: '4px' }}>Exhaustiveness</label>
+                          <input type="number" min="1" max="64" value={exhaustiveness} onChange={e => setExhaustiveness(parseInt(e.target.value))}
+                            style={{ width: '100%', padding: '8px', border: `1px solid ${colors.border}`, borderRadius: radius.sm, fontSize: '13px' }} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: colors.textMuted, marginBottom: '4px' }}>Max Poses</label>
+                          <input type="number" min="1" max="20" value={numModes} onChange={e => setNumModes(parseInt(e.target.value))}
+                            style={{ width: '100%', padding: '8px', border: `1px solid ${colors.border}`, borderRadius: radius.sm, fontSize: '13px' }} />
+                        </div>
+                      </div>
+                      <button 
                         onClick={() => runDocking(selectedIdx)}
                         disabled={isDocking || !receptor || entries.length === 0}
-                        style={{ width: '100%', padding: '12px', backgroundColor: colors.success, color: '#fff', border: 'none', borderRadius: radius.md, fontWeight: 700, fontSize: '14px', marginBottom: '12px' }}
+                        style={{ width: '100%', padding: '12px', backgroundColor: colors.success, color: '#fff', border: 'none', borderRadius: radius.md, fontWeight: 700, fontSize: '14px', marginBottom: '12px', marginTop: '16px' }}
                       >
                         {isDocking ? 'Simulating...' : '▶ Run AutoDock Vina'}
                       </button>

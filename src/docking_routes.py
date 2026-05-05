@@ -88,26 +88,35 @@ def init_docking_routes(app):
                 return jsonify({"error": "Missing parameters"}), 400
             
             pdbqt_ligand, err = prepare_ligand_pdbqt(ligand_smiles)
-            if err: return jsonify({"error": f"Ligand prep failed: {err}"}), 500
                 
             session_dir = os.path.dirname(receptor_path)
-            ligand_path = os.path.join(session_dir, "ligand.pdbqt")
-            with open(ligand_path, "w") as f: f.write(pdbqt_ligand)
-                
             receptor_pdbqt_path = receptor_path.replace(".pdb", ".pdbqt")
             try:
                 subprocess.run(["obabel", "-ipdb", receptor_path, "-opdbqt", "-O", receptor_pdbqt_path, "-xr", "-h"], check=True)
             except:
                 return jsonify({"error": "Failed to convert receptor to PDBQT"}), 500
             
+            center = data.get("center")
+            size = data.get("size")
+            exhaustiveness = data.get("exhaustiveness", 8)
+            num_modes = data.get("numModes", 9)
+            
+            # 2. Prep ligand
+            from docking_utils import prepare_ligand_pdbqt
+            ligand_path = os.path.join(session_dir, "ligand.pdbqt")
+            success, err = prepare_ligand_pdbqt(ligand_smiles, ligand_path)
+            if not success: return jsonify({"error": f"Ligand prep failed: {err}"}), 500
+            
+            # 3. Run Vina
             output_path = os.path.join(session_dir, "output.pdbqt")
-            log_path = os.path.join(session_dir, "docking.log")
+            log_path = os.path.join(session_dir, "vina.log")
             
             vina_cmd = [
                 "vina", "--receptor", receptor_pdbqt_path, "--ligand", ligand_path,
                 "--center_x", str(center['x']), "--center_y", str(center['y']), "--center_z", str(center['z']),
                 "--size_x", str(size['x']), "--size_y", str(size['y']), "--size_z", str(size['z']),
-                "--out", output_path, "--exhaustiveness", "8"
+                "--out", output_path, "--exhaustiveness", str(exhaustiveness),
+                "--num_modes", str(num_modes)
             ]
             
             try:

@@ -87,8 +87,8 @@ def init_docking_routes(app):
             if not all([receptor_path, ligand_smiles, center, size]):
                 return jsonify({"error": "Missing parameters"}), 400
             
-            pdbqt_ligand, err = prepare_ligand_pdbqt(ligand_smiles)
-                
+            from docking_utils import prepare_ligand_pdbqt
+            
             session_dir = os.path.dirname(receptor_path)
             receptor_pdbqt_path = receptor_path.replace(".pdb", ".pdbqt")
             try:
@@ -102,7 +102,6 @@ def init_docking_routes(app):
             num_modes = data.get("numModes", 9)
             
             # 2. Prep ligand
-            from docking_utils import prepare_ligand_pdbqt
             ligand_path = os.path.join(session_dir, "ligand.pdbqt")
             success, err = prepare_ligand_pdbqt(ligand_smiles, ligand_path)
             if not success: return jsonify({"error": f"Ligand prep failed: {err}"}), 500

@@ -16,11 +16,13 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     libxml2-dev \
     libxslt1-dev \
+    && ln -s /usr/include/openbabel3 /usr/local/include/openbabel3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables for OpenBabel compilation
 ENV CFLAGS="-I/usr/include/openbabel3"
 ENV CXXFLAGS="-I/usr/include/openbabel3"
+ENV SWIG_FEATURES="-I/usr/include/openbabel3"
 
 COPY . .
 COPY --from=frontend_build /frontend/src/static/build ./src/static/build

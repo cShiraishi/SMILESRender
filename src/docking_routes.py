@@ -166,8 +166,8 @@ def init_docking_routes(app):
             if not complex_path or not os.path.exists(complex_path):
                 return jsonify({"error": "Complex file not found"}), 404
             
-            plip_script = os.path.join(os.getcwd(), "plataformadocking2", "plataformadocking2", "plip_runner.py")
-            cmd = ["python", plip_script, complex_path]
+            plip_script = os.path.join(os.getcwd(), "src", "plip_runner.py")
+            cmd = ["python3", plip_script, complex_path]
             result = subprocess.run(cmd, capture_output=True, text=True)
             
             if result.returncode != 0:

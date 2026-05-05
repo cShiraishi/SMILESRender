@@ -27,17 +27,17 @@ supported_formats = [
 ]
 
 
-def sanitize_file_name(name: str) -> str:
+def sanitize_file_name(name) :
     return re.sub(r"[^a-zA-Z0-9]", "", name).lower()
 
 
-def valid_format(format: str) -> bool:
+def valid_format(format) :
     return format.upper() in supported_formats
 
 
-def convert_smiles(smiles: str, format: str) -> BytesIO:
+def convert_smiles(smiles, format) :
     if not valid_format(format):
-        raise Exception(f"Format {format.upper()} not supported.")
+        raise Exception("Format {} not supported.".format(format.upper()))
 
     molecule = Chem.MolFromSmiles(smiles)
     image = Draw.MolToImage(molecule)
@@ -62,10 +62,10 @@ def convert_smiles(smiles: str, format: str) -> BytesIO:
     return bin_image
 
 
-def convert_many_smiles_and_zip(smiles: list[tuple[str, str, str]]) -> BytesIO:
+def convert_many_smiles_and_zip(smiles[tuple[str, str, str]]) :
     zip_file = BytesIO()
 
-    used_names_cout: dict[str, int] = {}
+    used_names_cout[str, int] = {}
 
     with zipfile.ZipFile(zip_file, "w") as zip:
         for smile, name, format in smiles:
@@ -77,18 +77,18 @@ def convert_many_smiles_and_zip(smiles: list[tuple[str, str, str]]) -> BytesIO:
 
             if name in list(used_names_cout):
                 used_names_cout[name] += 1
-                name = f"{name} {used_names_cout[name]}"
+                name = "{} {}".format(name, used_names_cout[name])
 
             used_names_cout[name] = 1
 
-            zip.writestr(f"{name}.{format.lower()}", image.getvalue())
+            zip.writestr("{}.{}".format(name, format.lower()), image.getvalue())
 
     zip_file.seek(0)
 
     return zip_file
 
 
-def create_mols_grid(smiles_list: list[str], labels: list[str] = None, mols_per_row: int = 3, sub_img_size: tuple = (300, 300), format: str = "PNG") -> BytesIO:
+def create_mols_grid(smiles_list[str], labels[str] = None, mols_per_row = 3, sub_img_size: tuple = (300, 300), format = "PNG") :
     mols = []
     legends = []
     for i, smi in enumerate(smiles_list):
@@ -98,7 +98,7 @@ def create_mols_grid(smiles_list: list[str], labels: list[str] = None, mols_per_
             if labels and i < len(labels):
                 legends.append(labels[i])
             else:
-                legends.append(f"Compound {i+1}")
+                legends.append("Compound {}".format(i+1))
     
     img = Draw.MolsToGridImage(
         mols, 

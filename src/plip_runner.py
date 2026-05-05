@@ -24,13 +24,13 @@ def run_plip(pdb_file):
             # Map PLIP objects to serializable dicts
             for hbond in is_set.hbonds:
                 interactions["hbonds"].append({
-                    "residue": f"{hbond.resname}{hbond.resnr}",
+                    "residue": "{}{}".format(hbond.resname, hbond.resnr),
                     "dist": round(hbond.distance_ad, 2),
                     "type": "H-Bond"
                 })
             for hydro in is_set.hydrophobic_contacts:
                 interactions["hydrophobic"].append({
-                    "residue": f"{hydro.resname}{hydro.resnr}",
+                    "residue": "{}{}".format(hydro.resname, hydro.resnr),
                     "dist": round(hydro.distance, 2),
                     "type": "Hydrophobic"
                 })

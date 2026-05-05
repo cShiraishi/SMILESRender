@@ -3,7 +3,7 @@ import csv
 from io import TextIOWrapper
 
 
-def micro_hash(input: str):
+def micro_hash(input):
     hash_object = hashlib.sha1(input.encode())
     short_hash = int.from_bytes(hash_object.digest()[:3], "big")
 
@@ -19,10 +19,10 @@ def micro_hash(input: str):
 
 def read_csv(
     file: TextIOWrapper,
-    delimiter: str,
-    smiles_column: str,
-    names_column: str | None = None,
-) -> list[tuple[str, str]]:
+    delimiter,
+    smiles_column,
+    names_column | None = None,
+) :
     csv_data = csv.DictReader(file, delimiter=delimiter)
 
     if not csv_data:
@@ -30,15 +30,15 @@ def read_csv(
 
     if csv_data.fieldnames is not None:
         if smiles_column not in csv_data.fieldnames:
-            raise Exception(f"{smiles_column} column not found")
+            raise Exception("{} column not found".format(smiles_column))
         if names_column is not None:
             if names_column not in csv_data.fieldnames:
-                raise Exception(f"{names_column} column not found")
+                raise Exception("{} column not found".format(names_column))
     else:
         raise Exception("Could not read csv file")
 
-    smiles: list[str] = []
-    names: list[str] = []
+    smiles[str] = []
+    names[str] = []
 
     for row in csv_data:
         smiles.append(row[smiles_column].strip())

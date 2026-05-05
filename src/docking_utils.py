@@ -13,7 +13,7 @@ def get_rcsb_ligands(pdb_id):
     """
     url = "https://data.rcsb.org/graphql"
     query = {
-        "query": f"""
+        "query": """
         {{
           entry(entry_id: "{pdb_id.upper()}") {{
             nonpolymer_entities {{
@@ -50,7 +50,7 @@ def get_rcsb_ligands(pdb_id):
 
 def get_pdb_from_rcsb(pdb_id):
     """Fetches PDB file content from RCSB."""
-    url = f"https://files.rcsb.org/download/{pdb_id.upper()}.pdb"
+    url = "https://files.rcsb.org/download/{}.pdb".format(pdb_id.upper())
     try:
         resp = requests.get(url)
         if resp.ok:
@@ -87,7 +87,7 @@ def auto_detect_pocket_from_inhibitor(pdb_content, pdb_id):
                     except: continue
 
         if not coords:
-            return {"success": False, "error": f"Could not find coordinates for ligand {target_lig['id']}"}
+            return {"success": False, "error": "Could not find coordinates for ligand {}".format(target_lig['id'])}
 
         # 3. Calculate Centroid (Arithmetic Mean)
         xs = [c[0] for c in coords]
@@ -177,7 +177,7 @@ def generate_2d_interaction_diagram(ligand_smiles, plip_data):
             for item in interactions.get(itype, []):
                 # Try to find the ligand atom index (PLIP uses PDB indices, we need RDKit indices)
                 # For simplicity in this version, we'll annotate based on the residue name
-                res_info = f"{item.get('residue', 'RES')}"
+                res_info = "{}".format(item.get('residue', 'RES'))
                 annotations.append(res_info)
 
         # Draw the molecule
@@ -199,7 +199,7 @@ def extract_inhibitor_smiles(pdb_content, pdb_id, res_name, chain_id):
     """Extracts a ligand from PDB and converts to SMILES for redocking."""
     try:
         # Save temp pdb of just the ligand
-        temp_ligand_pdb = f"tmp_lig_{pdb_id}_{res_name}.pdb"
+        temp_ligand_pdb = "tmp_lig_{}_{}.pdb".format(pdb_id, res_name)
         with open(temp_ligand_pdb, "w") as f:
             for line in pdb_content.splitlines():
                 if line.startswith(("HETATM", "ATOM")):

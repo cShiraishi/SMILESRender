@@ -23,7 +23,7 @@ def predict_tool_task(tool_name, smiles_b64):
     
     # Use the same logic from routes.py for each tool
     urls = {
-        "stoptox": f"https://stoptox.mml.unc.edu/predict?smiles={decoded_smiles}",
+        "stoptox": "https://stoptox.mml.unc.edu/predict?smiles={}".format(decoded_smiles),
     }
     
     try:

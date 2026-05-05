@@ -18,14 +18,14 @@ _TAUT_ENUM    = rdMolStandardize.TautomerEnumerator()
 
 @dataclass
 class MolEntry:
-    name:    str
-    smiles:  str
-    sdf_3d:  str        = ""
-    energy:  float|None = None
-    ff_used: str        = ""
-    status:  str        = "pending"
-    error:   str        = ""
-    props:   dict       = field(default_factory=dict)
+    name
+    smiles
+    sdf_3d = ""
+    energy|None = None
+    ff_used = ""
+    status = "pending"
+    error = ""
+    props = field(default_factory=dict)
 
     def to_dict(self):
         return asdict(self)
@@ -49,7 +49,7 @@ def compute_descriptors(mol):
     rotb = rdMolDescriptors.CalcNumRotatableBonds(mol)
     
     lip_viol = int(mw > 500) + int(logp > 5) + int(hbd > 5) + int(hba > 10)
-    lip_ro5  = "Pass" if lip_viol == 0 else f"Fail ({lip_viol})"
+    lip_ro5  = "Pass" if lip_viol == 0 else "Fail ({})".format(lip_viol)
 
     return {
         "ExactMW": round(mw, 3),
@@ -122,7 +122,7 @@ def create_export_zip(entries, format="pdbqt"):
             for e in entries:
                 if e.get('status') == "ok" and e.get('sdf_3d'):
                     pdbqt = convert_to_pdbqt(e['sdf_3d'], e['name'])
-                    if pdbqt: zf.writestr(f"{e['name']}.pdbqt", pdbqt)
+                    if pdbqt: zf.writestr("{}.pdbqt".format(e['name']), pdbqt)
         elif format == "sdf":
             sdf_all = ""
             for e in entries:

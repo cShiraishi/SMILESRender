@@ -133,10 +133,18 @@ def prepare_ligand_pdbqt(smiles):
     """Converts SMILES to PDBQT using RDKit and Meeko."""
     try:
         from meeko import MoleculePreparation
-        mol = Chem.MolFromSmiles(smiles)
-        if not mol: return None, "Invalid SMILES"
+        # Strip potential name after whitespace
+        clean_smiles = smiles.split()[0] if smiles else ""
+        mol = Chem.MolFromSmiles(clean_smiles)
+        if not mol: 
+            return None, f"Invalid SMILES: {clean_smiles}"
+        
         mol = Chem.AddHs(mol)
-        AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+        if AllChem.EmbedMolecule(mol, AllChem.ETKDG()) == -1:
+            # Fallback for complex molecules
+            AllChem.Compute2DCoords(mol)
+            AllChem.EmbedMolecule(mol, AllChem.ETKDG(), ignoreStero=True)
+            
         AllChem.MMFFOptimizeMolecule(mol)
         preparator = MoleculePreparation()
         preparator.prepare(mol)
@@ -287,23 +295,45 @@ def generate_2d_interaction_diagram(ligand_smiles, plip_data):
 def extract_inhibitor_smiles(pdb_content, pdb_id, res_name, chain_id):
     """Extracts a ligand from PDB and converts to SMILES for redocking."""
     try:
+        if not res_name: return None
+        res_name = res_name.strip().upper()
+        chain_id = chain_id.strip().upper() if chain_id else None
+
         # Save temp pdb of just the ligand
         temp_ligand_pdb = "tmp_lig_{}_{}.pdb".format(pdb_id, res_name)
+        found_atoms = 0
         with open(temp_ligand_pdb, "w") as f:
             for line in pdb_content.splitlines():
                 if line.startswith(("HETATM", "ATOM")):
-                    rn = line[17:20].strip()
-                    cid = line[21:22].strip()
-                    if rn == res_name and cid == chain_id:
-                        f.write(line + "\n")
+                    rn = line[17:20].strip().upper()
+                    cid = line[21:22].strip().upper()
+                    if rn == res_name:
+                        # If chain_id is provided, it must match. If not, we take the first chain we find.
+                        if not chain_id or cid == chain_id:
+                            f.write(line + "\n")
+                            found_atoms += 1
         
+        if found_atoms == 0:
+            if os.path.exists(temp_ligand_pdb): os.remove(temp_ligand_pdb)
+            return None
+
         # Convert PDB to SMILES using OpenBabel
+        # Use -px to add hydrogens if missing (sometimes helpful)
         result = subprocess.run(["obabel", "-ipdb", temp_ligand_pdb, "-osmi"], capture_output=True, text=True)
         if os.path.exists(temp_ligand_pdb): os.remove(temp_ligand_pdb)
         
-        smiles = result.stdout.split()[0] if result.stdout else None
-        return smiles
-    except:
+        if not result.stdout: return None
+        
+        smiles = result.stdout.split()[0] # Take first part (SMILES)
+        
+        # Sanitize with RDKit to be sure it's valid
+        from rdkit import Chem
+        mol = Chem.MolFromSmiles(smiles)
+        if mol:
+            return Chem.MolToSmiles(mol)
+        return smiles # Fallback to raw smiles
+    except Exception as e:
+        print(f"Extraction error: {e}")
         return None
 
 def _pdbqt_to_hetatm_lines(pdbqt_content, res_name="LIG", chain="Z"):

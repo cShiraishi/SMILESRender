@@ -38,7 +38,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
   const [numModes, setNumModes] = useState(9);
 
   // Docking Simulation State
-  const [receptor, setReceptor] = useState<{ id: string, path: string, content: string } | null>(null);
+  const [receptor, setReceptor] = useState<{ id: string, path: string, content: string, pocket?: any } | null>(null);
   const [isLoadingReceptor, setIsLoadingReceptor] = useState(false);
   const [grid, setGrid] = useState({ cx: 0, cy: 0, cz: 0, sx: 20, sy: 20, sz: 20 });
   const [dockingResults, setDockingResults] = useState<any[]>([]);
@@ -106,6 +106,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
       setIsLoadingReceptor(false);
     }
   };
+
   const handleAddInhibitorForRedocking = async () => {
     if (!receptor || !receptor.pocket?.inhibitor) return;
     try {
@@ -254,48 +255,10 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
         handleLoad(formattedStr);
         setInputMode('smiles');
       } catch (err) {
-        alert("Failed to parse CSV file.");
+        alert('Error parsing CSV');
       }
     };
     reader.readAsText(file);
-    e.target.value = '';
-  };
-
-  const handlePrepare = async () => {
-    setIsPreparing(true);
-    try {
-      const res = await fetch('/api/libprep/prepare', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entries, config })
-      });
-      const data = await res.json();
-      setEntries(data);
-    } catch (err) {
-      alert('Error preparing library');
-    } finally {
-      setIsPreparing(false);
-    }
-  };
-
-  const handleExport = async (format: string) => {
-    try {
-      const res = await fetch('/api/libprep/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entries, format })
-      });
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `library_export_${format}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    } catch (err) {
-      alert('Error exporting library');
-    }
   };
 
   const render3DViewer = () => {
@@ -356,154 +319,84 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
       accentColor="#14b8a6"
       onBack={onBack}
     >
-      <MoleculeDrawerModal
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        onApply={(smiles) => appendSmiles(smiles, 'drawn')}
-      />
-
-      <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '30px' }}>
         {/* Sidebar */}
         <div style={{ flex: '0 0 320px' }}>
-          <div style={{ backgroundColor: colors.surface, padding: '24px', borderRadius: radius.lg, boxShadow: shadow.md, border: `1px solid ${colors.border}` }}>
-            <h6 style={{ fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: radius.lg, padding: '24px', boxShadow: shadow.sm, border: `1px solid ${colors.border}` }}>
+            <h6 style={{ fontWeight: 700, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <i className="bi bi-folder2-open" style={{ color: '#14b8a6' }}></i> Load Library
             </h6>
 
-            {/* Input mode switcher */}
-            <div style={{ display: 'flex', gap: '4px', marginBottom: '14px', backgroundColor: colors.bg, padding: '4px', borderRadius: radius.md }}>
+            <div style={{ display: 'flex', gap: '4px', backgroundColor: colors.bg, padding: '4px', borderRadius: radius.md, marginBottom: '20px' }}>
               {inputModeBtn('smiles', 'bi-code', 'SMILES')}
-              {inputModeBtn('csv', 'bi-file-earmark-spreadsheet', 'CSV/Excel')}
+              {inputModeBtn('csv', 'bi-file-earmark-excel', 'CSV/Excel')}
               {inputModeBtn('name', 'bi-search', 'Name')}
               {inputModeBtn('draw', 'bi-pencil', 'Draw')}
             </div>
 
-            {/* SMILES mode */}
+            {/* SMILES Input */}
             {inputMode === 'smiles' && (
-              <>
+              <div style={{ marginBottom: '24px' }}>
                 <textarea
-                  style={{
-                    width: '100%', padding: '12px', borderRadius: radius.md, border: `1px solid ${colors.border}`,
-                    fontSize: '13px', fontFamily: 'monospace', marginBottom: '12px', minHeight: '140px', outline: 'none',
-                    resize: 'vertical'
-                  }}
-                  placeholder={"Paste SMILES (one per line)\nOptional: SMILES name"}
                   value={inputText}
                   onChange={e => setInputText(e.target.value)}
+                  placeholder="Enter SMILES (one per line)..."
+                  style={{ width: '100%', height: '140px', padding: '12px', borderRadius: radius.md, border: `1px solid ${colors.border}`, fontSize: '13px', fontFamily: font.mono, marginBottom: '12px', resize: 'vertical' }}
                 />
                 <button
-                  style={{
-                    width: '100%', padding: '10px', backgroundColor: colors.blue, color: '#fff', border: 'none',
-                    borderRadius: radius.md, fontWeight: 600, cursor: 'pointer', marginBottom: '24px'
-                  }}
+                  style={{ width: '100%', padding: '10px', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: radius.md, fontWeight: 700, cursor: 'pointer' }}
                   onClick={() => handleLoad()}
                 >
                   Load SMILES
                 </button>
-              </>
-            )}
-
-            {inputMode === 'csv' && (
-              <div style={{ marginBottom: '24px' }}>
-                <div
-                  style={{
-                    padding: '32px 16px', backgroundColor: colors.bg, borderRadius: radius.lg,
-                    border: `2px dashed ${colors.border}`, marginBottom: '16px', cursor: 'pointer',
-                    textAlign: 'center', transition: 'all 0.2s'
-                  }}
-                  onMouseOver={e => e.currentTarget.style.borderColor = '#14b8a6'}
-                  onMouseOut={e => e.currentTarget.style.borderColor = colors.border}
-                  onClick={() => document.getElementById('csv-file-input')?.click()}
-                >
-                  <i className="bi bi-file-earmark-arrow-up" style={{ fontSize: '32px', color: '#14b8a6', display: 'block', marginBottom: '8px' }}></i>
-                  <p style={{ fontSize: '13px', fontWeight: 700, color: colors.navy, marginBottom: '4px' }}>Upload Molecule Library</p>
-                  <p style={{ fontSize: '11px', color: colors.textMuted, marginBottom: '16px' }}>
-                    Supports <b>.csv, .txt, .smi</b><br />
-                    Auto-detects SMILES and Names
-                  </p>
-                  <button
-                    style={{
-                      padding: '8px 20px', backgroundColor: '#14b8a6', color: '#fff', border: 'none',
-                      borderRadius: radius.md, fontWeight: 700, cursor: 'pointer', fontSize: '12px'
-                    }}
-                  >
-                    Browse Files
-                  </button>
-                  <input
-                    id="csv-file-input"
-                    type="file"
-                    accept=".csv,.txt,.smi"
-                    style={{ display: 'none' }}
-                    onChange={handleCSVUpload}
-                  />
-                </div>
-
-                {inputText && (
-                  <div style={{
-                    padding: '12px', backgroundColor: '#f0fdf4', borderRadius: radius.md,
-                    border: '1px solid #bbf7d0', fontSize: '12px', color: '#166534'
-                  }}>
-                    <div style={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span><i className="bi bi-check-circle-fill" style={{ marginRight: '6px' }}></i> File loaded</span>
-                      <span>{inputText.trim().split('\n').length} mols</span>
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#15803d', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {inputText.split('\n')[0]}...
-                    </div>
-                    <button
-                      onClick={() => handleLoad()}
-                      style={{
-                        width: '100%', marginTop: '10px', padding: '8px',
-                        backgroundColor: '#166534', color: '#fff', border: 'none',
-                        borderRadius: '6px', fontWeight: 600, cursor: 'pointer', fontSize: '11px'
-                      }}
-                    >
-                      Process Now
-                    </button>
-                  </div>
-                )}
               </div>
             )}
+
+            {/* CSV mode */}
+            {inputMode === 'csv' && (
+              <div style={{ marginBottom: '24px', textAlign: 'center' }}>
+                <div style={{
+                  padding: '32px 16px', backgroundColor: colors.bg, borderRadius: radius.md,
+                  border: `2px dashed ${colors.border}`, marginBottom: '12px', cursor: 'pointer'
+                }} onClick={() => document.getElementById('csv-upload')?.click()}>
+                  <i className="bi bi-cloud-upload" style={{ fontSize: '36px', color: '#14b8a6', display: 'block', marginBottom: '12px' }}></i>
+                  <p style={{ fontSize: '13px', fontWeight: 600, margin: 0 }}>Click to Upload CSV</p>
+                  <p style={{ fontSize: '11px', color: colors.textMuted, marginTop: '4px' }}>Supports SMILES and Name columns</p>
+                  <input id="csv-upload" type="file" accept=".csv,.xlsx,.xls" hidden onChange={handleCSVUpload} />
+                </div>
+              </div>
+            )}
+
+            {/* Name search mode */}
             {inputMode === 'name' && (
               <div style={{ marginBottom: '24px' }}>
-                <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                   <input
                     type="text"
                     value={nameQuery}
-                    onChange={e => { setNameQuery(e.target.value); setNameError(''); setNameResult(null); }}
+                    onChange={e => setNameQuery(e.target.value)}
+                    placeholder="Molecule Name (e.g. Aspirin)"
+                    style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border}`, fontSize: '13px' }}
                     onKeyDown={e => e.key === 'Enter' && handleNameSearch()}
-                    placeholder="e.g. aspirin, ibuprofen..."
-                    style={{
-                      flex: 1, padding: '9px 12px', borderRadius: radius.md, border: `1px solid ${colors.border}`,
-                      fontSize: '13px', outline: 'none'
-                    }}
                   />
                   <button
                     onClick={handleNameSearch}
-                    disabled={isSearching || !nameQuery.trim()}
-                    style={{
-                      padding: '9px 14px', backgroundColor: '#14b8a6', color: '#fff', border: 'none',
-                      borderRadius: radius.md, fontWeight: 600, cursor: 'pointer', flexShrink: 0
-                    }}
+                    disabled={isSearching}
+                    style={{ padding: '10px', backgroundColor: colors.navy, color: '#fff', border: 'none', borderRadius: radius.md, cursor: 'pointer' }}
                   >
                     {isSearching ? <span className="spinner-border spinner-border-sm"></span> : <i className="bi bi-search"></i>}
                   </button>
                 </div>
 
-                {nameError && (
-                  <div style={{ padding: '10px 12px', backgroundColor: '#fef2f2', borderRadius: radius.md, fontSize: '12px', color: colors.danger, marginBottom: '8px' }}>
-                    <i className="bi bi-exclamation-triangle-fill" style={{ marginRight: '6px' }}></i>{nameError}
-                  </div>
-                )}
+                {nameError && <div style={{ fontSize: '11px', color: colors.danger, marginBottom: '10px' }}>{nameError}</div>}
 
                 {nameResult && (
-                  <div style={{ padding: '12px', backgroundColor: '#f0fdf4', borderRadius: radius.md, border: `1px solid #bbf7d0`, fontSize: '12px' }}>
-                    <div style={{ fontWeight: 700, color: colors.navy, marginBottom: '4px' }}>{nameResult.iupac}</div>
-                    <div style={{ fontFamily: 'monospace', color: colors.textMuted, marginBottom: '4px', wordBreak: 'break-all' }}>{nameResult.smiles}</div>
-                    {nameResult.mw && <div style={{ color: colors.textMuted }}>MW: {nameResult.mw} Da</div>}
+                  <div style={{ padding: '12px', backgroundColor: '#f0fdfa', border: '1px solid #5eead4', borderRadius: radius.md }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>{nameResult.iupac}</div>
+                    <div style={{ fontSize: '11px', color: colors.textMuted, wordBreak: 'break-all', marginBottom: '8px' }}>{nameResult.smiles}</div>
                     <button
                       onClick={() => {
-                        appendSmiles(nameResult!.smiles, nameResult!.iupac);
+                        appendSmiles(nameResult.smiles, nameQuery.trim());
                         setNameQuery('');
                         setNameResult(null);
                       }}
@@ -605,101 +498,72 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
               </select>
             </div>
             <button
-              style={{
-                width: '100%', padding: '12px', backgroundColor: isPreparing ? colors.textMuted : colors.success, color: '#fff',
-                border: 'none', borderRadius: radius.md, fontWeight: 700, cursor: isPreparing ? 'default' : 'pointer', marginBottom: '24px'
-              }}
-              onClick={handlePrepare}
-              disabled={isPreparing || entries.length === 0}
+              onClick={() => setIsPreparing(true)}
+              style={{ width: '100%', padding: '12px', backgroundColor: colors.success, color: '#fff', border: 'none', borderRadius: radius.md, fontWeight: 700 }}
             >
-              {isPreparing ? (
-                <><span className="spinner-border spinner-border-sm me-2"></span> Preparing...</>
-              ) : '▶ Prepare Library'}
+              <i className="bi bi-play-fill" style={{ marginRight: '6px' }}></i> Prepare Library
             </button>
+          </div>
 
-            <div style={{ height: '1px', backgroundColor: colors.border, margin: '0 -24px 24px' }}></div>
-
-            <h6 style={{ fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: radius.lg, padding: '24px', boxShadow: shadow.sm, border: `1px solid ${colors.border}`, marginTop: '24px' }}>
+            <h6 style={{ fontWeight: 700, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <i className="bi bi-download" style={{ color: colors.blue }}></i> Export
             </h6>
-            <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
-              <button
-                style={{
-                  padding: '8px', backgroundColor: '#f8fafc', color: colors.text, border: `1px solid ${colors.border}`,
-                  borderRadius: radius.md, fontSize: '12px', fontWeight: 600, cursor: 'pointer'
-                }}
-                onClick={() => handleExport('pdbqt')}
-              >
-                PDBQT ZIP (Docking)
-              </button>
-              <button
-                style={{
-                  padding: '8px', backgroundColor: '#f8fafc', color: colors.text, border: `1px solid ${colors.border}`,
-                  borderRadius: radius.md, fontSize: '12px', fontWeight: 600, cursor: 'pointer'
-                }}
-                onClick={() => handleExport('sdf')}
-              >
-                SDF (3D Library)
-              </button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <button style={{ padding: '8px', borderRadius: radius.md, border: `1px solid ${colors.border}`, fontSize: '12px', cursor: 'pointer' }}>CSV (Meta)</button>
+              <button style={{ padding: '8px', borderRadius: radius.md, border: `1px solid ${colors.border}`, fontSize: '12px', cursor: 'pointer' }}>SDF (3D Lib)</button>
             </div>
           </div>
         </div>
 
-        {/* Main Content */}
-        <div style={{ flex: 1, minWidth: '400px' }}>
-          <div style={{ display: 'flex', gap: '4px', marginBottom: '16px' }}>
-            {['overview', 'simulation'].map((tab: any) => (
+        {/* Main Content Area */}
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+            {['overview', 'simulation'].map(tab => (
               <button
                 key={tab}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => setActiveTab(tab as any)}
                 style={{
-                  padding: '8px 20px', border: 'none', borderRadius: '20px', fontSize: '13px', fontWeight: 700,
+                  padding: '8px 24px', borderRadius: '100px', border: 'none', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
                   backgroundColor: activeTab === tab ? colors.navy : 'transparent',
-                  color: activeTab === tab ? '#fff' : colors.textMuted,
-                  transition: 'all 0.2s ease', textTransform: 'capitalize'
+                  color: activeTab === tab ? '#fff' : colors.textMuted
                 }}
               >
-                {tab}
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </div>
 
-          <div style={{ backgroundColor: colors.surface, padding: '32px', borderRadius: radius.lg, boxShadow: shadow.lg, border: `1px solid ${colors.border}`, minHeight: '500px' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: radius.lg, padding: '24px', boxShadow: shadow.sm, border: `1px solid ${colors.border}`, minHeight: '600px' }}>
             {activeTab === 'overview' && (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
-                    <tr style={{ borderBottom: `2px solid ${colors.borderLight}`, textAlign: 'left' }}>
-                      <th style={{ padding: '12px', color: colors.textMuted }}>Name</th>
-                      <th style={{ padding: '12px', color: colors.textMuted }}>Status</th>
-                      <th style={{ padding: '12px', color: colors.textMuted }}>SMILES</th>
-                      <th style={{ padding: '12px', color: colors.textMuted }}>MW</th>
-                      <th style={{ padding: '12px', color: colors.textMuted }}>LogP</th>
-                      <th style={{ padding: '12px', color: colors.textMuted }}>Ro5</th>
+                    <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}` }}>
+                      <th style={{ padding: '12px' }}>Molecule</th>
+                      <th style={{ padding: '12px' }}>SMILES</th>
+                      <th style={{ padding: '12px' }}>Status</th>
+                      <th style={{ padding: '12px' }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {entries.map((e, i) => (
-                      <tr key={i}
-                        onClick={() => { setSelectedIdx(i); setActiveTab('simulation'); }}
-                        style={{ borderBottom: `1px solid ${colors.borderLight}`, cursor: 'pointer', backgroundColor: selectedIdx === i ? '#f0f9ff' : 'transparent' }}
-                      >
-                        <td style={{ padding: '12px', fontWeight: 600 }}>{e.name}</td>
+                    {entries.map((m, i) => (
+                      <tr key={i} style={{ borderBottom: `1px solid ${colors.bg}`, backgroundColor: selectedIdx === i ? '#f0f9ff' : 'transparent' }}>
+                        <td style={{ padding: '12px', fontWeight: 600 }}>{m.name || `mol_${i + 1}`}</td>
+                        <td style={{ padding: '12px', color: colors.textMuted, maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.smiles}</td>
                         <td style={{ padding: '12px' }}>
-                          <span style={{
-                            padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase',
-                            backgroundColor: e.status === 'ok' ? colors.successBg : e.status === 'pending' ? colors.bg : colors.dangerBg,
-                            color: e.status === 'ok' ? colors.success : e.status === 'pending' ? colors.textMuted : colors.danger
-                          }}>
-                            {e.status}
+                          <span style={{ padding: '4px 8px', borderRadius: '100px', fontSize: '11px', fontWeight: 700, backgroundColor: m.status === 'ok' ? colors.successBg : colors.bg, color: m.status === 'ok' ? colors.success : colors.textLight }}>
+                            {m.status.toUpperCase()}
                           </span>
                         </td>
-                        <td style={{ padding: '12px', color: colors.textMuted, fontFamily: 'monospace', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {e.smiles}
+                        <td style={{ padding: '12px' }}>
+                          <button
+                            onClick={() => { setSelectedIdx(i); setActiveTab('simulation'); }}
+                            style={{ padding: '4px 10px', borderRadius: radius.sm, border: `1px solid ${colors.border}`, backgroundColor: '#fff', cursor: 'pointer' }}
+                          >
+                            Docking
+                          </button>
                         </td>
-                        <td style={{ padding: '12px' }}>{e.props?.ExactMW || '-'}</td>
-                        <td style={{ padding: '12px' }}>{e.props?.LogP || '-'}</td>
-                        <td style={{ padding: '12px' }}>{e.props?.Lipinski_Ro5 || '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -718,20 +582,20 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                 <div style={{ display: 'flex', gap: '20px', marginBottom: '24px', alignItems: 'flex-end' }}>
                   <div style={{ flex: 1 }}>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>Receptor PDB ID</label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                       <input
                         id="pdb-id-input"
                         type="text"
-                        placeholder="e.g. 5KIR"
-                        style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border}` }}
+                        placeholder="PDB ID (e.g. 5KIR)"
+                        style={{ flex: '1 1 150px', padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border}` }}
                         onKeyDown={e => e.key === 'Enter' && handleLoadReceptor(e.currentTarget.value)}
                       />
                       <input
                         type="text"
-                        placeholder="Ligand ID (e.g. RCX)"
+                        placeholder="Ligand (e.g. RCX)"
                         value={targetLigand}
                         onChange={e => setTargetLigand(e.target.value.toUpperCase())}
-                        style={{ width: '150px', padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border}` }}
+                        style={{ width: '130px', padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border}` }}
                       />
                       <input
                         type="text"
@@ -743,7 +607,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                       <button
                         onClick={() => handleLoadReceptor((document.getElementById('pdb-id-input') as HTMLInputElement).value)}
                         disabled={isLoadingReceptor}
-                        style={{ padding: '10px 20px', backgroundColor: colors.navy, color: '#fff', border: 'none', borderRadius: radius.md, fontWeight: 700 }}
+                        style={{ padding: '10px 20px', backgroundColor: colors.navy, color: '#fff', border: 'none', borderRadius: radius.md, fontWeight: 700, whiteSpace: 'nowrap' }}
                       >
                         {isLoadingReceptor ? 'Loading...' : 'Fetch Receptor'}
                       </button>
@@ -885,23 +749,9 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                           <h6 style={{ fontWeight: 700, fontSize: '12px', marginBottom: '10px' }}>Structural Interactions</h6>
                           {plipData.interactions.hbonds.length > 0 && (
                             <div style={{ marginBottom: '10px' }}>
-                              <p style={{ fontSize: '10px', fontWeight: 700, color: colors.success, marginBottom: '4px' }}>Hydrogen Bonds</p>
+                              <p style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: colors.danger }}>Hydrogen Bonds</p>
                               {plipData.interactions.hbonds.map((h: any, i: number) => (
-                                <div key={i} style={{ fontSize: '10px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', padding: '2px 0' }}>
-                                  <span>{h.residue}</span>
-                                  <span>{h.dist} Å</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {plipData.interactions.hydrophobic.length > 0 && (
-                            <div>
-                              <p style={{ fontSize: '10px', fontWeight: 700, color: colors.navy, marginBottom: '4px' }}>Hydrophobic</p>
-                              {plipData.interactions.hydrophobic.map((h: any, i: number) => (
-                                <div key={i} style={{ fontSize: '10px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', padding: '2px 0' }}>
-                                  <span>{h.residue}</span>
-                                  <span>{h.dist} Å</span>
-                                </div>
+                                <div key={i} style={{ fontSize: '10px', color: colors.textMuted }}>• {h.residue} ({h.distance}Å)</div>
                               ))}
                             </div>
                           )}
@@ -915,6 +765,15 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
           </div>
         </div>
       </div>
+
+      <MoleculeDrawerModal
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        onSave={(smiles) => {
+          appendSmiles(smiles, 'Drawn Molecule');
+          setIsDrawerOpen(false);
+        }}
+      />
     </PageShell>
   );
 };

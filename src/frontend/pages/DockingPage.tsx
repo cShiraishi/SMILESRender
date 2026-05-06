@@ -254,6 +254,174 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
     window.location.href = `/api/docking/download?session=${sessionInfo.sessionId}`;
   };
 
+  const handleSetControl = (idx: number) => {
+    setControlIdx(prev => prev === idx ? null : idx);
+    setAccumulated(prev => prev.map((r, i) => ({ ...r, isControl: i === idx && controlIdx !== idx })));
+  };
+
+  const handleDownloadReport = () => {
+    if (accumulated.length === 0) { alert('No docking results to export. Run docking for at least one molecule first.'); return; }
+    const ctrl = accumulated.find(r => r.isControl);
+    const ctrlAff = ctrl ? parseFloat(ctrl.affinity) : null;
+    const date = new Date().toLocaleDateString('pt-BR');
+
+    const rowColor = (aff: string) => {
+      if (!ctrlAff) return '#fff';
+      const d = parseFloat(aff) - ctrlAff;
+      if (d < -0.5) return '#f0fdf4';
+      if (d > 0.5) return '#fff7f7';
+      return '#fffbeb';
+    };
+    const badge = (aff: string) => {
+      if (!ctrlAff) return '';
+      const d = parseFloat(aff) - ctrlAff;
+      const pct = Math.abs(d / ctrlAff * 100).toFixed(1);
+      if (d < -0.1) return `<span style="color:#16a34a;font-weight:700">▲ ${pct}% better</span>`;
+      if (d > 0.1) return `<span style="color:#dc2626;font-weight:700">▼ ${pct}% worse</span>`;
+      return `<span style="color:#92400e">≈ similar</span>`;
+    };
+
+    const tableRows = accumulated.map((r, i) => {
+      const hb = r.plipData?.interactions?.hbonds?.length ?? '—';
+      const hp = r.plipData?.interactions?.hydrophobic?.length ?? '—';
+      const pi = r.plipData?.interactions?.pi_stacking?.length ?? '—';
+      const delta = ctrlAff && !r.isControl ? (parseFloat(r.affinity) - ctrlAff).toFixed(2) : '—';
+      const ki = r.plipData?.ki || '—';
+      const ctrl_label = r.isControl ? '<span class="badge-control">REFERENCE</span>' : '';
+      
+      return `<tr style="background:${rowColor(r.affinity)}">
+        <td style="padding:12px 14px;">
+          <div style="font-weight:700;color:#1e293b">${r.name} ${ctrl_label}</div>
+          <div style="font-size:10px;color:#64748b;font-family:monospace;margin-top:2px">${r.smiles}</div>
+        </td>
+        <td style="padding:12px;text-align:center;font-weight:800;color:#dc2626;font-size:14px">${r.affinity}</td>
+        <td style="padding:12px;text-align:center;font-weight:700;color:#16a34a">${ki}</td>
+        <td style="padding:12px;text-align:center;font-weight:600">${delta}</td>
+        <td style="padding:12px;text-align:center">${r.le > 0 ? r.le.toFixed(3) : '—'}</td>
+        <td style="padding:12px;text-align:center">${badge(r.affinity)}</td>
+        <td style="padding:12px;text-align:center"><span class="int-count hb">${hb}</span></td>
+        <td style="padding:12px;text-align:center"><span class="int-count hp">${hp}</span></td>
+        <td style="padding:12px;text-align:center"><span class="int-count pi">${pi}</span></td>
+      </tr>`;
+    }).join('');
+
+    const diagrams = accumulated.filter(r => r.plipData?.diagram).map((r, i) => `
+      <div class="diagram-card">
+        <div class="diagram-header">
+          <span class="diagram-title">${r.name} ${r.isControl ? '(Control)' : ''}</span>
+          <span class="diagram-score">${r.affinity} kcal/mol | Ki: ${r.plipData?.ki || '—'}</span>
+        </div>
+        <div class="diagram-content">
+          ${r.plipData.diagram}
+        </div>
+      </div>`).join('');
+
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Molecular Docking Report — ${receptor?.id || 'Analysis'}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  body { font-family: 'Inter', sans-serif; margin: 0; padding: 40px; color: #1e293b; background: #f8fafc; line-height: 1.5; }
+  .report-container { max-width: 1100px; margin: 0 auto; background: white; padding: 50px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
+  header { border-bottom: 3px solid #1e3a5f; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+  h1 { color: #1e3a5f; font-size: 28px; margin: 0; font-weight: 800; letter-spacing: -0.5px; }
+  h2 { color: #334155; font-size: 18px; font-weight: 700; margin-top: 40px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  h2::before { content: ""; display: inline-block; width: 4px; height: 18px; background: #1e3a5f; border-radius: 2px; }
+  .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; background: #f1f5f9; padding: 20px; border-radius: 12px; margin-bottom: 30px; }
+  .meta-item { display: flex; flexDirection: column; }
+  .meta-label { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+  .meta-value { font-size: 14px; font-weight: 600; color: #1e293b; }
+  
+  table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 12px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+  th { background: #1e3a5f; color: #fff; padding: 12px 14px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+  td { border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+  tr:last-child td { border-bottom: none; }
+  
+  .badge-control { background: #1e3a5f; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 800; vertical-align: middle; margin-left: 6px; }
+  .int-count { display: inline-block; width: 24px; height: 24px; line-height: 24px; border-radius: 6px; font-weight: 800; font-size: 11px; }
+  .int-count.hb { background: #dcfce7; color: #16a34a; }
+  .int-count.hp { background: #dbeafe; color: #2563eb; }
+  .int-count.pi { background: #f3e8ff; color: #9333ea; }
+  
+  .diagram-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 30px; page-break-inside: avoid; }
+  .diagram-header { display: flex; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 16px; }
+  .diagram-title { font-weight: 800; color: #1e3a5f; font-size: 15px; }
+  .diagram-score { font-weight: 700; color: #64748b; font-size: 12px; }
+  .diagram-content svg { max-width: 100%; height: auto; }
+  
+  .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; }
+  @media print { 
+    body { padding: 0; background: white; }
+    .report-container { box-shadow: none; border: none; width: 100%; max-width: none; padding: 0; }
+  }
+</style></head><body>
+<div class="report-container">
+  <header>
+    <div>
+      <h1>Molecular Docking Analysis</h1>
+      <div style="color: #64748b; font-size: 14px; font-weight: 500; margin-top: 4px;">SmileRender Professional Virtual Screening Report</div>
+    </div>
+    <div style="text-align: right">
+      <div style="font-weight: 700; color: #1e3a5f;">${date}</div>
+      <div style="font-size: 11px; color: #94a3b8;">ID: ${Date.now()}</div>
+    </div>
+  </header>
+
+  <div class="meta-grid">
+    <div class="meta-item"><div class="meta-label">Target Receptor</div><div class="meta-value">${receptor?.id || 'Unknown'}</div></div>
+    <div class="meta-item"><div class="meta-label">Grid Center</div><div class="meta-value">${grid.cx}, ${grid.cy}, ${grid.cz}</div></div>
+    <div class="meta-item"><div class="meta-label">Search Space (Å)</div><div class="meta-value">${grid.sx} × ${grid.sy} × ${grid.sz}</div></div>
+    <div class="meta-item"><div class="meta-label">Compounds</div><div class="meta-value">${accumulated.length}</div></div>
+  </div>
+
+  ${ctrl ? `
+  <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 20px; border-radius: 12px; margin-bottom: 30px; display: flex; align-items: center; gap: 20px;">
+    <div style="background: #1e3a5f; color: #fff; width: 50px; height: 50px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px;">
+      <i class="bi bi-shield-check"></i>
+    </div>
+    <div>
+      <div class="meta-label" style="color: #1e40af">Reference Compound (Control)</div>
+      <div style="font-size: 18px; font-weight: 800; color: #1e3a5f;">${ctrl.name}</div>
+      <div style="font-size: 13px; font-weight: 700; color: #1d4ed8;">Score: ${ctrl.affinity} kcal/mol | Ki: ${ctrl.plipData?.ki || '—'} | LE: ${ctrl.le.toFixed(3)}</div>
+    </div>
+  </div>
+  ` : ''}
+
+  <h2>Screening Performance Summary</h2>
+  <table>
+    <thead><tr>
+      <th style="width: 25%">Molecule / SMILES</th>
+      <th style="text-align: center">Affinity</th>
+      <th style="text-align: center">Est. Ki</th>
+      <th style="text-align: center">ΔΔG vs Ctrl</th>
+      <th style="text-align: center">LE</th>
+      <th style="text-align: center">Relative</th>
+      <th style="text-align: center">H-B</th>
+      <th style="text-align: center">H-P</th>
+      <th style="text-align: center">π-S</th>
+    </tr></thead>
+    <tbody>${tableRows}</tbody>
+  </table>
+
+  ${diagrams ? `<h2>Protein-Ligand Interaction Mapping</h2>${diagrams}` : ''}
+
+  <div class="footer">
+    <div>Generated by SmileRender Suite · Advanced Cheminformatics Division</div>
+    <div>&copy; ${new Date().getFullYear()} · Professional Research Edition</div>
+  </div>
+</div>
+</body></html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `docking_report_${receptor?.id || 'report'}_${Date.now()}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   React.useEffect(() => {
     if (initialSmiles) {
       handleLoad(initialSmiles);
@@ -609,6 +777,8 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                       <th style={{ padding: '12px' }}>Molecule</th>
                       <th style={{ padding: '12px' }}>SMILES</th>
                       <th style={{ padding: '12px' }}>Status</th>
+                      <th style={{ padding: '12px', textAlign: 'center' }}>Best Score</th>
+                      <th style={{ padding: '12px', textAlign: 'center' }}>Rel. to Ctrl</th>
                       <th style={{ padding: '12px' }}>Action</th>
                     </tr>
                   </thead>
@@ -616,11 +786,34 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                     {entries.map((m, i) => (
                       <tr key={i} style={{ borderBottom: `1px solid ${colors.bg}`, backgroundColor: selectedIdx === i ? '#f0f9ff' : 'transparent' }}>
                         <td style={{ padding: '12px', fontWeight: 600 }}>{m.name || `mol_${i + 1}`}</td>
-                        <td style={{ padding: '12px', color: colors.textMuted, maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.smiles}</td>
+                        <td style={{ padding: '12px', color: colors.textMuted, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.smiles}</td>
                         <td style={{ padding: '12px' }}>
                           <span style={{ padding: '4px 8px', borderRadius: '100px', fontSize: '11px', fontWeight: 700, backgroundColor: m.status === 'ok' ? colors.successBg : colors.bg, color: m.status === 'ok' ? colors.success : colors.textLight }}>
                             {m.status.toUpperCase()}
                           </span>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'center', fontWeight: 700 }}>
+                          {(() => {
+                            const res = accumulated.find(r => r.smiles === m.smiles);
+                            return res ? (
+                              <span style={{ color: colors.danger }}>{res.affinity} <small style={{ fontWeight: 400, color: colors.textMuted }}>kcal/mol</small></span>
+                            ) : '—';
+                          })()}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          {(() => {
+                            const res = accumulated.find(r => r.smiles === m.smiles);
+                            const ctrl = accumulated.find(c => c.isControl);
+                            if (!res || !ctrl || res.isControl) return '—';
+                            const diff = parseFloat(res.affinity) - parseFloat(ctrl.affinity);
+                            const better = diff < -0.1;
+                            const worse = diff > 0.1;
+                            return (
+                              <span style={{ fontWeight: 700, color: better ? '#16a34a' : worse ? '#dc2626' : '#92400e', fontSize: '11px' }}>
+                                {better ? '▲' : worse ? '▼' : '≈'} {diff > 0 ? '+' : ''}{diff.toFixed(2)}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td style={{ padding: '12px' }}>
                           <button
@@ -828,7 +1021,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                       </button>
 
                       {sessionInfo && (
-                        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                           <button
                             onClick={handleAnalyze}
                             disabled={isAnalyzing}
@@ -838,10 +1031,67 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                           </button>
                           <button
                             onClick={handleDownloadResults}
-                            style={{ flex: 1, padding: '8px', backgroundColor: colors.blue, color: '#fff', border: 'none', borderRadius: radius.md, fontSize: '11px', fontWeight: 700 }}
+                            style={{ padding: '8px 10px', backgroundColor: colors.blue, color: '#fff', border: 'none', borderRadius: radius.md, fontSize: '11px', fontWeight: 700 }}
                           >
-                            <i className="bi bi-download me-1"></i> Results.zip
+                            <i className="bi bi-download"></i>
                           </button>
+                        </div>
+                      )}
+
+                      {/* Accumulated results for comparison report */}
+                      {accumulated.length > 0 && (
+                        <div style={{ backgroundColor: '#f8fafc', border: `1px solid ${colors.border}`, borderRadius: radius.md, padding: '12px', marginBottom: '16px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                            <p style={{ fontSize: '11px', fontWeight: 700, color: colors.textMuted, margin: 0 }}>
+                              <i className="bi bi-collection" style={{ marginRight: 5 }}></i>
+                              Comparison ({accumulated.length} mol{accumulated.length > 1 ? 's' : ''})
+                            </p>
+                            <button
+                              onClick={handleDownloadReport}
+                              style={{ padding: '5px 10px', backgroundColor: '#1e3a5f', color: '#fff', border: 'none', borderRadius: radius.sm, fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}
+                            >
+                              <i className="bi bi-file-earmark-text me-1"></i> Report
+                            </button>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {(() => {
+                              const ctrl = accumulated.find(r => r.isControl);
+                              const ctrlAff = ctrl ? parseFloat(ctrl.affinity) : null;
+                              return accumulated.map((r, i) => {
+                                const aff = parseFloat(r.affinity);
+                                const delta = ctrlAff !== null && !r.isControl ? aff - ctrlAff : null;
+                                const isBetter = delta !== null && delta < -0.1;
+                                const isWorse  = delta !== null && delta > 0.1;
+                                const bg = r.isControl ? '#e0f2fe' : isBetter ? '#f0fdf4' : isWorse ? '#fff7f7' : '#fff';
+                                const borderColor = r.isControl ? '#0ea5e9' : isBetter ? '#86efac' : isWorse ? '#fca5a5' : colors.border;
+                                return (
+                                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 8px', backgroundColor: bg, borderRadius: radius.sm, border: `1px solid ${borderColor}` }}>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ fontSize: '11px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {r.isControl && <span style={{ fontSize: '9px', backgroundColor: '#0ea5e9', color: '#fff', borderRadius: '100px', padding: '1px 5px', marginRight: 4 }}>CTRL</span>}
+                                        {r.name}
+                                      </div>
+                                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: 2 }}>
+                                        <span style={{ fontSize: '10px', color: colors.danger, fontWeight: 700 }}>{r.affinity} kcal/mol</span>
+                                        {delta !== null && (
+                                          <span style={{ fontSize: '10px', fontWeight: 700, color: isBetter ? '#16a34a' : isWorse ? '#dc2626' : '#92400e' }}>
+                                            {isBetter ? '▲' : isWorse ? '▼' : '≈'} {delta > 0 ? '+' : ''}{delta.toFixed(2)}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => handleSetControl(i)}
+                                      title={r.isControl ? 'Remove control' : 'Set as control'}
+                                      style={{ padding: '3px 7px', fontSize: '11px', border: `1px solid ${r.isControl ? '#0ea5e9' : colors.border}`, borderRadius: radius.sm, backgroundColor: r.isControl ? '#0ea5e9' : '#fff', color: r.isControl ? '#fff' : '#94a3b8', cursor: 'pointer', flexShrink: 0, lineHeight: 1 }}
+                                    >
+                                      {r.isControl ? '★' : '☆'}
+                                    </button>
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
                         </div>
                       )}
 
@@ -886,7 +1136,37 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
 
                       {plipData?.diagram && (
                         <div style={{ marginTop: '24px', backgroundColor: '#fff', padding: '16px', borderRadius: radius.md, border: `1px solid ${colors.border}`, textAlign: 'center' }}>
-                          <h6 style={{ fontWeight: 700, fontSize: '13px', marginBottom: '12px' }}>2D Interaction Map</h6>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <h6 style={{ fontWeight: 700, fontSize: '13px', margin: 0 }}>2D Interaction Map</h6>
+                            <button
+                              onClick={() => {
+                                const svgStr = plipData.diagram as string;
+                                const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+                                const url = URL.createObjectURL(blob);
+                                const img = new Image();
+                                img.onload = () => {
+                                  const canvas = document.createElement('canvas');
+                                  canvas.width = img.naturalWidth || 700;
+                                  canvas.height = img.naturalHeight || 680;
+                                  const ctx = canvas.getContext('2d')!;
+                                  ctx.fillStyle = '#ffffff';
+                                  ctx.fillRect(0, 0, canvas.width, canvas.height);
+                                  ctx.drawImage(img, 0, 0);
+                                  URL.revokeObjectURL(url);
+                                  const a = document.createElement('a');
+                                  a.download = `interaction_map_${entries[selectedIdx]?.name || 'ligand'}.png`;
+                                  a.href = canvas.toDataURL('image/png');
+                                  document.body.appendChild(a);
+                                  a.click();
+                                  document.body.removeChild(a);
+                                };
+                                img.src = url;
+                              }}
+                              style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 700, backgroundColor: '#f1f5f9', border: `1px solid ${colors.border}`, borderRadius: radius.sm, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              <i className="bi bi-download"></i> PNG
+                            </button>
+                          </div>
                           <div dangerouslySetInnerHTML={{ __html: plipData.diagram }} style={{ maxWidth: '100%' }} />
                         </div>
                       )}

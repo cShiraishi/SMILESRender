@@ -39,6 +39,9 @@ def init_docking_routes(app):
             from docking_utils import get_pdb_from_rcsb, auto_detect_pocket_from_inhibitor, clean_pdb_for_docking
             data = request.get_json()
             pdb_id = data.get("pdbId", "").upper()
+            ligand_id = data.get("ligandId")
+            chain_id = data.get("chainId")
+            
             if not pdb_id or len(pdb_id) != 4:
                 return jsonify({"error": "Invalid PDB ID"}), 400
                 
@@ -46,7 +49,7 @@ def init_docking_routes(app):
             if not pdb_content:
                 return jsonify({"error": "Could not find PDB " + str(pdb_id) + " on RCSB"}), 404
                 
-            pocket_data = auto_detect_pocket_from_inhibitor(pdb_content, pdb_id)
+            pocket_data = auto_detect_pocket_from_inhibitor(pdb_content, pdb_id, ligand_id, chain_id)
             cleaned_pdb = clean_pdb_for_docking(pdb_content)
             
             session_id = hashlib.md5(pdb_id.encode()).hexdigest()
@@ -140,13 +143,12 @@ def init_docking_routes(app):
                 lines = vina_output.splitlines()
                 capture = False
                 for line in lines:
-                    if "mode |   affinity | dist from rmsd" in line: capture = True; continue
-                    if capture and (line.startswith("----") or line.strip() == ""):
-                        if line.strip() == "" and len(scores) > 0: break
-                        continue
+                    if "mode |   affinity" in line: capture = True; continue
+                    if capture and line.startswith("-----"): continue
+                    if capture and line.strip() == "" and len(scores) > 0: break
                     if capture:
                         parts = line.split()
-                        if len(parts) >= 2:
+                        if len(parts) >= 4 and parts[0].isdigit():
                             scores.append({"mode": parts[0], "affinity": parts[1]})
 
                 complex_path = os.path.join(session_dir, "complex.pdb")

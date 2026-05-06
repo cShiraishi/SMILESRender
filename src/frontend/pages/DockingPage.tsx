@@ -47,6 +47,8 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
   const [plipData, setPlipData] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [boxColor, setBoxColor] = useState('yellow');
+  const [targetLigand, setTargetLigand] = useState('');
+  const [targetChain, setTargetChain] = useState('');
 
   const [config, setConfig] = useState({
     remove_salts: true,
@@ -80,7 +82,11 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
       const res = await fetch('/api/docking/receptor/load-pdb-id', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pdbId: id })
+        body: JSON.stringify({ 
+          pdbId: id,
+          ligandId: targetLigand.trim() || null,
+          chainId: targetChain.trim() || null
+        })
       });
       const data = await res.json();
       if (data.success) {
@@ -719,6 +725,20 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                         placeholder="e.g. 5KIR"
                         style={{ flex: 1, padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border}` }}
                         onKeyDown={e => e.key === 'Enter' && handleLoadReceptor(e.currentTarget.value)}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Ligand ID (e.g. RCX)"
+                        value={targetLigand}
+                        onChange={e => setTargetLigand(e.target.value.toUpperCase())}
+                        style={{ width: '150px', padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border}` }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Chain"
+                        value={targetChain}
+                        onChange={e => setTargetChain(e.target.value.toUpperCase())}
+                        style={{ width: '70px', padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border}` }}
                       />
                       <button
                         onClick={() => handleLoadReceptor((document.getElementById('pdb-id-input') as HTMLInputElement).value)}

@@ -59,26 +59,38 @@ def get_pdb_from_rcsb(pdb_id):
         pass
     return None
 
-def auto_detect_pocket_from_inhibitor(pdb_content, pdb_id):
+def auto_detect_pocket_from_inhibitor(pdb_content, pdb_id, ligand_id=None, chain_id=None):
     """
-    Detects the binding pocket by finding the largest co-crystallized inhibitor.
+    Detects the binding pocket by finding the specified ligand or the largest co-crystallized inhibitor.
     Logic ported from pluginPBD.
     """
     try:
-        # 1. Get validated ligands from RCSB API
-        valid_ligands = get_rcsb_ligands(pdb_id)
-        if not valid_ligands:
-            return {"success": False, "error": "No significant inhibitor found in RCSB metadata"}
+        target_lig = None
+        
+        if ligand_id:
+            # If manual ligand is provided, use it
+            target_lig = {"id": ligand_id.upper(), "chain": chain_id.upper() if chain_id else None}
+        else:
+            # 1. Get validated ligands from RCSB API
+            valid_ligands = get_rcsb_ligands(pdb_id)
+            if not valid_ligands:
+                return {"success": False, "error": "No significant inhibitor found in RCSB metadata"}
+            target_lig = valid_ligands[0]
 
-        # 2. Extract coordinates for the first valid ligand
-        target_lig = valid_ligands[0]
+        # 2. Extract coordinates for the target ligand
         coords = []
         
         for line in pdb_content.splitlines():
             if line.startswith(("HETATM", "ATOM")):
                 res_name = line[17:20].strip()
-                chain_id = line[21:22].strip()
-                if res_name == target_lig["id"] and chain_id == target_lig["chain"]:
+                curr_chain = line[21:22].strip()
+                
+                match_id = (res_name == target_lig["id"])
+                match_chain = True
+                if target_lig["chain"]:
+                    match_chain = (curr_chain == target_lig["chain"])
+                
+                if match_id and match_chain:
                     try:
                         x = float(line[30:38])
                         y = float(line[38:46])
@@ -87,7 +99,9 @@ def auto_detect_pocket_from_inhibitor(pdb_content, pdb_id):
                     except: continue
 
         if not coords:
-            return {"success": False, "error": "Could not find coordinates for ligand {}".format(target_lig['id'])}
+            msg = "Could not find coordinates for ligand {}".format(target_lig['id'])
+            if target_lig['chain']: msg += " in chain {}".format(target_lig['chain'])
+            return {"success": False, "error": msg}
 
         # 3. Calculate Centroid (Arithmetic Mean)
         xs = [c[0] for c in coords]
@@ -118,18 +132,11 @@ def auto_detect_pocket_from_inhibitor(pdb_content, pdb_id):
         return {"success": False, "error": str(e)}
 
 def clean_pdb_for_docking(pdb_content):
-    """Removes solvent and ions for simulation."""
-    ignore_list = ["HOH", "DOD", "WAT", "NA", "CL", "K", "MG", "CA", "ZN", "CU", "FE", "MN", "CO", "NI", "I", "BR", "SO4", "PO4"]
+    """Keeps only protein ATOM records for receptor preparation."""
     lines = pdb_content.split('\n')
     cleaned_lines = []
     for line in lines:
-        if line.startswith("ATOM"):
-            cleaned_lines.append(line)
-        elif line.startswith("HETATM"):
-            res_name = line[17:20].strip().upper()
-            if res_name not in ignore_list:
-                cleaned_lines.append(line)
-        elif line.startswith(("CONECT", "TER", "END")):
+        if line.startswith("ATOM") or line.startswith(("TER", "END")):
             cleaned_lines.append(line)
     return '\n'.join(cleaned_lines)
 
@@ -217,16 +224,39 @@ def extract_inhibitor_smiles(pdb_content, pdb_id, res_name, chain_id):
     except:
         return None
 
+def _pdbqt_to_hetatm_lines(pdbqt_content, res_name="LIG", chain="Z"):
+    """Converts PDBQT atom records to PDB HETATM lines (no obabel needed)."""
+    lines = []
+    serial = 1
+    for line in pdbqt_content.splitlines():
+        if not line.startswith(("ATOM", "HETATM")):
+            continue
+        try:
+            atom_name = line[12:16].strip()
+            x, y, z = float(line[30:38]), float(line[38:46]), float(line[46:54])
+            element = line[77:79].strip() if len(line) >= 79 else atom_name[:1]
+            pdb_line = "HETATM{:5d} {:<4s} {:3s} {:1s}{:4d}    {:8.3f}{:8.3f}{:8.3f}  1.00  0.00          {:>2s}\n".format(
+                serial, atom_name, res_name, chain, 1, x, y, z, element
+            )
+            lines.append(pdb_line)
+            serial += 1
+        except Exception:
+            continue
+    return lines
+
 def merge_receptor_ligand(receptor_pdb_path, ligand_pdbqt_content, output_pdb_path):
-    """Merges receptor and ligand for interaction analysis."""
+    """Merges receptor PDB and docked ligand PDBQT into a single PDB for PLIP."""
     try:
-        lig_pdbqt_path = output_pdb_path + ".lig.pdbqt"
-        with open(lig_pdbqt_path, "w") as f: f.write(ligand_pdbqt_content)
-        lig_pdb_path = output_pdb_path + ".lig.pdb"
-        subprocess.run(["obabel", "-ipdbqt", lig_pdbqt_path, "-opdb", "-O", lig_pdb_path], check=True)
-        subprocess.run(["obabel", receptor_pdb_path, lig_pdb_path, "-opdb", "-O", output_pdb_path], check=True)
-        if os.path.exists(lig_pdbqt_path): os.remove(lig_pdbqt_path)
-        if os.path.exists(lig_pdb_path): os.remove(lig_pdb_path)
+        with open(receptor_pdb_path, "r") as f:
+            receptor_lines = [l for l in f if l.startswith(("ATOM", "TER"))]
+        ligand_lines = _pdbqt_to_hetatm_lines(ligand_pdbqt_content)
+        if not ligand_lines:
+            return False, "No ligand atoms parsed from PDBQT"
+        with open(output_pdb_path, "w") as f:
+            f.writelines(receptor_lines)
+            f.write("TER\n")
+            f.writelines(ligand_lines)
+            f.write("END\n")
         return True, None
     except Exception as e:
         return False, str(e)
@@ -247,3 +277,4 @@ def calculate_ligand_efficiency(affinity_kcal, smiles):
         return round(-float(affinity_kcal) / hac, 3)
     except:
         return 0
+

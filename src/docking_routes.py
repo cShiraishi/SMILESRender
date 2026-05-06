@@ -244,7 +244,10 @@ def init_docking_routes(app):
         sx = request.args.get("sx", "20")
         sy = request.args.get("sy", "20")
         sz = request.args.get("sz", "20")
-        color = request.args.get("color", "yellow")
+        color = request.args.get("color", "blue")
+        
+        # Add a version comment to help debug if the server is updated
+        # Version: 2026-05-06-B
         
         return """<!DOCTYPE html>
 <html>

@@ -256,7 +256,10 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
 
   const handleSetControl = (idx: number) => {
     setControlIdx(prev => prev === idx ? null : idx);
-    setAccumulated(prev => prev.map((r, i) => ({ ...r, isControl: i === idx && controlIdx !== idx })));
+    setAccumulated(prev => prev.map((r, i) => ({ 
+      ...r, 
+      isControl: i === idx ? !r.isControl : false 
+    })));
   };
 
   const handleDownloadReport = () => {
@@ -348,6 +351,8 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
   .diagram-score { font-weight: 700; color: #64748b; font-size: 12px; }
   .diagram-content svg { max-width: 100%; height: auto; }
   
+  .no-control-warn { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; padding: 16px; border-radius: 12px; font-size: 13px; font-weight: 600; margin-bottom: 30px; text-align: center; }
+  
   .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; }
   @media print { 
     body { padding: 0; background: white; }
@@ -384,7 +389,12 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
       <div style="font-size: 13px; font-weight: 700; color: #1d4ed8;">Score: ${ctrl.affinity} kcal/mol | Ki: ${ctrl.plipData?.ki || '—'} | LE: ${ctrl.le.toFixed(3)}</div>
     </div>
   </div>
-  ` : ''}
+  ` : `
+  <div class="no-control-warn">
+    <i class="bi bi-exclamation-triangle-fill" style="margin-right: 8px"></i>
+    No Control Molecule defined. Comparative ΔΔG analysis is disabled for this report.
+  </div>
+  `}
 
   <h2>Screening Performance Summary</h2>
   <table>

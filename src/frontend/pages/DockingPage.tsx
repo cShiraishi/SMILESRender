@@ -274,8 +274,9 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
       </div>
     );
 
-    // Use the dedicated viewer route
-    const viewerUrl = `/api/docking/viewer?pdb=${receptor.id}&cx=${grid.cx}&cy=${grid.cy}&cz=${grid.cz}&sx=${grid.sx}&sy=${grid.sy}&sz=${grid.sz}&color=${boxColor}`.replace(/,/g, '.');
+    // Use the dedicated viewer route with cache bust
+    const cacheBust = new Date().getTime();
+    const viewerUrl = `/api/docking/viewer?pdb=${receptor.id}&cx=${grid.cx}&cy=${grid.cy}&cz=${grid.cz}&sx=${grid.sx}&sy=${grid.sy}&sz=${grid.sz}&color=${boxColor}&v=${cacheBust}`.replace(/,/g, '.');
 
     return (
       <div style={{ position: 'relative' }}>

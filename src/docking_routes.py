@@ -36,38 +36,75 @@ def init_docking_routes(app):
     def load_receptor_by_id():
         """Downloads PDB by ID, cleans it, and auto-detects the pocket."""
         try:
-            from docking_utils import get_pdb_from_rcsb, auto_detect_pocket_from_inhibitor, clean_pdb_for_docking
+            from docking_utils import get_pdb_from_rcsb, auto_detect_pocket_from_inhibitor, clean_pdb_for_docking, get_rcsb_ligands
             data = request.get_json()
             pdb_id = data.get("pdbId", "").upper()
             ligand_id = data.get("ligandId")
             chain_id = data.get("chainId")
-            
+
             if not pdb_id or len(pdb_id) != 4:
                 return jsonify({"error": "Invalid PDB ID"}), 400
-                
+
             pdb_content = get_pdb_from_rcsb(pdb_id)
             if not pdb_content:
                 return jsonify({"error": "Could not find PDB " + str(pdb_id) + " on RCSB"}), 404
-                
+
+            rcsb_ligands = get_rcsb_ligands(pdb_id)
             pocket_data = auto_detect_pocket_from_inhibitor(pdb_content, pdb_id, ligand_id, chain_id)
             cleaned_pdb = clean_pdb_for_docking(pdb_content)
-            
+
+            # Also save the original PDB for pocket detection queries
             session_id = hashlib.md5(pdb_id.encode()).hexdigest()
             session_dir = os.path.join(DOCKING_WORKSPACE, session_id)
             if not os.path.exists(session_dir):
                 os.makedirs(session_dir)
-            
+
             pdb_path = os.path.join(session_dir, str(pdb_id) + "_cleaned.pdb")
+            orig_path = os.path.join(session_dir, str(pdb_id) + "_original.pdb")
             with open(pdb_path, "w") as f:
                 f.write(cleaned_pdb)
-                
+            with open(orig_path, "w") as f:
+                f.write(pdb_content)
+
             return jsonify({
                 "success": True,
                 "pdbId": pdb_id,
                 "pocket": pocket_data,
                 "pdbPath": pdb_path,
-                "pdbContent": cleaned_pdb
+                "pdbContent": cleaned_pdb,
+                "rcsbLigands": rcsb_ligands
             })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/docking/receptor/detect-pocket", methods=["POST"])
+    def detect_pocket():
+        """Re-detects the binding pocket from a specific ligand without re-preparing the receptor."""
+        try:
+            from docking_utils import auto_detect_pocket_from_inhibitor
+            data = request.get_json()
+            pdb_id = data.get("pdbId", "").upper()
+            ligand_id = data.get("ligandId", "").strip().upper() or None
+            chain_id = data.get("chainId", "").strip().upper() or None
+
+            if not pdb_id:
+                return jsonify({"error": "Missing pdbId"}), 400
+
+            # Read original PDB from session (already downloaded)
+            session_id = hashlib.md5(pdb_id.encode()).hexdigest()
+            orig_path = os.path.join(DOCKING_WORKSPACE, session_id, str(pdb_id) + "_original.pdb")
+            if os.path.exists(orig_path):
+                with open(orig_path, "r") as f:
+                    pdb_content = f.read()
+            else:
+                # Fallback: download again
+                from docking_utils import get_pdb_from_rcsb
+                pdb_content = get_pdb_from_rcsb(pdb_id)
+                if not pdb_content:
+                    return jsonify({"error": "Could not fetch PDB " + pdb_id}), 404
+
+            pocket = auto_detect_pocket_from_inhibitor(pdb_content, pdb_id, ligand_id, chain_id)
+            return jsonify(pocket)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
@@ -212,10 +249,16 @@ def init_docking_routes(app):
                     
                     if pose_pdbqt:
                         complex_path = os.path.join(session_dir, "complex_" + str(pose_idx) + ".pdb")
-                        merge_receptor_ligand(receptor_path, pose_pdbqt, complex_path)
+                        ok, err = merge_receptor_ligand(receptor_path, pose_pdbqt, complex_path)
+                        if not ok:
+                            return jsonify({"error": "Failed to merge complex: " + str(err)}), 500
+                    else:
+                        return jsonify({"error": "Could not find pose " + str(pose_idx) + " in output"}), 404
+                else:
+                    return jsonify({"error": "Missing output.pdbqt or cleaned receptor"}), 404
 
             if not complex_path or not os.path.exists(complex_path):
-                return jsonify({"error": "Complex file not found"}), 404
+                return jsonify({"error": "Complex file not found at " + str(complex_path)}), 404
             
             import sys as _sys
             _current = os.path.dirname(os.path.abspath(__file__))

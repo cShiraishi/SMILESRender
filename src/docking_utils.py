@@ -12,22 +12,11 @@ def get_rcsb_ligands(pdb_id):
     This replicates the discovery logic of the PDB plugin.
     """
     url = "https://data.rcsb.org/graphql"
-    query = {
-        "query": """
-        {{
-          entry(entry_id: "{pdb_id.upper()}") {{
-            nonpolymer_entities {{
-              nonpolymer_comp {{
-                rcsb_id
-              }}
-              rcsb_nonpolymer_entity_container_identifiers {{
-                auth_asym_ids
-              }}
-            }}
-          }}
-        }}
-        """
-    }
+    gql = (
+        "{ entry(entry_id: \"%s\") { nonpolymer_entities { nonpolymer_comp { rcsb_id } "
+        "rcsb_nonpolymer_entity_container_identifiers { auth_asym_ids } } } }"
+    ) % pdb_id.upper()
+    query = {"query": gql}
     try:
         resp = requests.post(url, json=query)
         if resp.ok:
@@ -157,49 +146,142 @@ def prepare_ligand_pdbqt(smiles):
 
 def generate_2d_interaction_diagram(ligand_smiles, plip_data):
     """
-    Generates an SVG 2D diagram of the ligand annotated with protein interactions.
+    LigPlot-style SVG: ligand in center, protein residues as labeled boxes
+    arranged radially, connected by colored dashed lines by interaction type.
     """
+    import math
     try:
         from rdkit.Chem.Draw import rdMolDraw2D
-        mol = Chem.MolFromSmiles(ligand_smiles)
-        if not mol: return None
-        
-        # Standardize 2D coords
-        AllChem.Compute2DCoords(mol)
-        
-        # Extract interactions to annotate
-        # Map interaction types to colors
-        color_map = {
-            "hbonds": (0.1, 0.7, 0.1),       # Green
-            "hydrophobic": (0.1, 0.1, 0.8),  # Blue
-            "salt_bridges": (0.8, 0.1, 0.1), # Red
-            "pi_stacking": (0.6, 0.1, 0.6)   # Purple
-        }
-        
-        annotations = []
-        # PLIP data structure: plip_data['interactions']['hbonds'] -> list of dicts
-        interactions = plip_data.get("interactions", {})
-        
-        for itype, color in color_map.items():
-            for item in interactions.get(itype, []):
-                # Try to find the ligand atom index (PLIP uses PDB indices, we need RDKit indices)
-                # For simplicity in this version, we'll annotate based on the residue name
-                res_info = "{}".format(item.get('residue', 'RES'))
-                annotations.append(res_info)
 
-        # Draw the molecule
-        drawer = rdMolDraw2D.MolDraw2DSVG(400, 400)
+        mol = Chem.MolFromSmiles(ligand_smiles)
+        if not mol:
+            return None
+        AllChem.Compute2DCoords(mol)
+
+        # --- collect interactions ---
+        ITYPE_STYLE = {
+            "hbonds":      {"color": "#16a34a", "label": "H-Bond",      "dash": "6,3"},
+            "hydrophobic": {"color": "#2563eb", "label": "Hydrophobic", "dash": "4,4"},
+            "pi_stacking": {"color": "#9333ea", "label": "π-Stack",  "dash": "8,3"},
+            "salt_bridges":{"color": "#dc2626", "label": "Salt Bridge", "dash": "3,3"},
+        }
+
+        interactions = plip_data.get("interactions", {})
+        entries = []  # list of (residue_label, itype, color, dash)
+        for itype, style in ITYPE_STYLE.items():
+            for item in interactions.get(itype, []):
+                res = item.get("residue", "UNK")
+                entries.append((res, itype, style["color"], style["dash"], style["label"]))
+
+        # --- canvas dimensions ---
+        W, H = 700, 680
+        MOL_SIZE = 260
+        CX, CY = W // 2, H // 2 - 20   # molecule center
+
+        # draw ligand SVG (smaller canvas, we'll embed it)
+        drawer = rdMolDraw2D.MolDraw2DSVG(MOL_SIZE, MOL_SIZE)
         opts = drawer.drawOptions()
         opts.addAtomIndices = False
-        opts.annotationFontScale = 0.8
-        
-        # Add legend or annotations (Advanced logic would map to specific atoms)
-        # For this version, we provide the clean 2D and the interaction summary
+        opts.padding = 0.15
         drawer.DrawMolecule(mol)
         drawer.FinishDrawing()
-        
-        return drawer.GetDrawingText()
-    except:
+        mol_svg_inner = drawer.GetDrawingText()
+        # strip outer <svg> tags to embed inline
+        import re
+        mol_inner = re.sub(r"<\?xml[^>]*\?>", "", mol_svg_inner)
+        mol_inner = re.sub(r"<svg[^>]*>", "", mol_inner, count=1)
+        mol_inner = re.sub(r"</svg>", "", mol_inner, count=1)
+
+        # --- radial layout for residue boxes ---
+        BOX_W, BOX_H = 86, 28
+        RADIUS = 240
+        N = max(len(entries), 1)
+        angle_step = 2 * math.pi / N
+
+        # build SVG parts
+        lines_svg = []
+        boxes_svg = []
+
+        for i, (res, itype, color, dash, type_label) in enumerate(entries):
+            angle = -math.pi / 2 + i * angle_step
+            bx = CX + RADIUS * math.cos(angle)
+            by = CY + RADIUS * math.sin(angle)
+
+            # connection line: from molecule center to box edge
+            # find point on box nearest to molecule center
+            dx, dy = CX - bx, CY - by
+            dist = math.sqrt(dx*dx + dy*dy) or 1
+            # box edge intercept
+            tx = bx + (BOX_W / 2) * (dx / abs(dx) if abs(dx) > abs(dy) * (BOX_W / BOX_H) else dx / dist * BOX_W / 2)
+            ty = by + (BOX_H / 2) * (dy / abs(dy) if abs(dy) >= abs(dx) * (BOX_H / BOX_W) else dy / dist * BOX_H / 2)
+            # line endpoint on molecule edge (MOL_SIZE/2 radius)
+            mol_r = MOL_SIZE / 2 - 10
+            ex = CX - mol_r * dx / dist
+            ey = CY - mol_r * dy / dist
+
+            lines_svg.append(
+                '<line x1="{:.1f}" y1="{:.1f}" x2="{:.1f}" y2="{:.1f}" '
+                'stroke="{}" stroke-width="2" stroke-dasharray="{}" opacity="0.85"/>'.format(
+                    ex, ey, tx, ty, color, dash
+                )
+            )
+
+            # residue box
+            rx, ry = bx - BOX_W / 2, by - BOX_H / 2
+            boxes_svg.append(
+                '<rect x="{:.1f}" y="{:.1f}" width="{}" height="{}" rx="5" ry="5" '
+                'fill="white" stroke="{}" stroke-width="2"/>'.format(rx, ry, BOX_W, BOX_H, color)
+            )
+            boxes_svg.append(
+                '<text x="{:.1f}" y="{:.1f}" text-anchor="middle" dominant-baseline="middle" '
+                'font-family="monospace" font-size="11" font-weight="bold" fill="{}">{}</text>'.format(
+                    bx, by - 4, color, res[:12]
+                )
+            )
+            boxes_svg.append(
+                '<text x="{:.1f}" y="{:.1f}" text-anchor="middle" dominant-baseline="middle" '
+                'font-family="sans-serif" font-size="8" fill="#64748b">{}</text>'.format(
+                    bx, by + 8, type_label
+                )
+            )
+
+        # --- legend ---
+        legend_y = H - 50
+        lx = 20
+        legend_items = [(s["color"], s["dash"], s["label"])
+                        for k, s in ITYPE_STYLE.items()
+                        if interactions.get(k)]
+        for color, dash, label in legend_items:
+            legend_items_svg = (
+                '<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="2" stroke-dasharray="{}"/>'
+                '<text x="{}" y="{}" font-family="sans-serif" font-size="11" fill="#334155" '
+                'dominant-baseline="middle">{}</text>'.format(
+                    lx, legend_y, lx + 24, legend_y, color, dash,
+                    lx + 30, legend_y, label
+                )
+            )
+            boxes_svg.append(legend_items_svg)
+            lx += 115
+
+        # --- assemble final SVG ---
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="{}" height="{}" '
+            'viewBox="0 0 {} {}" '
+            'style="background:white;font-family:sans-serif;max-width:100%;height:auto;">'.format(W, H, W, H)
+        )
+        svg += '<rect width="{}" height="{}" fill="white"/>'.format(W, H)
+        # embed molecule
+        svg += '<g transform="translate({},{})">'.format(CX - MOL_SIZE // 2, CY - MOL_SIZE // 2)
+        svg += mol_inner
+        svg += '</g>'
+        # interaction lines (under boxes)
+        svg += "".join(lines_svg)
+        # residue boxes and labels
+        svg += "".join(boxes_svg)
+        svg += '</svg>'
+
+        return svg
+    except Exception:
         return None
 
 def extract_inhibitor_smiles(pdb_content, pdb_id, res_name, chain_id):
@@ -229,14 +311,33 @@ def _pdbqt_to_hetatm_lines(pdbqt_content, res_name="LIG", chain="Z"):
     lines = []
     serial = 1
     for line in pdbqt_content.splitlines():
-        if not line.startswith(("ATOM", "HETATM")):
+        if not (line.startswith("ATOM") or line.startswith("HETATM")):
             continue
         try:
+            # PDBQT format:
+            # 0-6   Record
+            # 12-16 Atom Name
+            # 30-38 X
+            # 38-46 Y
+            # 46-54 Z
+            # 77-79 Element
             atom_name = line[12:16].strip()
-            x, y, z = float(line[30:38]), float(line[38:46]), float(line[46:54])
-            element = line[77:79].strip() if len(line) >= 79 else atom_name[:1]
+            if not atom_name: atom_name = "UNK"
+            
+            x_str = line[30:38].strip()
+            y_str = line[38:46].strip()
+            z_str = line[46:54].strip()
+            
+            x, y, z = float(x_str), float(y_str), float(z_str)
+            
+            element = ""
+            if len(line) >= 79:
+                element = line[76:78].strip()
+            if not element:
+                element = atom_name[0] if atom_name else "C"
+                
             pdb_line = "HETATM{:5d} {:<4s} {:3s} {:1s}{:4d}    {:8.3f}{:8.3f}{:8.3f}  1.00  0.00          {:>2s}\n".format(
-                serial, atom_name, res_name, chain, 1, x, y, z, element
+                serial % 100000, atom_name[:4], res_name[:3], chain[:1], 1, x, y, z, element[:2]
             )
             lines.append(pdb_line)
             serial += 1

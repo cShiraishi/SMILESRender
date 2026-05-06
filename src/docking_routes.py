@@ -1,4 +1,5 @@
 import os
+import shutil
 import hashlib
 import json
 import subprocess
@@ -12,6 +13,22 @@ DOCKING_LOCK = threading.Semaphore(1)
 DOCKING_WORKSPACE = os.path.join(os.getcwd(), "tmp", "docking_sessions")
 if not os.path.exists(DOCKING_WORKSPACE):
     os.makedirs(DOCKING_WORKSPACE)
+
+_VINA_CANDIDATES = [
+    "vina",
+    r"C:\Program Files (x86)\The Scripps Research Institute\Vina\vina.exe",
+    r"C:\Program Files\The Scripps Research Institute\Vina\vina.exe",
+    "/usr/bin/vina",
+    "/usr/local/bin/vina",
+]
+
+def _find_vina():
+    for candidate in _VINA_CANDIDATES:
+        if shutil.which(candidate) or os.path.isfile(candidate):
+            return candidate
+    return None
+
+VINA_EXE = _find_vina()
 
 def init_docking_routes(app):
     
@@ -86,10 +103,15 @@ def init_docking_routes(app):
                 
                 session_dir = os.path.dirname(receptor_path)
                 receptor_pdbqt_path = receptor_path.replace(".pdb", ".pdbqt")
+                out_prefix = receptor_path.replace(".pdb", "")
                 try:
-                    subprocess.run(["obabel", "-ipdb", receptor_path, "-opdbqt", "-O", receptor_pdbqt_path, "-xr", "-h"], check=True)
-                except:
-                    return jsonify({"error": "Failed to convert receptor to PDBQT"}), 500
+                    subprocess.run(
+                        ["mk_prepare_receptor", "--read_pdb", receptor_path,
+                         "-o", out_prefix, "--default_altloc", "A", "--allow_bad_res", "-p"],
+                        check=True, capture_output=True, text=True
+                    )
+                except Exception as e:
+                    return jsonify({"error": "Failed to convert receptor to PDBQT: " + str(e)}), 500
                 
                 exhaustiveness = data.get("exhaustiveness", 8)
                 num_modes = data.get("numModes", 9)
@@ -99,15 +121,18 @@ def init_docking_routes(app):
                 if err: return jsonify({"error": "Ligand prep failed: " + str(err)}), 500
                 with open(ligand_path, "w") as f: f.write(pdbqt_content)
                 
+                if not VINA_EXE:
+                    return jsonify({"error": "AutoDock Vina not found. Please install it."}), 500
+
                 output_path = os.path.join(session_dir, "output.pdbqt")
                 vina_cmd = [
-                    "vina", "--receptor", receptor_pdbqt_path, "--ligand", ligand_path,
+                    VINA_EXE, "--receptor", receptor_pdbqt_path, "--ligand", ligand_path,
                     "--center_x", str(center['x']), "--center_y", str(center['y']), "--center_z", str(center['z']),
                     "--size_x", str(size['x']), "--size_y", str(size['y']), "--size_z", str(size['z']),
                     "--out", output_path, "--exhaustiveness", str(exhaustiveness),
                     "--num_modes", str(num_modes)
                 ]
-                
+
                 result_vina = subprocess.run(vina_cmd, check=True, capture_output=True, text=True)
                 vina_output = result_vina.stdout
                 
@@ -173,6 +198,7 @@ def init_docking_routes(app):
 
     @app.route("/api/docking/viewer")
     def standalone_viewer():
+        """Returns a standalone HTML page for 3D visualization using 3Dmol.js."""
         pdb_id = request.args.get("pdb")
         cx = request.args.get("cx", "0")
         cy = request.args.get("cy", "0")
@@ -180,50 +206,61 @@ def init_docking_routes(app):
         sx = request.args.get("sx", "20")
         sy = request.args.get("sy", "20")
         sz = request.args.get("sz", "20")
+        color = request.args.get("color", "yellow")
         
-        return """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <script src="https://unpkg.com/ngl@2.0.0-dev.37/dist/ngl.js"></script>
-            <style>body { margin: 0; padding: 0; overflow: hidden; background: white; }</style>
-        </head>
-        <body>
-            <div id="v" style="width:100vw; height:100vh;"></div>
-            <script>
-                document.addEventListener("DOMContentLoaded", function() {
-                    var stage = new NGL.Stage("v", { backgroundColor: "white" });
-                    var pdbId = \"""" + str(pdb_id) + """\";
-                    
-                    var loadPromise;
-                    if (pdbId && pdbId.length === 4) {
-                        loadPromise = stage.loadFile("rcsb://" + pdbId);
-                    } else {
-                        return;
-                    }
+        return """<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://3dmol.org/build/3Dmol-min.js"></script>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background: white; }
+        #v { width: 100vw; height: 100vh; position: relative; }
+        #err { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+               background:#fff3cd; border:1px solid #ffc107; padding:16px 24px;
+               border-radius:8px; font-family:sans-serif; font-size:14px; color:#856404; text-align:center; }
+    </style>
+</head>
+<body>
+    <div id="v"></div>
+    <div id="err"></div>
+    <script>
+        var pdbId = \"""" + str(pdb_id) + """\";
+        var cx = parseFloat(\"""" + str(cx) + """\");
+        var cy = parseFloat(\"""" + str(cy) + """\");
+        var cz = parseFloat(\"""" + str(cz) + """\");
+        var sx = parseFloat(\"""" + str(sx) + """\");
+        var sy = parseFloat(\"""" + str(sy) + """\");
+        var sz = parseFloat(\"""" + str(sz) + """\");
+        var boxColor = \"""" + str(color) + """\";
 
-                    loadPromise.then(function(o) {
-                        o.addRepresentation("cartoon", { color: "spectrum", opacity: 0.8 });
-                        o.autoView();
-                        
-                        var cx = parseFloat(\"""" + str(cx) + """\");
-                        var cy = parseFloat(\"""" + str(cy) + """\");
-                        var cz = parseFloat(\"""" + str(cz) + """\");
-                        var sx = parseFloat(\"""" + str(sx) + """\");
-                        var sy = parseFloat(\"""" + str(sy) + """\");
-                        var sz = parseFloat(\"""" + str(sz) + """\");
-                        
-                        var shape = new NGL.Shape("grid");
-                        shape.addBox([cx, cy, cz], [sx, 0, 0], [0, sy, 0], [0, 0, sz], "yellow", true);
-                        var shapeComp = stage.addComponentFromObject(shape);
-                        shapeComp.addRepresentation("buffer", { wireframe: true, linewidth: 2 });
-                    });
-                    window.addEventListener("resize", function() { stage.handleResize(); });
+        function showErr(msg) {
+            var el = document.getElementById("err");
+            el.textContent = msg;
+            el.style.display = "block";
+        }
+
+        if (!pdbId || pdbId.length !== 4) {
+            showErr("No PDB ID provided.");
+        } else {
+            var viewer = $3Dmol.createViewer(document.getElementById("v"), { backgroundColor: "white" });
+            $3Dmol.download("pdb:" + pdbId, viewer, {}, function() {
+                viewer.setStyle({}, { cartoon: { colorscheme: "spectrum", opacity: 0.8 } });
+                viewer.addBox({
+                    center: { x: cx, y: cy, z: cz },
+                    dimensions: { w: sx, h: sy, d: sz },
+                    color: boxColor,
+                    wireframe: true,
+                    linewidth: 2
                 });
-            </script>
-        </body>
-        </html>
-        """
+                viewer.zoomTo();
+                viewer.render();
+            });
+            viewer.resize();
+            window.addEventListener("resize", function() { viewer.resize(); });
+        }
+    </script>
+</body>
+</html>"""
 
     @app.route("/api/docking/files/<session_id>/<filename>")
     def serve_docking_file(session_id, filename):

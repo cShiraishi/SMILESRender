@@ -46,6 +46,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
   const [sessionInfo, setSessionInfo] = useState<any>(null);
   const [plipData, setPlipData] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [boxColor, setBoxColor] = useState('yellow');
 
   const [config, setConfig] = useState({
     remove_salts: true,
@@ -303,7 +304,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
     );
 
     // Use the dedicated viewer route
-    const viewerUrl = `/api/docking/viewer?pdb=${receptor.id}&cx=${grid.cx}&cy=${grid.cy}&cz=${grid.cz}&sx=${grid.sx}&sy=${grid.sy}&sz=${grid.sz}`.replace(/,/g, '.');
+    const viewerUrl = `/api/docking/viewer?pdb=${receptor.id}&cx=${grid.cx}&cy=${grid.cy}&cz=${grid.cz}&sx=${grid.sx}&sy=${grid.sy}&sz=${grid.sz}&color=${boxColor}`.replace(/,/g, '.');
 
     return (
       <div style={{ position: 'relative' }}>
@@ -768,6 +769,22 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                               style={{ width: '100%', padding: '8px', borderRadius: radius.md, border: `1px solid ${colors.border}` }} />
                           </div>
                         ))}
+                        <div>
+                          <label style={{ fontSize: '11px', color: colors.textMuted }}>Box Color</label>
+                          <select 
+                            value={boxColor} 
+                            onChange={e => setBoxColor(e.target.value)}
+                            style={{ width: '100%', padding: '8px', borderRadius: radius.md, border: `1px solid ${colors.border}`, fontSize: '12px' }}
+                          >
+                            <option value="yellow">Yellow</option>
+                            <option value="lime">Lime Green</option>
+                            <option value="red">Red</option>
+                            <option value="cyan">Cyan</option>
+                            <option value="magenta">Magenta</option>
+                            <option value="blue">Blue</option>
+                            <option value="orange">Orange</option>
+                          </select>
+                        </div>
                       </div>
                       {render3DViewer()}
                     </div>

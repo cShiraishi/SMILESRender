@@ -46,7 +46,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
   const [sessionInfo, setSessionInfo] = useState<any>(null);
   const [plipData, setPlipData] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [boxColor, setBoxColor] = useState('yellow');
+  const [boxColor, setBoxColor] = useState('blue');
   const [targetLigand, setTargetLigand] = useState('');
   const [targetChain, setTargetChain] = useState('');
 

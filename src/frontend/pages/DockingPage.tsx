@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import PageShell from '../components/PageShell';
 import MoleculeDrawerModal from '../components/MoleculeDrawerModal';
 import { colors, radius, shadow, font } from '../styles/themes';
@@ -52,11 +52,13 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
   const [dismissRedocking, setDismissRedocking] = useState(false);
   const [rcsbLigands, setRcsbLigands] = useState<{id: string, chain: string}[]>([]);
   const [isDetectingPocket, setIsDetectingPocket] = useState(false);
+  const [isBatchRunning, setIsBatchRunning] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, name: '' });
+  const batchAbortRef = useRef(false);
 
   // Accumulated results for comparison report
   type AccumResult = { name: string; smiles: string; affinity: string; le: number; plipData?: any; isControl: boolean; };
   const [accumulated, setAccumulated] = useState<AccumResult[]>([]);
-  const [controlIdx, setControlIdx] = useState<number | null>(null);
 
   const [config, setConfig] = useState({
     remove_salts: true,
@@ -167,26 +169,35 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
         const molSmiles = entries[idx].smiles;
         const bestAffinity = data.scores.length > 0 ? data.scores[0].affinity : '—';
         setAccumulated(prev => {
-          const existing = prev.findIndex(r => r.smiles === molSmiles);
-          // Auto-set as control if it's the first one OR if it's the native inhibitor
-          const shouldBeControl = prev.length === 0 || molName.includes(receptor?.pocket?.inhibitor || '___');
-          const isCtrl = shouldBeControl && !prev.some(r => r.isControl);
+          const existingIdx = prev.findIndex(r => r.smiles === molSmiles);
+          // If a control already exists in the list (other than the one we are updating), don't override it
+          const hasControl = prev.some((r, idx) => r.isControl && idx !== existingIdx);
+          
+          // Auto-set as control if: 
+          // 1. No control exists yet
+          // 2. OR it's the native inhibitor being redocked
+          const isNative = molName.toLowerCase().includes((receptor?.pocket?.inhibitor || '___').toLowerCase());
+          const shouldBeControl = !hasControl || isNative;
           
           const entry: AccumResult = { 
             name: molName, 
             smiles: molSmiles, 
             affinity: bestAffinity, 
             le: data.le || 0, 
-            isControl: isCtrl 
+            isControl: shouldBeControl 
           };
-          if (isCtrl) setControlIdx(existing >= 0 ? existing : prev.length);
 
-          if (existing >= 0) {
-            const updated = [...prev];
-            updated[existing] = { ...updated[existing], ...entry };
-            return updated;
+          // If we are setting THIS one as control, others must lose it
+          let newList = [...prev];
+          if (shouldBeControl) {
+            newList = newList.map(r => ({ ...r, isControl: false }));
           }
-          return [...prev, entry];
+
+          if (existingIdx >= 0) {
+            newList[existingIdx] = { ...newList[existingIdx], ...entry };
+            return newList;
+          }
+          return [...newList, entry];
         });
       } else {
         alert(data.error || 'Docking failed');
@@ -266,8 +277,79 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
     window.location.href = `/api/docking/download?session=${sessionInfo.sessionId}`;
   };
 
+  const runBatchDocking = async () => {
+    if (!receptor || entries.length === 0) return;
+    batchAbortRef.current = false;
+    setIsBatchRunning(true);
+    const valid = entries.filter(e => e.smiles && e.smiles.trim());
+    setBatchProgress({ current: 0, total: valid.length, name: '' });
+
+    for (let i = 0; i < valid.length; i++) {
+      if (batchAbortRef.current) break;
+      const entry = valid[i];
+      const entryIdx = entries.indexOf(entry);
+      const molName = entry.name || ('mol_' + (entryIdx + 1));
+      setBatchProgress({ current: i + 1, total: valid.length, name: molName });
+      setSelectedIdx(entryIdx);
+
+      try {
+        const dockRes = await fetch('/api/docking/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            receptorPath: receptor.path,
+            smiles: entry.smiles,
+            center: { x: grid.cx, y: grid.cy, z: grid.cz },
+            size: { x: grid.sx, y: grid.sy, z: grid.sz },
+            exhaustiveness,
+            numModes
+          })
+        });
+        const dockData = await dockRes.json();
+        if (!dockData.success) continue;
+
+        setDockingResults(dockData.scores);
+        setSessionInfo(dockData);
+
+        const bestAff = dockData.scores.length > 0 ? dockData.scores[0].affinity : '—';
+        setAccumulated(prev => {
+          const existing = prev.findIndex(r => r.smiles === entry.smiles);
+          const shouldBeControl = prev.length === 0 || molName.includes(receptor?.pocket?.inhibitor || '\x00');
+          const isCtrl = shouldBeControl && !prev.some(r => r.isControl);
+          const ae: AccumResult = { name: molName, smiles: entry.smiles, affinity: bestAff, le: dockData.le || 0, isControl: isCtrl };
+          if (isCtrl) setControlIdx(existing >= 0 ? existing : prev.length);
+          if (existing >= 0) { const u = [...prev]; u[existing] = { ...u[existing], ...ae }; return u; }
+          return [...prev, ae];
+        });
+
+        if (batchAbortRef.current) break;
+
+        if (dockData.complexPath) {
+          try {
+            const plipRes = await fetch('/api/docking/analyze', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ complexPath: dockData.complexPath, sessionId: dockData.sessionId, poseIdx: 0, smiles: entry.smiles })
+            });
+            const plipResult = await plipRes.json();
+            if (!plipResult.error) {
+              setPlipData(plipResult);
+              setAccumulated(prev => {
+                const idx = prev.findIndex(r => r.smiles === entry.smiles);
+                if (idx >= 0) { const u = [...prev]; u[idx] = { ...u[idx], plipData: plipResult }; return u; }
+                return prev;
+              });
+            }
+          } catch { /* skip PLIP errors silently */ }
+        }
+      } catch { /* skip molecule on network error */ }
+    }
+
+    setIsBatchRunning(false);
+    setBatchProgress({ current: 0, total: 0, name: '' });
+  };
+
   const handleSetControl = (idx: number) => {
-    setControlIdx(prev => prev === idx ? null : idx);
     setAccumulated(prev => prev.map((r, i) => ({ 
       ...r, 
       isControl: i === idx ? !r.isControl : false 

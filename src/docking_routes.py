@@ -217,14 +217,14 @@ def init_docking_routes(app):
             if not complex_path or not os.path.exists(complex_path):
                 return jsonify({"error": "Complex file not found"}), 404
             
-            plip_script = os.path.join(os.getcwd(), "src", "plip_runner.py")
-            cmd = ["python3", plip_script, complex_path]
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            
-            if result.returncode != 0:
-                return jsonify({"error": "PLIP failed: " + str(result.stderr)}), 500
-                
-            plip_data = json.loads(result.stdout)
+            import sys as _sys
+            _current = os.path.dirname(os.path.abspath(__file__))
+            if _current not in _sys.path:
+                _sys.path.insert(0, _current)
+            import plip_runner
+            import importlib
+            importlib.reload(plip_runner)
+            plip_data = plip_runner.analyze(complex_path)
             ligand_smiles = data.get("smiles", "")
             diagram_svg = generate_2d_interaction_diagram(ligand_smiles, plip_data) if ligand_smiles else None
             

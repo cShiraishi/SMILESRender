@@ -1,4 +1,5 @@
 import type { BuildConfig } from 'bun';
+// Cache bust: 2026-05-06T18:36:00
 
 // Build workers first as separate bundles
 const workers = ['prediction.worker', 'admetlab.worker'];

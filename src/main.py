@@ -22,8 +22,18 @@ def main():
     port = int(getenv("PORT") or 3000)
     threads = int(getenv("THREADS") or 4)
     print("smiles-render-web running at {}:{} with {} threads (Render Free Optimized)".format(host, port, threads))
-    serve(app, host=host, port=port, threads=threads)
+    # Optimized for long-running docking simulations (10 min timeout)
+    serve(
+        app, 
+        host=host, 
+        port=port, 
+        threads=threads, 
+        connection_limit=1000, 
+        channel_timeout=600,
+        ident="SmileRender-Waitress"
+    )
 
 
 if __name__ == "__main__":
     main()
+

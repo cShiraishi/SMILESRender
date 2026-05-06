@@ -49,8 +49,14 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
   const [boxColor, setBoxColor] = useState('blue');
   const [targetLigand, setTargetLigand] = useState('');
   const [targetChain, setTargetChain] = useState('');
+  const [dismissRedocking, setDismissRedocking] = useState(false);
   const [rcsbLigands, setRcsbLigands] = useState<{id: string, chain: string}[]>([]);
   const [isDetectingPocket, setIsDetectingPocket] = useState(false);
+
+  // Accumulated results for comparison report
+  type AccumResult = { name: string; smiles: string; affinity: string; le: number; plipData?: any; isControl: boolean; };
+  const [accumulated, setAccumulated] = useState<AccumResult[]>([]);
+  const [controlIdx, setControlIdx] = useState<number | null>(null);
 
   const [config, setConfig] = useState({
     remove_salts: true,
@@ -94,6 +100,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
       if (data.success) {
         setReceptor({ id: data.pdbId, path: data.pdbPath, content: data.pdbContent, pocket: data.pocket });
         if (data.rcsbLigands) setRcsbLigands(data.rcsbLigands);
+        setDismissRedocking(false);
         if (data.pocket && data.pocket.success) {
           setGrid({
             cx: data.pocket.center.x, cy: data.pocket.center.y, cz: data.pocket.center.z,
@@ -155,6 +162,20 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
         setDockingResults(data.scores);
         setSessionInfo(data);
         setPlipData(null);
+        // Accumulate result for comparison report
+        const molName = entries[idx].name || ('mol_' + (idx + 1));
+        const molSmiles = entries[idx].smiles;
+        const bestAffinity = data.scores.length > 0 ? data.scores[0].affinity : '—';
+        setAccumulated(prev => {
+          const existing = prev.findIndex(r => r.smiles === molSmiles);
+          const entry: AccumResult = { name: molName, smiles: molSmiles, affinity: bestAffinity, le: data.le || 0, isControl: false };
+          if (existing >= 0) {
+            const updated = [...prev];
+            updated[existing] = { ...updated[existing], ...entry };
+            return updated;
+          }
+          return [...prev, entry];
+        });
       } else {
         alert(data.error || 'Docking failed');
       }
@@ -180,8 +201,19 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
         })
       });
       const data = await res.json();
-      if (data.error) alert(data.error);
-      else setPlipData(data);
+      if (data.error) { alert(data.error); }
+      else {
+        setPlipData(data);
+        // Save PLIP data into accumulated result for report
+        const molSmiles = entries[selectedIdx]?.smiles;
+        if (molSmiles) {
+          setAccumulated(prev => {
+            const i = prev.findIndex(r => r.smiles === molSmiles);
+            if (i >= 0) { const u = [...prev]; u[i] = { ...u[i], plipData: data }; return u; }
+            return prev;
+          });
+        }
+      }
     } catch (err) {
       alert('Error running PLIP analysis');
     } finally {
@@ -638,17 +670,36 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                       <div style={{ padding: '10px', backgroundColor: colors.successBg, border: `1px solid ${colors.success}`, borderRadius: radius.md, fontSize: '12px', color: colors.success }}>
                         <i className="bi bi-check-circle-fill me-2"></i> Receptor <b>{receptor.id}</b> Loaded
                       </div>
-                      {receptor.pocket?.inhibitor && (
-                        <button
-                          onClick={handleAddInhibitorForRedocking}
-                          style={{
-                            padding: '8px 12px', backgroundColor: '#fef3c7', color: '#92400e',
-                            border: '1px solid #fde68a', borderRadius: radius.md, fontSize: '11px',
-                            fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
-                          }}
-                        >
-                          <i className="bi bi-magic"></i> Add Inhibitor ({receptor.pocket.inhibitor}) for Redocking
-                        </button>
+                      {!dismissRedocking && receptor.pocket?.inhibitor && (
+                        <div style={{
+                          padding: '12px 16px', backgroundColor: '#fff7ed', border: '1px solid #fdba74', 
+                          borderRadius: radius.md, position: 'relative', minWidth: '300px',
+                          animation: 'slideIn 0.3s ease-out'
+                        }}>
+                          <button 
+                            onClick={() => setDismissRedocking(true)}
+                            style={{ position: 'absolute', top: '8px', right: '8px', background: 'none', border: 'none', color: '#9a3412', cursor: 'pointer', fontSize: '14px' }}
+                          >
+                            <i className="bi bi-x-lg"></i>
+                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ width: '32px', height: '32px', backgroundColor: '#ffedd5', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ea580c' }}>
+                              <i className="bi bi-magic"></i>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '12px', fontWeight: 700, color: '#9a3412' }}>Redocking Suggestion</div>
+                              <p style={{ fontSize: '11px', color: '#c2410c', margin: 0 }}>
+                                We found <b>{receptor.pocket.inhibitor}</b>. Add it for validation?
+                              </p>
+                              <button 
+                                onClick={handleAddInhibitorForRedocking}
+                                style={{ marginTop: '8px', padding: '4px 10px', backgroundColor: '#ea580c', color: '#fff', border: 'none', borderRadius: radius.sm, fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}
+                              >
+                                Yes, Prepare Redocking
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}

@@ -362,15 +362,47 @@ def merge_receptor_ligand(receptor_pdb_path, ligand_pdbqt_content, output_pdb_pa
     except Exception as e:
         return False, str(e)
 
-def calculate_rmsd(ref_pdb_path, docked_pdbqt_path):
-    """Calculates RMSD between co-crystallized and docked pose (simplified)."""
-    # This would require atom mapping, for now return a placeholder or 
-    # implement a simple distance-based RMSD if atoms match.
-    return 0.0
+def calculate_rmsd(ref_pdbqt_path, docked_pdbqt_content):
+    """
+    Calculates RMSD between a reference PDBQT file and a docked pose.
+    Matches atoms by name for redocking validation.
+    """
+    try:
+        def get_coords(content):
+            atoms = {}
+            for line in content.splitlines():
+                if line.startswith(("ATOM", "HETATM")):
+                    name = line[12:16].strip()
+                    try:
+                        x = float(line[30:38])
+                        y = float(line[38:46])
+                        z = float(line[46:54])
+                        atoms[name] = (x, y, z)
+                    except: continue
+                if line.startswith("ENDMDL"): break
+            return atoms
+
+        with open(ref_pdbqt_path, "r") as f:
+            ref_atoms = get_coords(f.read())
+        dock_atoms = get_coords(docked_pdbqt_content)
+
+        common = set(ref_atoms.keys()) & set(dock_atoms.keys())
+        if not common: return None
+
+        sq_dist = 0
+        for name in common:
+            p1 = ref_atoms[name]
+            p2 = dock_atoms[name]
+            sq_dist += sum((a - b)**2 for a, b in zip(p1, p2))
+        
+        return round(math.sqrt(sq_dist / len(common)), 3)
+    except:
+        return None
 
 def calculate_ligand_efficiency(affinity_kcal, smiles):
     """Calculates LE = -affinity / heavy_atom_count."""
     try:
+        from rdkit import Chem
         mol = Chem.MolFromSmiles(smiles)
         if not mol: return 0
         hac = mol.GetNumHeavyAtoms()

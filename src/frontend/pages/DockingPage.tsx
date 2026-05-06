@@ -49,6 +49,8 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
   const [boxColor, setBoxColor] = useState('blue');
   const [targetLigand, setTargetLigand] = useState('');
   const [targetChain, setTargetChain] = useState('');
+  const [rcsbLigands, setRcsbLigands] = useState<{id: string, chain: string}[]>([]);
+  const [isDetectingPocket, setIsDetectingPocket] = useState(false);
 
   const [config, setConfig] = useState({
     remove_salts: true,
@@ -91,6 +93,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
       const data = await res.json();
       if (data.success) {
         setReceptor({ id: data.pdbId, path: data.pdbPath, content: data.pdbContent, pocket: data.pocket });
+        if (data.rcsbLigands) setRcsbLigands(data.rcsbLigands);
         if (data.pocket && data.pocket.success) {
           setGrid({
             cx: data.pocket.center.x, cy: data.pocket.center.y, cz: data.pocket.center.z,
@@ -183,6 +186,34 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
       alert('Error running PLIP analysis');
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const handleDetectBox = async (ligId?: string, chainId?: string) => {
+    if (!receptor) return;
+    const lig = (ligId ?? targetLigand).trim() || null;
+    const ch = (chainId ?? targetChain).trim() || null;
+    setIsDetectingPocket(true);
+    try {
+      const res = await fetch('/api/docking/receptor/detect-pocket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pdbId: receptor.id, ligandId: lig, chainId: ch })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setGrid({
+          cx: data.center.x, cy: data.center.y, cz: data.center.z,
+          sx: data.size.x, sy: data.size.y, sz: data.size.z
+        });
+        if (ligId) { setTargetLigand(ligId); setTargetChain(chainId || ''); }
+      } else {
+        alert(data.error || 'Ligand not found in structure');
+      }
+    } catch {
+      alert('Error detecting pocket');
+    } finally {
+      setIsDetectingPocket(false);
     }
   };
 
@@ -593,20 +624,6 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                         style={{ flex: '1 1 150px', padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border}` }}
                         onKeyDown={e => e.key === 'Enter' && handleLoadReceptor(e.currentTarget.value)}
                       />
-                      <input
-                        type="text"
-                        placeholder="Ligand (e.g. RCX)"
-                        value={targetLigand}
-                        onChange={e => setTargetLigand(e.target.value.toUpperCase())}
-                        style={{ width: '130px', padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border}` }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Chain"
-                        value={targetChain}
-                        onChange={e => setTargetChain(e.target.value.toUpperCase())}
-                        style={{ width: '70px', padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border}` }}
-                      />
                       <button
                         onClick={() => handleLoadReceptor((document.getElementById('pdb-id-input') as HTMLInputElement).value)}
                         disabled={isLoadingReceptor}
@@ -641,6 +658,64 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                   <div style={{ display: 'flex', gap: '24px' }}>
                     <div style={{ flex: '1 1 500px' }}>
                       <h6 style={{ fontWeight: 700, marginBottom: '12px' }}>Grid Box Configuration</h6>
+
+                      {/* Ligand-based pocket detection */}
+                      <div style={{ backgroundColor: '#f8fafc', border: `1px solid ${colors.border}`, borderRadius: radius.md, padding: '12px', marginBottom: '16px' }}>
+                        <p style={{ fontSize: '11px', fontWeight: 700, color: colors.textMuted, marginBottom: '8px' }}>
+                          <i className="bi bi-crosshair" style={{ marginRight: '5px' }}></i>
+                          Detect Box from PDB Ligand
+                        </p>
+                        {rcsbLigands.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+                            {rcsbLigands.map((lig, i) => (
+                              <button
+                                key={i}
+                                onClick={() => handleDetectBox(lig.id, lig.chain)}
+                                disabled={isDetectingPocket}
+                                style={{
+                                  padding: '4px 10px', fontSize: '11px', fontWeight: 700, borderRadius: '100px',
+                                  border: `1px solid ${targetLigand === lig.id && targetChain === (lig.chain || '') ? colors.navy : colors.border}`,
+                                  backgroundColor: targetLigand === lig.id && targetChain === (lig.chain || '') ? colors.navy : '#fff',
+                                  color: targetLigand === lig.id && targetChain === (lig.chain || '') ? '#fff' : colors.text,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {lig.id}{lig.chain ? ' / ' + lig.chain : ''}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            placeholder="Ligand ID (e.g. RCX)"
+                            value={targetLigand}
+                            onChange={e => setTargetLigand(e.target.value.toUpperCase())}
+                            style={{ flex: 1, padding: '7px 10px', borderRadius: radius.md, border: `1px solid ${colors.border}`, fontSize: '12px', fontFamily: 'monospace' }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Chain"
+                            value={targetChain}
+                            onChange={e => setTargetChain(e.target.value.toUpperCase())}
+                            style={{ width: '70px', padding: '7px 10px', borderRadius: radius.md, border: `1px solid ${colors.border}`, fontSize: '12px' }}
+                          />
+                          <button
+                            onClick={() => handleDetectBox()}
+                            disabled={isDetectingPocket || !targetLigand.trim()}
+                            style={{
+                              padding: '7px 14px', backgroundColor: colors.navy, color: '#fff',
+                              border: 'none', borderRadius: radius.md, fontSize: '12px', fontWeight: 700,
+                              cursor: isDetectingPocket || !targetLigand.trim() ? 'not-allowed' : 'pointer',
+                              opacity: isDetectingPocket || !targetLigand.trim() ? 0.6 : 1,
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {isDetectingPocket ? '...' : 'Detect Box'}
+                          </button>
+                        </div>
+                      </div>
+
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
                         {['cx', 'cy', 'cz'].map(k => (
                           <div key={k}>
@@ -727,7 +802,14 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                               <div key={i} style={{ padding: '10px', backgroundColor: i === (plipData?.poseIdx || 0) ? '#f0fdf4' : colors.bg, border: `1px solid ${i === (plipData?.poseIdx || 0) ? colors.success : colors.border}`, borderRadius: radius.md, display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <span style={{ fontWeight: 700 }}>Pose {r.mode}</span>
-                                  <span style={{ color: colors.danger, fontWeight: 700 }}>{r.affinity} kcal/mol</span>
+                                  <div style={{ textAlign: 'right' }}>
+                                    <div style={{ color: colors.danger, fontWeight: 700, fontSize: '14px' }}>{r.affinity} kcal/mol</div>
+                                    {r.rmsd !== null && (
+                                      <div style={{ fontSize: '10px', color: colors.primary, fontWeight: 700 }}>
+                                        RMSD: {r.rmsd}Å
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                                 <button
                                   onClick={() => handleAnalyze(i)}
@@ -762,11 +844,30 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                           <h6 style={{ fontWeight: 700, fontSize: '12px', marginBottom: '10px' }}>Structural Interactions</h6>
                           {plipData.interactions.hbonds.length > 0 && (
                             <div style={{ marginBottom: '10px' }}>
-                              <p style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: colors.danger }}>Hydrogen Bonds</p>
+                              <p style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: '#16a34a' }}>Hydrogen Bonds ({plipData.interactions.hbonds.length})</p>
                               {plipData.interactions.hbonds.map((h: any, i: number) => (
-                                <div key={i} style={{ fontSize: '10px', color: colors.textMuted }}>• {h.residue} ({h.distance}Å)</div>
+                                <div key={i} style={{ fontSize: '10px', color: colors.textMuted }}>• {h.residue} ({h.dist}Å)</div>
                               ))}
                             </div>
+                          )}
+                          {plipData.interactions.hydrophobic.length > 0 && (
+                            <div style={{ marginBottom: '10px' }}>
+                              <p style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: '#2563eb' }}>Hydrophobic ({plipData.interactions.hydrophobic.length})</p>
+                              {plipData.interactions.hydrophobic.map((h: any, i: number) => (
+                                <div key={i} style={{ fontSize: '10px', color: colors.textMuted }}>• {h.residue} ({h.dist}Å)</div>
+                              ))}
+                            </div>
+                          )}
+                          {plipData.interactions.pi_stacking.length > 0 && (
+                            <div style={{ marginBottom: '10px' }}>
+                              <p style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: '#9333ea' }}>π-Stacking ({plipData.interactions.pi_stacking.length})</p>
+                              {plipData.interactions.pi_stacking.map((h: any, i: number) => (
+                                <div key={i} style={{ fontSize: '10px', color: colors.textMuted }}>• {h.residue} ({h.dist}Å)</div>
+                              ))}
+                            </div>
+                          )}
+                          {plipData.interactions.hbonds.length === 0 && plipData.interactions.hydrophobic.length === 0 && plipData.interactions.pi_stacking.length === 0 && (
+                            <p style={{ fontSize: '11px', color: colors.textMuted }}>No significant interactions detected.</p>
                           )}
                         </div>
                       )}

@@ -66,6 +66,24 @@ def init_docking_routes(app):
             with open(orig_path, "w") as f:
                 f.write(pdb_content)
 
+            # --- Save Native Ligand PDBQT for Redocking Comparison ---
+            if pocket_data.get("success") and pocket_data.get("inhibitor"):
+                from docking_utils import extract_inhibitor_smiles
+                res_name = pocket_data["inhibitor"]
+                cid = pocket_data.get("chain")
+                
+                native_pdbqt_path = os.path.join(session_dir, "native.pdbqt")
+                native_lines = []
+                for line in pdb_content.splitlines():
+                    if line.startswith(("HETATM", "ATOM")):
+                        rn = line[17:20].strip()
+                        curr_cid = line[21:22].strip()
+                        if rn == res_name and (not cid or curr_cid == cid):
+                            native_lines.append(line)
+                if native_lines:
+                    with open(native_pdbqt_path, "w") as f:
+                        f.write("\n".join(native_lines))
+
             return jsonify({
                 "success": True,
                 "pdbId": pdb_id,
@@ -176,17 +194,43 @@ def init_docking_routes(app):
                 result_vina = subprocess.run(vina_cmd, check=True, capture_output=True, text=True)
                 vina_output = result_vina.stdout
                 
+                from docking_utils import calculate_rmsd
+                native_pdbqt = os.path.join(session_dir, "native.pdbqt")
+                has_native = os.path.exists(native_pdbqt)
+
                 scores = []
-                lines = vina_output.splitlines()
+                vina_output_lines = vina_output.splitlines()
                 capture = False
-                for line in lines:
+                for line in vina_output_lines:
                     if "mode |   affinity" in line: capture = True; continue
                     if capture and line.startswith("-----"): continue
                     if capture and line.strip() == "" and len(scores) > 0: break
                     if capture:
                         parts = line.split()
                         if len(parts) >= 4 and parts[0].isdigit():
-                            scores.append({"mode": parts[0], "affinity": parts[1]})
+                            mode_idx = int(parts[0]) - 1 # 0-indexed
+                            # Extract this pose content for RMSD
+                            pose_content = ""
+                            curr_m = 0
+                            with open(output_path, "r") as f:
+                                cap_m = False
+                                for pline in f:
+                                    if pline.startswith("MODEL"):
+                                        if curr_m == mode_idx: cap_m = True
+                                    if cap_m: pose_content += pline
+                                    if pline.startswith("ENDMDL"):
+                                        if cap_m: break
+                                        curr_m += 1
+                            
+                            rmsd = None
+                            if has_native and pose_content:
+                                rmsd = calculate_rmsd(native_pdbqt, pose_content)
+                            
+                            scores.append({
+                                "mode": parts[0], 
+                                "affinity": parts[1],
+                                "rmsd": rmsd
+                            })
 
                 complex_path = os.path.join(session_dir, "complex.pdb")
                 best_pose_pdbqt = ""
@@ -203,6 +247,7 @@ def init_docking_routes(app):
                     "success": True,
                     "scores": scores,
                     "le": le,
+                    "hasNative": has_native,
                     "outputPdbqt": output_path,
                     "complexPath": complex_path,
                     "sessionId": os.path.basename(session_dir)

@@ -7,7 +7,8 @@ docker compose down
 
 # 2. Build e Start (Build das IAs e do Frontend)
 echo "📦 Construindo containers (isso pode demorar alguns minutos)..."
-docker compose up --build -d
+docker compose build --no-cache
+docker compose up -d
 
 # 3. Limpar imagens antigas para economizar espaço no VPS
 docker image prune -f

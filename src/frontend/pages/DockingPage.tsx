@@ -162,7 +162,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
     }
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = async (poseIdx = 0) => {
     if (!sessionInfo?.complexPath) return;
     setIsAnalyzing(true);
     try {
@@ -171,6 +171,8 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           complexPath: sessionInfo.complexPath,
+          sessionId: sessionInfo.sessionId,
+          poseIdx: poseIdx,
           smiles: entries[selectedIdx].smiles
         })
       });
@@ -720,9 +722,18 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                           <h6 style={{ fontWeight: 700, fontSize: '13px', marginBottom: '10px' }}>Results (Scores)</h6>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
                             {dockingResults.map((r, i) => (
-                              <div key={i} style={{ padding: '10px', backgroundColor: i === 0 ? '#f0fdf4' : colors.bg, border: `1px solid ${i === 0 ? colors.success : colors.border}`, borderRadius: radius.md, display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ fontWeight: 700 }}>Pose {r.mode}</span>
-                                <span style={{ color: colors.danger, fontWeight: 700 }}>{r.affinity} kcal/mol</span>
+                              <div key={i} style={{ padding: '10px', backgroundColor: i === (plipData?.poseIdx || 0) ? '#f0fdf4' : colors.bg, border: `1px solid ${i === (plipData?.poseIdx || 0) ? colors.success : colors.border}`, borderRadius: radius.md, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontWeight: 700 }}>Pose {r.mode}</span>
+                                  <span style={{ color: colors.danger, fontWeight: 700 }}>{r.affinity} kcal/mol</span>
+                                </div>
+                                <button
+                                  onClick={() => handleAnalyze(i)}
+                                  disabled={isAnalyzing}
+                                  style={{ width: '100%', padding: '4px', fontSize: '10px', backgroundColor: colors.navy, color: '#fff', border: 'none', borderRadius: radius.sm, cursor: 'pointer' }}
+                                >
+                                  {isAnalyzing && (plipData?.poseIdx === i) ? 'Analyzing...' : '🔍 Analyze Interactions'}
+                                </button>
                               </div>
                             ))}
                           </div>

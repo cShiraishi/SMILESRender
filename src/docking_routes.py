@@ -175,10 +175,45 @@ def init_docking_routes(app):
 
     @app.route("/api/docking/analyze", methods=["POST"])
     def analyze_interactions():
+        """Runs PLIP analysis on a specific docking complex or pose."""
         try:
-            from docking_utils import generate_2d_interaction_diagram
+            from docking_utils import generate_2d_interaction_diagram, merge_receptor_ligand
             data = request.get_json()
             complex_path = data.get("complexPath")
+            pose_idx = data.get("poseIdx", 0) # 0-indexed
+            session_id = data.get("sessionId")
+            
+            if session_id and pose_idx > 0:
+                # Need to extract specific pose from output.pdbqt
+                session_dir = os.path.join(DOCKING_WORKSPACE, session_id)
+                output_path = os.path.join(session_dir, "output.pdbqt")
+                receptor_path = None
+                # Find receptor path in session dir
+                for f in os.listdir(session_dir):
+                    if f.endswith("_cleaned.pdb"):
+                        receptor_path = os.path.join(session_dir, f)
+                        break
+                
+                if os.path.exists(output_path) and receptor_path:
+                    pose_pdbqt = ""
+                    curr_idx = 0
+                    with open(output_path, "r") as f:
+                        capturing = False
+                        for line in f:
+                            if line.startswith("MODEL"):
+                                if curr_idx == pose_idx: capturing = True
+                            if capturing:
+                                pose_pdbqt += line
+                                if line.startswith("ENDMDL"):
+                                    capturing = False
+                                    break
+                            if line.startswith("ENDMDL"):
+                                curr_idx += 1
+                    
+                    if pose_pdbqt:
+                        complex_path = os.path.join(session_dir, "complex_" + str(pose_idx) + ".pdb")
+                        merge_receptor_ligand(receptor_path, pose_pdbqt, complex_path)
+
             if not complex_path or not os.path.exists(complex_path):
                 return jsonify({"error": "Complex file not found"}), 404
             
@@ -194,6 +229,7 @@ def init_docking_routes(app):
             diagram_svg = generate_2d_interaction_diagram(ligand_smiles, plip_data) if ligand_smiles else None
             
             plip_data["diagram"] = diagram_svg
+            plip_data["poseIdx"] = pose_idx
             return jsonify(plip_data)
         except Exception as e:
             return jsonify({"error": str(e)}), 500

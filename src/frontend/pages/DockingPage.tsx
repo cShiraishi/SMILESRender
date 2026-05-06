@@ -804,6 +804,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                                   <span style={{ fontWeight: 700 }}>Pose {r.mode}</span>
                                   <div style={{ textAlign: 'right' }}>
                                     <div style={{ color: colors.danger, fontWeight: 700, fontSize: '14px' }}>{r.affinity} kcal/mol</div>
+                                    <div style={{ fontSize: '11px', color: colors.success, fontWeight: 700 }}>Est. Ki: {r.ki}</div>
                                     {r.rmsd !== null && (
                                       <div style={{ fontSize: '10px', color: colors.primary, fontWeight: 700 }}>
                                         RMSD: {r.rmsd}Å

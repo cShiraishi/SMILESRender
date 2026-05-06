@@ -226,10 +226,26 @@ def init_docking_routes(app):
                             if has_native and pose_content:
                                 rmsd = calculate_rmsd(native_pdbqt, pose_content)
                             
+                            # Predicted Inhibition (Ki) calculation
+                            # dG = RT ln Ki => Ki = exp(dG / RT)
+                            # R = 1.987e-3 kcal/mol/K, T = 298.15 K => RT = 0.592
+                            try:
+                                dg = float(parts[1])
+                                ki_val = math.exp(dg / 0.592)
+                                if ki_val < 1e-6:
+                                    ki_str = "{:.2f} nM".format(ki_val * 1e9)
+                                elif ki_val < 1e-3:
+                                    ki_str = "{:.2f} µM".format(ki_val * 1e6)
+                                else:
+                                    ki_str = "{:.2f} mM".format(ki_val * 1e3)
+                            except:
+                                ki_str = "N/A"
+
                             scores.append({
                                 "mode": parts[0], 
                                 "affinity": parts[1],
-                                "rmsd": rmsd
+                                "rmsd": rmsd,
+                                "ki": ki_str
                             })
 
                 complex_path = os.path.join(session_dir, "complex.pdb")

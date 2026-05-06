@@ -168,7 +168,19 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
         const bestAffinity = data.scores.length > 0 ? data.scores[0].affinity : '—';
         setAccumulated(prev => {
           const existing = prev.findIndex(r => r.smiles === molSmiles);
-          const entry: AccumResult = { name: molName, smiles: molSmiles, affinity: bestAffinity, le: data.le || 0, isControl: false };
+          // Auto-set as control if it's the first one OR if it's the native inhibitor
+          const shouldBeControl = prev.length === 0 || molName.includes(receptor?.pocket?.inhibitor || '___');
+          const isCtrl = shouldBeControl && !prev.some(r => r.isControl);
+          
+          const entry: AccumResult = { 
+            name: molName, 
+            smiles: molSmiles, 
+            affinity: bestAffinity, 
+            le: data.le || 0, 
+            isControl: isCtrl 
+          };
+          if (isCtrl) setControlIdx(existing >= 0 ? existing : prev.length);
+
           if (existing >= 0) {
             const updated = [...prev];
             updated[existing] = { ...updated[existing], ...entry };
@@ -1063,6 +1075,11 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                               <i className="bi bi-file-earmark-text me-1"></i> Report
                             </button>
                           </div>
+                          {!accumulated.some(r => r.isControl) && (
+                             <div style={{ fontSize: '10px', color: '#b45309', backgroundColor: '#fffbeb', padding: '6px 8px', borderRadius: '4px', marginBottom: '8px', border: '1px solid #fcd34d' }}>
+                               <i className="bi bi-info-circle-fill me-1"></i> Click the star <b>☆</b> to set a reference for comparison.
+                             </div>
+                          )}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             {(() => {
                               const ctrl = accumulated.find(r => r.isControl);

@@ -30,10 +30,16 @@ def _find_vina():
 
 VINA_EXE = _find_vina()
 
+_DOCKING_ROUTES_INIT = False
+
 def init_docking_routes(app):
+    global _DOCKING_ROUTES_INIT
+    if _DOCKING_ROUTES_INIT:
+        return
+    _DOCKING_ROUTES_INIT = True
     
     @app.route("/api/docking/receptor/load-pdb-id", methods=["POST"])
-    def load_receptor_by_id():
+    def load_receptor_by_id_endpoint():
         """Downloads PDB by ID, cleans it, and auto-detects the pocket."""
         try:
             from docking_utils import get_pdb_from_rcsb, auto_detect_pocket_from_inhibitor, clean_pdb_for_docking, get_rcsb_ligands
@@ -349,25 +355,69 @@ def init_docking_routes(app):
         sy = request.args.get("sy", "20")
         sz = request.args.get("sz", "20")
         color = request.args.get("color", "blue")
-        
-        # Add a version comment to help debug if the server is updated
-        # Version: 2026-05-06-B
-        
+        session_id = request.args.get("session", "")
+        pose_idx = request.args.get("pose", "0")
+        affinity = request.args.get("aff", "")
+
+        # Build the complex PDB URL if a session is available
+        complex_file = "complex.pdb" if pose_idx == "0" else ("complex_" + str(pose_idx) + ".pdb")
+        complex_url = ("/api/docking/files/" + str(session_id) + "/" + complex_file) if session_id else ""
+
         return """<!DOCTYPE html>
 <html>
 <head>
     <script src="https://3dmol.org/build/3Dmol-min.js"></script>
     <style>
-        body { margin: 0; padding: 0; overflow: hidden; background: white; }
-        #v { width: 100vw; height: 100vh; position: relative; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { overflow: hidden; background: #1a1a2e; font-family: -apple-system, sans-serif; }
+        #v { width: 100vw; height: 100vh; }
         #err { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
                background:#fff3cd; border:1px solid #ffc107; padding:16px 24px;
-               border-radius:8px; font-family:sans-serif; font-size:14px; color:#856404; text-align:center; }
+               border-radius:8px; font-size:14px; color:#856404; text-align:center; }
+        /* Badge: affinity top-left */
+        #badge {
+            display:none; position:absolute; top:10px; left:10px;
+            background:rgba(0,0,0,0.75); color:#fff; border-radius:8px;
+            padding:8px 14px; font-size:12px; line-height:1.6;
+            backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,0.15);
+        }
+        /* Style toolbar: top-right */
+        #toolbar {
+            position:absolute; top:10px; right:10px;
+            display:flex; flex-direction:column; gap:4px;
+        }
+        .tb-group {
+            background:rgba(0,0,0,0.7); border-radius:8px; padding:6px 8px;
+            backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,0.12);
+        }
+        .tb-label {
+            font-size:9px; font-weight:700; color:rgba(255,255,255,0.5);
+            text-transform:uppercase; letter-spacing:0.6px; margin-bottom:4px;
+        }
+        .tb-row { display:flex; gap:3px; }
+        .tb-btn {
+            padding:4px 8px; border:1px solid rgba(255,255,255,0.2); border-radius:5px;
+            background:rgba(255,255,255,0.08); color:#fff; font-size:10px; font-weight:600;
+            cursor:pointer; transition:all 0.15s; white-space:nowrap;
+        }
+        .tb-btn:hover { background:rgba(255,255,255,0.2); }
+        .tb-btn.active { background:#6366f1; border-color:#818cf8; }
+        /* Legend: bottom-left */
+        #legend {
+            position:absolute; bottom:10px; left:10px;
+            background:rgba(0,0,0,0.65); color:#fff; border-radius:8px;
+            padding:8px 12px; font-size:11px; line-height:1.9;
+            backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,0.1);
+        }
+        .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align:middle; }
     </style>
 </head>
 <body>
     <div id="v"></div>
     <div id="err"></div>
+    <div id="badge"></div>
+    <div id="toolbar"></div>
+    <div id="legend"></div>
     <script>
         var pdbId = \"""" + str(pdb_id) + """\";
         var cx = parseFloat(\"""" + str(cx) + """\");
@@ -377,35 +427,253 @@ def init_docking_routes(app):
         var sy = parseFloat(\"""" + str(sy) + """\");
         var sz = parseFloat(\"""" + str(sz) + """\");
         var boxColor = \"""" + str(color) + """\";
+        var complexUrl = \"""" + str(complex_url) + """\";
+        var affinity = \"""" + str(affinity) + """\";
+        var poseIdx = \"""" + str(pose_idx) + """\";
+
+        var viewer = null;
+        var hasLigand = false;
+        var currentLigStyle = "ballstick";
+        var currentRecStyle = "cartoon";
+        var surfaceObj = null;
+        var showSurface = false;
+        var showBox = true;
+        var boxObj = null;
+        // model indices: 0 = receptor, 1 = ligand
+        var REC = 0;
+        var LIG = 1;
+
+        var sessionId = complexUrl ? complexUrl.split("/")[3] : "";
+        var ligandUrl = sessionId
+            ? "/api/docking/ligand/" + sessionId + "?pose=" + poseIdx
+            : "";
 
         function showErr(msg) {
-            var el = document.getElementById("err");
-            el.textContent = msg;
-            el.style.display = "block";
+            document.getElementById("err").textContent = msg;
+            document.getElementById("err").style.display = "block";
+        }
+
+        // ── Ligand style definitions (model: LIG) ──────────────────
+        var ligStyles = {
+            ballstick: function() {
+                viewer.setStyle({ model: LIG }, {
+                    stick:  { colorscheme: "elementPlusCarbon", radius: 0.18 },
+                    sphere: { colorscheme: "elementPlusCarbon", scale: 0.32 }
+                });
+            },
+            stick: function() {
+                viewer.setStyle({ model: LIG }, {
+                    stick: { colorscheme: "elementPlusCarbon", radius: 0.22 }
+                });
+            },
+            sphere: function() {
+                viewer.setStyle({ model: LIG }, {
+                    sphere: { colorscheme: "elementPlusCarbon" }
+                });
+            },
+            line: function() {
+                viewer.setStyle({ model: LIG }, {
+                    line: { colorscheme: "elementPlusCarbon", linewidth: 4 }
+                });
+            },
+            cross: function() {
+                viewer.setStyle({ model: LIG }, {
+                    cross: { colorscheme: "elementPlusCarbon", radius: 0.25 }
+                });
+            }
+        };
+
+        // ── Receptor style definitions (model: REC) ─────────────────
+        var recStyles = {
+            cartoon: function() {
+                viewer.setStyle({ model: REC }, {
+                    cartoon: { colorscheme: "spectrum", opacity: 0.85 }
+                });
+            },
+            surface: function() {
+                viewer.setStyle({ model: REC }, {
+                    cartoon: { colorscheme: "spectrum", opacity: 0.12 }
+                });
+            },
+            line: function() {
+                viewer.setStyle({ model: REC }, {
+                    line: { colorscheme: "spectrum", opacity: 0.7 }
+                });
+            },
+            ribbon: function() {
+                viewer.setStyle({ model: REC }, {
+                    ribbon: { colorscheme: "spectrum", opacity: 0.85 }
+                });
+            }
+        };
+
+        function applyStyles() {
+            // Reset each model separately
+            viewer.setStyle({ model: REC }, {});
+            if (hasLigand) viewer.setStyle({ model: LIG }, {});
+
+            if (recStyles[currentRecStyle]) recStyles[currentRecStyle]();
+            if (hasLigand && ligStyles[currentLigStyle]) ligStyles[currentLigStyle]();
+
+            // Pocket surface
+            if (surfaceObj !== null) { viewer.removeSurface(surfaceObj); surfaceObj = null; }
+            if (showSurface && hasLigand) {
+                surfaceObj = viewer.addSurface($3Dmol.SurfaceType.MS, {
+                    opacity: currentRecStyle === "surface" ? 0.55 : 0.18,
+                    colorscheme: { prop: "b", gradient: "sinebow" }
+                }, { model: REC, within: { distance: 6, sel: { model: LIG } } });
+            }
+            viewer.render();
+        }
+
+        function addBox() {
+            if (boxObj !== null) { try { viewer.removeShape(boxObj); } catch(e){} boxObj = null; }
+            if (showBox) {
+                boxObj = viewer.addBox({
+                    center: { x: cx, y: cy, z: cz },
+                    dimensions: { w: sx, h: sy, d: sz },
+                    color: boxColor, wireframe: true, linewidth: 2, opacity: 0.9
+                });
+            }
+            viewer.render();
+        }
+
+        function buildToolbar() {
+            var tb = document.getElementById("toolbar");
+            var ligRow = hasLigand
+                ? "<div class='tb-group'>" +
+                    "<div class='tb-label'>Ligante</div>" +
+                    "<div class='tb-row'>" +
+                      "<button class='tb-btn active' id='ls-ballstick' onclick='setLigStyle(\"ballstick\")'>Ball&amp;Stick</button>" +
+                      "<button class='tb-btn' id='ls-stick'   onclick='setLigStyle(\"stick\")'>Stick</button>" +
+                      "<button class='tb-btn' id='ls-sphere'  onclick='setLigStyle(\"sphere\")'>Sphere</button>" +
+                      "<button class='tb-btn' id='ls-line'    onclick='setLigStyle(\"line\")'>Line</button>" +
+                      "<button class='tb-btn' id='ls-cross'   onclick='setLigStyle(\"cross\")'>Cross</button>" +
+                    "</div></div>"
+                : "";
+            tb.innerHTML = ligRow +
+                "<div class='tb-group'>" +
+                  "<div class='tb-label'>Receptor</div>" +
+                  "<div class='tb-row'>" +
+                    "<button class='tb-btn active' id='rs-cartoon' onclick='setRecStyle(\"cartoon\")'>Cartoon</button>" +
+                    "<button class='tb-btn' id='rs-surface'  onclick='setRecStyle(\"surface\")'>Surface</button>" +
+                    "<button class='tb-btn' id='rs-ribbon'   onclick='setRecStyle(\"ribbon\")'>Ribbon</button>" +
+                    "<button class='tb-btn' id='rs-line'     onclick='setRecStyle(\"line\")'>Line</button>" +
+                  "</div>" +
+                "</div>" +
+                "<div class='tb-group'>" +
+                  "<div class='tb-label'>Extras</div>" +
+                  "<div class='tb-row'>" +
+                    (hasLigand ? "<button class='tb-btn' id='btn-surface' onclick='toggleSurface()'>Pocket Surface</button>" : "") +
+                    "<button class='tb-btn active' id='btn-box' onclick='toggleBox()'>Grid Box</button>" +
+                    (hasLigand ? "<button class='tb-btn' onclick='zoomLig()'>Zoom Ligante</button>" : "") +
+                    "<button class='tb-btn' onclick='viewer.zoomTo({model:REC});viewer.render()'>Zoom Tudo</button>" +
+                  "</div>" +
+                "</div>";
+        }
+
+        function zoomLig() { viewer.zoomTo({ model: LIG }); viewer.render(); }
+
+        function setLigStyle(s) {
+            currentLigStyle = s;
+            document.querySelectorAll("[id^='ls-']").forEach(function(b) { b.classList.remove("active"); });
+            var el = document.getElementById("ls-" + s); if (el) el.classList.add("active");
+            applyStyles();
+        }
+        function setRecStyle(s) {
+            currentRecStyle = s;
+            document.querySelectorAll("[id^='rs-']").forEach(function(b) { b.classList.remove("active"); });
+            var el = document.getElementById("rs-" + s); if (el) el.classList.add("active");
+            applyStyles();
+        }
+        function toggleSurface() {
+            showSurface = !showSurface;
+            var btn = document.getElementById("btn-surface");
+            if (btn) btn.classList.toggle("active", showSurface);
+            applyStyles();
+        }
+        function toggleBox() {
+            showBox = !showBox;
+            var btn = document.getElementById("btn-box");
+            if (btn) btn.classList.toggle("active", showBox);
+            addBox();
+        }
+
+        function finishScene() {
+            addBox();
+            if (hasLigand) {
+                viewer.zoomTo({ model: LIG });
+            } else {
+                viewer.zoomTo({ model: REC });
+            }
+            applyStyles();
+            buildToolbar();
+
+            if (hasLigand && affinity) {
+                var badge = document.getElementById("badge");
+                badge.innerHTML = "<b>Pose " + (parseInt(poseIdx)+1) + "</b><br>\\u0394G: <b style='color:#f87171'>" + affinity + " kcal/mol</b>";
+                badge.style.display = "block";
+            }
+
+            var leg = document.getElementById("legend");
+            var html = hasLigand ? "<span class='dot' style='background:#ff6b6b'></span>Ligante<br>" : "";
+            html += "<span class='dot' style='background:linear-gradient(90deg,#4ecdc4,#556b9e)'></span>Receptor<br>";
+            html += "<span class='dot' style='background:transparent;border:2px solid " + boxColor + ";border-radius:2px'></span>Grid Box";
+            leg.innerHTML = html;
         }
 
         if (!pdbId || pdbId.length !== 4) {
             showErr("No PDB ID provided.");
         } else {
-            var viewer = $3Dmol.createViewer(document.getElementById("v"), { backgroundColor: "white" });
+            viewer = $3Dmol.createViewer(document.getElementById("v"), { backgroundColor: "#1a1a2e" });
+
+            // Always load receptor from RCSB (model 0) — reliable cartoon rendering
             $3Dmol.download("pdb:" + pdbId, viewer, {}, function() {
-                viewer.setStyle({}, { cartoon: { colorscheme: "spectrum", opacity: 0.8 } });
-                viewer.addBox({
-                    center: { x: cx, y: cy, z: cz },
-                    dimensions: { w: sx, h: sy, d: sz },
-                    color: boxColor,
-                    wireframe: true,
-                    linewidth: 2
-                });
-                viewer.zoomTo();
-                viewer.render();
+                if (ligandUrl) {
+                    // Load only ligand atoms as separate model (model 1)
+                    fetch(ligandUrl)
+                        .then(function(r) { return r.ok ? r.text() : Promise.reject(); })
+                        .then(function(pdbText) {
+                            viewer.addModel(pdbText, "pdb");
+                            hasLigand = true;
+                            finishScene();
+                        })
+                        .catch(function() {
+                            hasLigand = false;
+                            finishScene();
+                        });
+                } else {
+                    hasLigand = false;
+                    finishScene();
+                }
             });
+
             viewer.resize();
             window.addEventListener("resize", function() { viewer.resize(); });
         }
     </script>
 </body>
 </html>"""
+
+    @app.route("/api/docking/ligand/<session_id>")
+    def serve_ligand_pdb(session_id):
+        """Returns only the ligand atoms (HETATM) from the docked complex as a mini-PDB."""
+        try:
+            pose_idx = int(request.args.get("pose", "0"))
+            session_dir = os.path.join(DOCKING_WORKSPACE, session_id)
+            complex_file = "complex.pdb" if pose_idx == 0 else ("complex_" + str(pose_idx) + ".pdb")
+            complex_path = os.path.join(session_dir, complex_file)
+            if not os.path.exists(complex_path):
+                return "Pose not found", 404
+            lines = []
+            with open(complex_path, "r") as f:
+                for line in f:
+                    if line.startswith("HETATM") or line.startswith("CONECT") or line.startswith("END"):
+                        lines.append(line)
+            from flask import Response
+            return Response("\n".join(l.rstrip() for l in lines), mimetype="text/plain")
+        except Exception as e:
+            return str(e), 500
 
     @app.route("/api/docking/files/<session_id>/<filename>")
     def serve_docking_file(session_id, filename):

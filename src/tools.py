@@ -16,13 +16,8 @@ def micro_hash(input):
 
     return base62_hash
 
-
-def read_csv(
-    file: TextIOWrapper,
-    delimiter,
-    smiles_column,
-    names_column | None = None,
-) :
+# Standard CSV reader for molecular data
+def read_csv(file, delimiter, smiles_column, names_column=None):
     csv_data = csv.DictReader(file, delimiter=delimiter)
 
     if not csv_data:
@@ -37,8 +32,8 @@ def read_csv(
     else:
         raise Exception("Could not read csv file")
 
-    smiles[str] = []
-    names[str] = []
+    smiles = []
+    names = []
 
     for row in csv_data:
         smiles.append(row[smiles_column].strip())
@@ -48,3 +43,4 @@ def read_csv(
             names.append("")
 
     return list(zip(smiles, names))
+

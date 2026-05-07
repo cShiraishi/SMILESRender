@@ -1,6 +1,6 @@
 """
 Rule-based ADMET interpretation engine.
-Takes organised data (smiles → tool → category → rows) and returns
+Takes organised data (smiles     tool     category     rows) and returns
 a structured risk profile per molecule.
 """
 
@@ -28,16 +28,16 @@ RISK_HEX = {
 @dataclass
 class Flag:
     level: RiskLevel
-    tool
-    text
+    tool: str
+    text: str
 
 
 @dataclass
 class MoleculeProfile:
-    smiles
-    flags[Flag] = field(default_factory=list)
+    smiles: str
+    flags: list = field(default_factory=list)
     overall: RiskLevel = "low"
-    narrative = ""
+    narrative: str = ""
 
     def add(self, flag: Flag):
         self.flags.append(flag)
@@ -54,11 +54,11 @@ class MoleculeProfile:
         return [f for f in self.flags if f.level == "low"]
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+#                                                                                                                                                                                                                                           
 # Helpers
-# ──────────────────────────────────────────────────────────────────────────────
+#                                                                                                                                                                                                                                           
 
-def _find(tools, tool, *keywords) -> str | None:
+def _find(tools, tool, *keywords):
     """Return first Value whose Property contains ALL keywords (case-insensitive)."""
     for cat_rows in tools.get(tool, {}).values():
         for row in cat_rows:
@@ -68,7 +68,7 @@ def _find(tools, tool, *keywords) -> str | None:
     return None
 
 
-def _num(val | None) -> float | None:
+def _num(val=None):
     if val is None:
         return None
     import re
@@ -76,7 +76,7 @@ def _num(val | None) -> float | None:
     return float(m.group()) if m else None
 
 
-def _yes(val | None) -> bool | None:
+def _yes(val=None):
     if val is None:
         return None
     v = val.strip().lower()
@@ -87,9 +87,9 @@ def _yes(val | None) -> bool | None:
     return None
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+#                                                                                                                                                                                                                                           
 # Per-tool rule sets
-# ──────────────────────────────────────────────────────────────────────────────
+#                                                                                                                                                                                                                                           
 
 def _check_stoptox(tools, p: MoleculeProfile):
     # StopTox stores data with Category = "Toxicity", Property = column header
@@ -102,32 +102,32 @@ def _check_stoptox(tools, p: MoleculeProfile):
             if "oral" in prop and n is not None:
                 if n < 50:
                     p.add(Flag("critical", "StopTox",
-                               "Oral LD50 {} mg/kg — extremely/very toxic (GHS Class 1-2)".format(n)))
+                               "Oral LD50 {} mg/kg     extremely/very toxic (GHS Class 1-2)".format(n)))
                 elif n < 300:
                     p.add(Flag("high", "StopTox",
-                               "Oral LD50 {} mg/kg — toxic (GHS Class 3)".format(n)))
+                               "Oral LD50 {} mg/kg     toxic (GHS Class 3)".format(n)))
                 elif n < 2000:
                     p.add(Flag("medium", "StopTox",
-                               "Oral LD50 {} mg/kg — harmful (GHS Class 4)".format(n)))
+                               "Oral LD50 {} mg/kg     harmful (GHS Class 4)".format(n)))
                 else:
                     p.add(Flag("low", "StopTox",
-                               "Oral LD50 {} mg/kg — low acute oral toxicity".format(n)))
+                               "Oral LD50 {} mg/kg     low acute oral toxicity".format(n)))
 
             elif "dermal" in prop and n is not None:
                 if n < 50:
                     p.add(Flag("critical", "StopTox",
-                               "Dermal LD50 {} mg/kg — critically toxic via skin".format(n)))
+                               "Dermal LD50 {} mg/kg     critically toxic via skin".format(n)))
                 elif n < 300:
                     p.add(Flag("high", "StopTox",
-                               "Dermal LD50 {} mg/kg — toxic via skin contact".format(n)))
+                               "Dermal LD50 {} mg/kg     toxic via skin contact".format(n)))
 
             elif "inhal" in prop and n is not None:
                 if n < 0.5:
                     p.add(Flag("critical", "StopTox",
-                               "Inhalation LC50 {} mg/L — extremely toxic by inhalation".format(n)))
+                               "Inhalation LC50 {} mg/L     extremely toxic by inhalation".format(n)))
                 elif n < 2:
                     p.add(Flag("high", "StopTox",
-                               "Inhalation LC50 {} mg/L — toxic by inhalation".format(n)))
+                               "Inhalation LC50 {} mg/L     toxic by inhalation".format(n)))
 
 
 def _check_stoplight(tools, p: MoleculeProfile):
@@ -151,26 +151,26 @@ def _check_stoplight(tools, p: MoleculeProfile):
             violations += 1
             p.add(Flag("medium", "StopLight", "MW {} Da > 500 Da (Lipinski violation)".format(mw)))
         else:
-            p.add(Flag("low", "StopLight", "MW {} Da — within Lipinski range".format(mw)))
+            p.add(Flag("low", "StopLight", "MW {} Da     within Lipinski range".format(mw)))
 
     if logp is not None:
         if logp > 5:
             violations += 1
             p.add(Flag("medium", "StopLight", "ALogP {} > 5 (Lipinski violation, lipophilicity concern)".format(logp)))
         elif logp > 3.5:
-            p.add(Flag("low", "StopLight", "ALogP {} — acceptable lipophilicity".format(logp)))
+            p.add(Flag("low", "StopLight", "ALogP {}     acceptable lipophilicity".format(logp)))
         else:
-            p.add(Flag("low", "StopLight", "ALogP {} — good lipophilicity".format(logp)))
+            p.add(Flag("low", "StopLight", "ALogP {}     good lipophilicity".format(logp)))
 
     if tpsa is not None:
         if tpsa > 140:
             p.add(Flag("high", "StopLight",
-                       "TPSA {} A2 > 140 A2 — poor oral absorption predicted".format(tpsa)))
+                       "TPSA {} A2 > 140 A2     poor oral absorption predicted".format(tpsa)))
         elif tpsa > 90:
             p.add(Flag("medium", "StopLight",
-                       "TPSA {} A2 — moderate absorption (90-140 A2)".format(tpsa)))
+                       "TPSA {} A2     moderate absorption (90-140 A2)".format(tpsa)))
         else:
-            p.add(Flag("low", "StopLight", "TPSA {} A2 — good oral absorption profile".format(tpsa)))
+            p.add(Flag("low", "StopLight", "TPSA {} A2     good oral absorption profile".format(tpsa)))
 
     if hbd is not None and hbd > 5:
         violations += 1
@@ -180,24 +180,24 @@ def _check_stoplight(tools, p: MoleculeProfile):
         p.add(Flag("medium", "StopLight", "HBA {} > 10 (Lipinski violation)".format(int(hba))))
     if rotb is not None and rotb > 10:
         p.add(Flag("medium", "StopLight",
-                   "{} rotatable bonds > 10 — reduced oral bioavailability (Veber)".format(int(rotb))))
+                   "{} rotatable bonds > 10     reduced oral bioavailability (Veber)".format(int(rotb))))
 
     if sol is not None:
         if sol < 0.01:
-            p.add(Flag("high", "StopLight", "Water solubility {} mg/L — very low (BCS Class II/IV risk)".format(sol)))
+            p.add(Flag("high", "StopLight", "Water solubility {} mg/L     very low (BCS Class II/IV risk)".format(sol)))
         elif sol < 1:
-            p.add(Flag("medium", "StopLight", "Water solubility {} mg/L — low solubility".format(sol)))
+            p.add(Flag("medium", "StopLight", "Water solubility {} mg/L     low solubility".format(sol)))
         else:
-            p.add(Flag("low", "StopLight", "Water solubility {} mg/L — adequate".format(sol)))
+            p.add(Flag("low", "StopLight", "Water solubility {} mg/L     adequate".format(sol)))
 
     if violations >= 2:
         p.add(Flag("high", "StopLight",
-                   "{} Lipinski Rule of 5 violations — poor oral drug-likeness likely".format(violations)))
+                   "{} Lipinski Rule of 5 violations     poor oral drug-likeness likely".format(violations)))
     elif violations == 1:
         p.add(Flag("medium", "StopLight",
-                   "1 Lipinski Rule of 5 violation — borderline oral drug-likeness"))
+                   "1 Lipinski Rule of 5 violation     borderline oral drug-likeness"))
     elif violations == 0 and mw is not None:
-        p.add(Flag("low", "StopLight", "Passes Lipinski Rule of 5 — good oral drug-likeness"))
+        p.add(Flag("low", "StopLight", "Passes Lipinski Rule of 5     good oral drug-likeness"))
 
 
 def _check_protox(tools, p: MoleculeProfile):
@@ -222,9 +222,9 @@ def _check_protox(tools, p: MoleculeProfile):
             p.add(Flag(level, "ADMETlab 3.0", msg))
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+#                                                                                                                                                                                                                                           
 # Narrative generator
-# ──────────────────────────────────────────────────────────────────────────────
+#                                                                                                                                                                                                                                           
 
 def _narrative(p: MoleculeProfile) :
     reds    = p.red_flags()
@@ -290,9 +290,9 @@ def _narrative(p: MoleculeProfile) :
     return "".join(parts)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+#                                                                                                                                                                                                                                           
 # Public API
-# ──────────────────────────────────────────────────────────────────────────────
+#                                                                                                                                                                                                                                           
 
 def interpret(smiles, tools) :
     """
@@ -305,3 +305,4 @@ def interpret(smiles, tools) :
     _check_protox(tools, p)  # Checks ADMETlab 3.0
     p.narrative = _narrative(p)
     return p
+

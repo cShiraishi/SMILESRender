@@ -61,11 +61,11 @@ def convert_smiles(smiles, format) :
 
     return bin_image
 
-
-def convert_many_smiles_and_zip(smiles[tuple[str, str, str]]) :
+# Optimized for high-throughput SMILES conversion and ZIP export
+def convert_many_smiles_and_zip(smiles):
     zip_file = BytesIO()
 
-    used_names_cout[str, int] = {}
+    used_names_cout = {}
 
     with zipfile.ZipFile(zip_file, "w") as zip:
         for smile, name, format in smiles:
@@ -88,7 +88,7 @@ def convert_many_smiles_and_zip(smiles[tuple[str, str, str]]) :
     return zip_file
 
 
-def create_mols_grid(smiles_list[str], labels[str] = None, mols_per_row = 3, sub_img_size: tuple = (300, 300), format = "PNG") :
+def create_mols_grid(smiles_list, labels=None, mols_per_row=3, sub_img_size=(300, 300), format="PNG"):
     mols = []
     legends = []
     for i, smi in enumerate(smiles_list):
@@ -115,3 +115,4 @@ def create_mols_grid(smiles_list[str], labels[str] = None, mols_per_row = 3, sub
     img.save(buf, format=format.upper(), quality=95)
     buf.seek(0)
     return buf
+

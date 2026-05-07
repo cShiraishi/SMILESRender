@@ -137,7 +137,7 @@ def prepare_ligand_pdbqt(smiles):
         clean_smiles = smiles.split()[0] if smiles else ""
         mol = Chem.MolFromSmiles(clean_smiles)
         if not mol: 
-            return None, f"Invalid SMILES: {clean_smiles}"
+            return None, "Invalid SMILES: {}".format(clean_smiles)
         
         mol = Chem.AddHs(mol)
         if AllChem.EmbedMolecule(mol, AllChem.ETKDG()) == -1:

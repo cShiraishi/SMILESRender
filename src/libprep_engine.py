@@ -16,16 +16,17 @@ _LARGEST_FRAG = rdMolStandardize.LargestFragmentChooser()
 _UNCHARGER    = rdMolStandardize.Uncharger()
 _TAUT_ENUM    = rdMolStandardize.TautomerEnumerator()
 
+# Data entry for library preparation
 @dataclass
 class MolEntry:
-    name
-    smiles
-    sdf_3d = ""
-    energy|None = None
-    ff_used = ""
-    status = "pending"
-    error = ""
-    props = field(default_factory=dict)
+    name: str
+    smiles: str
+    sdf_3d: str = ""
+    energy: object = None
+    ff_used: str = ""
+    status: str = "pending"
+    error: str = ""
+    props: dict = field(default_factory=dict)
 
     def to_dict(self):
         return asdict(self)
@@ -135,3 +136,4 @@ def create_export_zip(entries, format="pdbqt"):
             if sdf_all: zf.writestr("library_3d.sdf", sdf_all)
     buf.seek(0)
     return buf.read()
+

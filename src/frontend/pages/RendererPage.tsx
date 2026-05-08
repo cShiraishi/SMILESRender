@@ -3,7 +3,7 @@ import PageShell from '../components/PageShell';
 import DirectInput from '../forms/DirectInput';
 import { colors } from '../styles/themes';
 
-function RendererPage({ onBack, initialSmiles, onNavigate }: { onBack: () => void; initialSmiles?: string; onNavigate?: (page: string, smiles?: string) => void }) {
+function RendererPage({ onBack, initialSmiles, onNavigate, onSmilesChange }: { onBack: () => void; initialSmiles?: string; onNavigate?: (page: string, smiles?: string) => void; onSmilesChange?: (s: string) => void }) {
   return (
     <PageShell
       icon="bi-diagram-2"
@@ -13,7 +13,7 @@ function RendererPage({ onBack, initialSmiles, onNavigate }: { onBack: () => voi
       onBack={onBack}
     >
       <>
-        <DirectInput initialSmiles={initialSmiles} onNavigate={onNavigate} />
+        <DirectInput initialSmiles={initialSmiles} onNavigate={onNavigate} onSmilesChange={onSmilesChange} />
       </>
     </PageShell>
   );

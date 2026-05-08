@@ -20,9 +20,10 @@ type InputMode = 'smiles' | 'name' | 'draw' | 'csv';
 interface DockingPageProps {
   onBack: () => void;
   initialSmiles?: string;
+  onSmilesChange?: (s: string) => void;
 }
 
-const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
+const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles, onSmilesChange }) => {
   const [entries, setEntries] = useState<MolEntry[]>([]);
   const [inputText, setInputText] = useState(initialSmiles || '');
   const [isPreparing, setIsPreparing] = useState(false);
@@ -317,7 +318,6 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
           const shouldBeControl = prev.length === 0 || molName.includes(receptor?.pocket?.inhibitor || '\x00');
           const isCtrl = shouldBeControl && !prev.some(r => r.isControl);
           const ae: AccumResult = { name: molName, smiles: entry.smiles, affinity: bestAff, le: dockData.le || 0, isControl: isCtrl };
-          if (isCtrl) setControlIdx(existing >= 0 ? existing : prev.length);
           if (existing >= 0) { const u = [...prev]; u[existing] = { ...u[existing], ...ae }; return u; }
           return [...prev, ae];
         });
@@ -360,158 +360,215 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
     if (accumulated.length === 0) { alert('No docking results to export. Run docking for at least one molecule first.'); return; }
     const ctrl = accumulated.find(r => r.isControl);
     const ctrlAff = ctrl ? parseFloat(ctrl.affinity) : null;
-    const date = new Date().toLocaleDateString('pt-BR');
+    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const sorted = [...accumulated].sort((a, b) => parseFloat(a.affinity) - parseFloat(b.affinity));
+    const affinities = accumulated.map(r => parseFloat(r.affinity)).filter(v => !isNaN(v));
+    const bestAff = affinities.length > 0 ? Math.min(...affinities) : null;
+    const bestMol = bestAff !== null ? accumulated.find(r => parseFloat(r.affinity) === bestAff) : null;
+    const hitsVsCtrl = ctrlAff !== null ? accumulated.filter(r => !r.isControl && parseFloat(r.affinity) < ctrlAff - 0.1).length : null;
+    const deltaList = ctrlAff !== null ? accumulated.filter(r => !r.isControl && !isNaN(parseFloat(r.affinity))).map(r => parseFloat(r.affinity) - ctrlAff) : [];
+    const bestDelta = deltaList.length > 0 ? Math.min(...deltaList) : null;
 
-    const rowColor = (aff: string) => {
+    const allResSet = new Set<string>();
+    accumulated.forEach(r => {
+      if (r.plipData?.interactions) {
+        (r.plipData.interactions.hbonds || []).forEach((h: any) => allResSet.add(h.residue));
+        (r.plipData.interactions.hydrophobic || []).forEach((h: any) => allResSet.add(h.residue));
+        (r.plipData.interactions.pi_stacking || []).forEach((h: any) => allResSet.add(h.residue));
+      }
+    });
+    const residueList = Array.from(allResSet).sort();
+    const ctrlRes = new Set<string>();
+    if (ctrl?.plipData?.interactions) {
+      (ctrl.plipData.interactions.hbonds || []).forEach((h: any) => ctrlRes.add(h.residue));
+      (ctrl.plipData.interactions.hydrophobic || []).forEach((h: any) => ctrlRes.add(h.residue));
+      (ctrl.plipData.interactions.pi_stacking || []).forEach((h: any) => ctrlRes.add(h.residue));
+    }
+
+    const rowBg = (r: AccumResult) => {
+      if (r.isControl) return '#eff6ff';
       if (!ctrlAff) return '#fff';
-      const d = parseFloat(aff) - ctrlAff;
-      if (d < -0.5) return '#f0fdf4';
-      if (d > 0.5) return '#fff7f7';
-      return '#fffbeb';
-    };
-    const badge = (aff: string) => {
-      if (!ctrlAff) return '';
-      const d = parseFloat(aff) - ctrlAff;
-      const pct = Math.abs(d / ctrlAff * 100).toFixed(1);
-      if (d < -0.1) return `<span style="color:#16a34a;font-weight:700">▲ ${pct}% better</span>`;
-      if (d > 0.1) return `<span style="color:#dc2626;font-weight:700">▼ ${pct}% worse</span>`;
-      return `<span style="color:#92400e">≈ similar</span>`;
+      const d = parseFloat(r.affinity) - ctrlAff;
+      return d < -0.5 ? '#f0fdf4' : d > 0.5 ? '#fff7f7' : '#fffbeb';
     };
 
-    const tableRows = accumulated.map((r, i) => {
+    const tableRows = sorted.map((r, rank) => {
       const hb = r.plipData?.interactions?.hbonds?.length ?? '—';
       const hp = r.plipData?.interactions?.hydrophobic?.length ?? '—';
       const pi = r.plipData?.interactions?.pi_stacking?.length ?? '—';
-      const delta = ctrlAff && !r.isControl ? (parseFloat(r.affinity) - ctrlAff).toFixed(2) : '—';
+      const delta = ctrlAff !== null && !r.isControl ? (parseFloat(r.affinity) - ctrlAff).toFixed(2) : (r.isControl ? 'REF' : '—');
+      const dColor = !r.isControl && ctrlAff !== null ? (parseFloat(r.affinity)-ctrlAff < -0.1 ? '#16a34a' : parseFloat(r.affinity)-ctrlAff > 0.1 ? '#dc2626' : '#92400e') : '#64748b';
       const ki = r.plipData?.ki || '—';
-      const ctrl_label = r.isControl ? '<span class="badge-control">REFERENCE</span>' : '';
-      
-      return `<tr style="background:${rowColor(r.affinity)}">
-        <td style="padding:12px 14px;">
-          <div style="font-weight:700;color:#1e293b">${r.name} ${ctrl_label}</div>
-          <div style="font-size:10px;color:#64748b;font-family:monospace;margin-top:2px">${r.smiles}</div>
-        </td>
-        <td style="padding:12px;text-align:center;font-weight:800;color:#dc2626;font-size:14px">${r.affinity}</td>
-        <td style="padding:12px;text-align:center;font-weight:700;color:#16a34a">${ki}</td>
-        <td style="padding:12px;text-align:center;font-weight:600">${delta}</td>
-        <td style="padding:12px;text-align:center">${r.le > 0 ? r.le.toFixed(3) : '—'}</td>
-        <td style="padding:12px;text-align:center">${badge(r.affinity)}</td>
-        <td style="padding:12px;text-align:center"><span class="int-count hb">${hb}</span></td>
-        <td style="padding:12px;text-align:center"><span class="int-count hp">${hp}</span></td>
-        <td style="padding:12px;text-align:center"><span class="int-count pi">${pi}</span></td>
+      const le = r.le > 0 ? r.le.toFixed(3) : '—';
+      const ctrlLabel = r.isControl ? ' <span style="background:#1e3a5f;color:#fff;padding:1px 7px;border-radius:4px;font-size:9px;font-weight:800;vertical-align:middle">REF</span>' : '';
+      return `<tr style="background:${rowBg(r)}">
+        <td style="padding:10px 10px;text-align:center;font-weight:800;color:#94a3b8;font-size:12px">${r.isControl ? '—' : '#'+(rank+1)}</td>
+        <td style="padding:10px 10px"><div style="font-weight:700;color:#1e293b;font-size:12px">${r.name}${ctrlLabel}</div><div style="font-size:9px;color:#94a3b8;font-family:monospace;word-break:break-all">${r.smiles.length>60?r.smiles.slice(0,60)+'…':r.smiles}</div></td>
+        <td style="padding:10px;text-align:center;font-weight:800;color:#dc2626;font-size:13px">${r.affinity}</td>
+        <td style="padding:10px;text-align:center;font-weight:700;color:#16a34a;font-size:11px">${ki}</td>
+        <td style="padding:10px;text-align:center;font-weight:700;color:${dColor};font-size:12px">${delta}</td>
+        <td style="padding:10px;text-align:center;font-size:11px">${le}</td>
+        <td style="padding:10px;text-align:center"><span style="display:inline-block;min-width:22px;height:22px;line-height:22px;border-radius:5px;font-weight:800;font-size:11px;background:#dcfce7;color:#16a34a">${hb}</span></td>
+        <td style="padding:10px;text-align:center"><span style="display:inline-block;min-width:22px;height:22px;line-height:22px;border-radius:5px;font-weight:800;font-size:11px;background:#dbeafe;color:#2563eb">${hp}</span></td>
+        <td style="padding:10px;text-align:center"><span style="display:inline-block;min-width:22px;height:22px;line-height:22px;border-radius:5px;font-weight:800;font-size:11px;background:#f3e8ff;color:#9333ea">${pi}</span></td>
       </tr>`;
     }).join('');
 
-    const diagrams = accumulated.filter(r => r.plipData?.diagram).map((r, i) => `
-      <div class="diagram-card">
-        <div class="diagram-header">
-          <span class="diagram-title">${r.name} ${r.isControl ? '(Control)' : ''}</span>
-          <span class="diagram-score">${r.affinity} kcal/mol | Ki: ${r.plipData?.ki || '—'}</span>
-        </div>
-        <div class="diagram-content">
-          ${r.plipData.diagram}
-        </div>
-      </div>`).join('');
+    const hasAnyPlip = accumulated.some(r => r.plipData?.interactions);
+    const heatmapSection = hasAnyPlip && residueList.length > 0 ? (() => {
+      const hdrCols = residueList.map(res =>
+        `<th style="background:#1e3a5f;color:#fff;padding:5px 3px;font-size:8px;font-weight:700;writing-mode:vertical-rl;transform:rotate(180deg);min-width:26px;white-space:nowrap">${res}${ctrlRes.has(res) ? ' ★' : ''}</th>`
+      ).join('');
+      const bRows = sorted.map(r => {
+        const hbSet = new Set((r.plipData?.interactions?.hbonds||[]).map((h:any)=>h.residue));
+        const hpSet = new Set((r.plipData?.interactions?.hydrophobic||[]).map((h:any)=>h.residue));
+        const piSet = new Set((r.plipData?.interactions?.pi_stacking||[]).map((h:any)=>h.residue));
+        const cells = residueList.map(res => {
+          if (hbSet.has(res)) return `<td style="background:#16a34a;color:#fff;text-align:center;font-weight:800;font-size:9px;padding:4px 2px">H</td>`;
+          if (hpSet.has(res)) return `<td style="background:#2563eb;color:#fff;text-align:center;font-weight:800;font-size:9px;padding:4px 2px">P</td>`;
+          if (piSet.has(res)) return `<td style="background:#9333ea;color:#fff;text-align:center;font-weight:800;font-size:9px;padding:4px 2px">π</td>`;
+          return `<td style="background:#f8fafc;color:#e2e8f0;text-align:center;font-size:9px;padding:4px 2px">·</td>`;
+        }).join('');
+        const cm = r.isControl ? ' <span style="background:#0ea5e9;color:#fff;border-radius:3px;padding:0 4px;font-size:8px">REF</span>' : '';
+        return `<tr><td style="padding:5px 10px;font-size:10px;font-weight:700;white-space:nowrap;border-right:2px solid #e2e8f0">${r.name}${cm}</td>${cells}</tr>`;
+      }).join('');
+      return `<p style="font-size:11px;color:#64748b;margin:0 0 10px">
+        <span style="display:inline-block;width:11px;height:11px;background:#16a34a;border-radius:2px;margin-right:4px;vertical-align:middle"></span>H = Hydrogen bond &nbsp;
+        <span style="display:inline-block;width:11px;height:11px;background:#2563eb;border-radius:2px;margin-right:4px;vertical-align:middle"></span>P = Hydrophobic &nbsp;
+        <span style="display:inline-block;width:11px;height:11px;background:#9333ea;border-radius:2px;margin-right:4px;vertical-align:middle"></span>π = Pi-stacking &nbsp;
+        ★ = shared with reference
+      </p>
+      <div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:10px">
+        <thead><tr><th style="background:#0f172a;color:#fff;padding:8px 12px;font-size:10px;font-weight:700;text-align:left;min-width:110px">Compound</th>${hdrCols}</tr></thead>
+        <tbody>${bRows}</tbody>
+      </table></div>`;
+    })() : '';
 
-    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-<title>Molecular Docking Report — ${receptor?.id || 'Analysis'}</title>
+    const detailCards = sorted.filter(r => r.plipData).map(r => {
+      const intList = [
+        ...(r.plipData.interactions?.hbonds||[]).map((h:any)=>`<div style="font-size:10px;color:#065f46;padding:2px 0"><b style="color:#16a34a">H</b> ${h.residue} (${h.dist}Å)</div>`),
+        ...(r.plipData.interactions?.hydrophobic||[]).map((h:any)=>`<div style="font-size:10px;color:#1e40af;padding:2px 0"><b style="color:#2563eb">P</b> ${h.residue} (${h.dist}Å)</div>`),
+        ...(r.plipData.interactions?.pi_stacking||[]).map((h:any)=>`<div style="font-size:10px;color:#581c87;padding:2px 0"><b style="color:#9333ea">π</b> ${h.residue} (${h.dist}Å)</div>`),
+      ].join('') || '<div style="font-size:10px;color:#94a3b8">No significant interactions detected</div>';
+      const diag = r.plipData.diagram ? `<div>${r.plipData.diagram}</div>` : '';
+      const ctrlLabel = r.isControl ? ' <span style="background:#0ea5e9;color:#fff;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:800">REFERENCE</span>' : '';
+      const delta = ctrlAff !== null && !r.isControl
+        ? `<span style="font-weight:700;color:${parseFloat(r.affinity)-ctrlAff < -0.1 ? '#16a34a' : parseFloat(r.affinity)-ctrlAff > 0.1 ? '#dc2626' : '#92400e'}">ΔΔG: ${(parseFloat(r.affinity)-ctrlAff).toFixed(2)} kcal/mol</span>`
+        : '';
+      return `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;margin-bottom:24px;page-break-inside:avoid">
+        <div style="display:flex;justify-content:space-between;border-bottom:1px solid #f1f5f9;padding-bottom:14px;margin-bottom:16px">
+          <div>
+            <div style="font-size:16px;font-weight:800;color:#1e3a5f">${r.name}${ctrlLabel}</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px">${r.affinity} kcal/mol | Ki: ${r.plipData?.ki||'—'} | LE: ${r.le>0?r.le.toFixed(3):'—'}</div>
+            ${delta?`<div style="font-size:11px;margin-top:4px">${delta}</div>`:''}
+          </div>
+          <div style="text-align:right;font-size:10px;color:#94a3b8">
+            <div>${(r.plipData.interactions?.hbonds||[]).length} H-bonds</div>
+            <div>${(r.plipData.interactions?.hydrophobic||[]).length} Hydrophobic</div>
+            <div>${(r.plipData.interactions?.pi_stacking||[]).length} π-stack</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap">
+          <div style="flex:1;min-width:160px">${intList}</div>
+          <div style="flex:0 0 300px;text-align:center">${diag}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<title>Drug Design Report — ${receptor?.id||'Virtual Screening'}</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-  body { font-family: 'Inter', sans-serif; margin: 0; padding: 40px; color: #1e293b; background: #f8fafc; line-height: 1.5; }
-  .report-container { max-width: 1100px; margin: 0 auto; background: white; padding: 50px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
-  header { border-bottom: 3px solid #1e3a5f; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
-  h1 { color: #1e3a5f; font-size: 28px; margin: 0; font-weight: 800; letter-spacing: -0.5px; }
-  h2 { color: #334155; font-size: 18px; font-weight: 700; margin-top: 40px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-  h2::before { content: ""; display: inline-block; width: 4px; height: 18px; background: #1e3a5f; border-radius: 2px; }
-  .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; background: #f1f5f9; padding: 20px; border-radius: 12px; margin-bottom: 30px; }
-  .meta-item { display: flex; flexDirection: column; }
-  .meta-label { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
-  .meta-value { font-size: 14px; font-weight: 600; color: #1e293b; }
-  
-  table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 12px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
-  th { background: #1e3a5f; color: #fff; padding: 12px 14px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-  td { border-bottom: 1px solid #e2e8f0; font-size: 12px; }
-  tr:last-child td { border-bottom: none; }
-  
-  .badge-control { background: #1e3a5f; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 800; vertical-align: middle; margin-left: 6px; }
-  .int-count { display: inline-block; width: 24px; height: 24px; line-height: 24px; border-radius: 6px; font-weight: 800; font-size: 11px; }
-  .int-count.hb { background: #dcfce7; color: #16a34a; }
-  .int-count.hp { background: #dbeafe; color: #2563eb; }
-  .int-count.pi { background: #f3e8ff; color: #9333ea; }
-  
-  .diagram-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 30px; page-break-inside: avoid; }
-  .diagram-header { display: flex; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 16px; }
-  .diagram-title { font-weight: 800; color: #1e3a5f; font-size: 15px; }
-  .diagram-score { font-weight: 700; color: #64748b; font-size: 12px; }
-  .diagram-content svg { max-width: 100%; height: auto; }
-  
-  .no-control-warn { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; padding: 16px; border-radius: 12px; font-size: 13px; font-weight: 600; margin-bottom: 30px; text-align: center; }
-  
-  .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; }
-  @media print { 
-    body { padding: 0; background: white; }
-    .report-container { box-shadow: none; border: none; width: 100%; max-width: none; padding: 0; }
-  }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+  *{box-sizing:border-box}
+  body{font-family:'Inter',-apple-system,sans-serif;margin:0;padding:32px;color:#1e293b;background:#f1f5f9;line-height:1.5}
+  .page{max-width:1150px;margin:0 auto;background:#fff;padding:52px;border-radius:16px;box-shadow:0 4px 40px rgba(0,0,0,.08)}
+  header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1e3a5f;padding-bottom:24px;margin-bottom:32px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 28px}
+  .chip{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:100px;padding:5px 14px;font-size:11px;font-weight:600;color:#475569}
+  .chip b{color:#1e293b}
+  .sec{font-size:13px;font-weight:800;color:#1e3a5f;margin:36px 0 14px;padding-left:12px;border-left:4px solid #1e3a5f;text-transform:uppercase;letter-spacing:.5px}
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+  .kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px}
+  .kpi .lbl{font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+  .kpi .val{font-size:22px;font-weight:900;color:#1e293b;line-height:1}
+  .kpi .sub{font-size:10px;color:#64748b;margin-top:4px}
+  .kpi.best{border-color:#dc2626;background:#fff7f7}.kpi.best .val{color:#dc2626}
+  .kpi.hit{border-color:#16a34a;background:#f0fdf4}.kpi.hit .val{color:#16a34a}
+  .ctrl-bar{background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:18px 20px;margin-bottom:28px;display:flex;align-items:center;gap:14px}
+  .warn{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;padding:14px;border-radius:10px;font-size:12px;font-weight:600;margin-bottom:24px}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  thead th{background:#0f172a;color:#fff;padding:10px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.6px}
+  tbody td{padding:9px 10px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}
+  .methods{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;font-size:11px;color:#475569;line-height:1.8}
+  .methods b{color:#1e293b}
+  footer{margin-top:48px;padding-top:18px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8}
+  @media print{body{background:#fff;padding:0}.page{box-shadow:none;padding:28px;max-width:none}}
 </style></head><body>
-<div class="report-container">
+<div class="page">
   <header>
     <div>
-      <h1>Molecular Docking Analysis</h1>
-      <div style="color: #64748b; font-size: 14px; font-weight: 500; margin-top: 4px;">SmileRender Professional Virtual Screening Report</div>
+      <h1 style="color:#1e3a5f;font-size:26px;font-weight:900;margin:0 0 4px;letter-spacing:-.5px">Drug Design Virtual Screening Report</h1>
+      <p style="color:#64748b;font-size:12px;font-weight:500;margin:0">SmileRender Suite &mdash; Advanced Cheminformatics &amp; Molecular Docking</p>
     </div>
-    <div style="text-align: right">
-      <div style="font-weight: 700; color: #1e3a5f;">${date}</div>
-      <div style="font-size: 11px; color: #94a3b8;">ID: ${Date.now()}</div>
+    <div style="text-align:right">
+      <div style="font-weight:700;color:#1e3a5f;font-size:13px">${date}</div>
+      <div style="font-size:10px;color:#94a3b8">Report ID: ${Date.now()}</div>
     </div>
   </header>
-
-  <div class="meta-grid">
-    <div class="meta-item"><div class="meta-label">Target Receptor</div><div class="meta-value">${receptor?.id || 'Unknown'}</div></div>
-    <div class="meta-item"><div class="meta-label">Grid Center</div><div class="meta-value">${grid.cx}, ${grid.cy}, ${grid.cz}</div></div>
-    <div class="meta-item"><div class="meta-label">Search Space (Å)</div><div class="meta-value">${grid.sx} × ${grid.sy} × ${grid.sz}</div></div>
-    <div class="meta-item"><div class="meta-label">Compounds</div><div class="meta-value">${accumulated.length}</div></div>
+  <div class="chips">
+    <div class="chip">Receptor: <b>${receptor?.id||'—'}</b></div>
+    <div class="chip">Center: <b>${grid.cx.toFixed(1)}, ${grid.cy.toFixed(1)}, ${grid.cz.toFixed(1)}</b></div>
+    <div class="chip">Box (Å): <b>${grid.sx}&times;${grid.sy}&times;${grid.sz}</b></div>
+    <div class="chip">Exhaustiveness: <b>${exhaustiveness}</b></div>
+    <div class="chip">Max Poses: <b>${numModes}</b></div>
+    <div class="chip">Screened: <b>${accumulated.length}</b></div>
   </div>
-
-  ${ctrl ? `
-  <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 20px; border-radius: 12px; margin-bottom: 30px; display: flex; align-items: center; gap: 20px;">
-    <div style="background: #1e3a5f; color: #fff; width: 50px; height: 50px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px;">
-      <i class="bi bi-shield-check"></i>
-    </div>
+  <div class="sec">Executive Summary</div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="lbl">Compounds Screened</div><div class="val">${accumulated.length}</div><div class="sub">Against ${receptor?.id||'target'}</div></div>
+    <div class="kpi best"><div class="lbl">Best Binder</div><div class="val">${bestAff!==null?bestAff.toFixed(2):'—'}</div><div class="sub">${bestMol?.name||'—'} (kcal/mol)</div></div>
+    <div class="kpi hit"><div class="lbl">Hits vs. Control</div><div class="val">${hitsVsCtrl!==null?hitsVsCtrl:'—'}</div><div class="sub">Better than reference</div></div>
+    <div class="kpi" style="${bestDelta!==null&&bestDelta<-0.1?'border-color:#16a34a;background:#f0fdf4':''}"><div class="lbl">Best &Delta;&Delta;G</div><div class="val" style="color:${bestDelta!==null&&bestDelta<-0.1?'#16a34a':'#1e293b'}">${bestDelta!==null?(bestDelta>0?'+':'')+bestDelta.toFixed(2):'—'}</div><div class="sub">vs. reference (kcal/mol)</div></div>
+  </div>
+  ${ctrl?`<div class="ctrl-bar">
+    <div style="background:#1e3a5f;color:#fff;border-radius:8px;width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">&#9733;</div>
     <div>
-      <div class="meta-label" style="color: #1e40af">Reference Compound (Control)</div>
-      <div style="font-size: 18px; font-weight: 800; color: #1e3a5f;">${ctrl.name}</div>
-      <div style="font-size: 13px; font-weight: 700; color: #1d4ed8;">Score: ${ctrl.affinity} kcal/mol | Ki: ${ctrl.plipData?.ki || '—'} | LE: ${ctrl.le.toFixed(3)}</div>
+      <div style="font-size:9px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:.7px;margin-bottom:3px">Reference Compound</div>
+      <div style="font-size:17px;font-weight:800;color:#1e3a5f">${ctrl.name}</div>
+      <div style="font-size:12px;color:#1d4ed8;font-weight:600;margin-top:2px">${ctrl.affinity} kcal/mol &nbsp;|&nbsp; Ki: ${ctrl.plipData?.ki||'—'} &nbsp;|&nbsp; LE: ${ctrl.le>0?ctrl.le.toFixed(3):'—'} &nbsp;|&nbsp; H-bonds: ${ctrl.plipData?.interactions?.hbonds?.length??'—'}</div>
     </div>
-  </div>
-  ` : `
-  <div class="no-control-warn">
-    <i class="bi bi-exclamation-triangle-fill" style="margin-right: 8px"></i>
-    No Control Molecule defined. Comparative ΔΔG analysis is disabled for this report.
-  </div>
-  `}
-
-  <h2>Screening Performance Summary</h2>
+  </div>`:`<div class="warn">&#9888; No reference compound defined. &Delta;&Delta;G comparison is disabled.</div>`}
+  <div class="sec">Ranked Binding Results</div>
   <table>
     <thead><tr>
-      <th style="width: 25%">Molecule / SMILES</th>
-      <th style="text-align: center">Affinity</th>
-      <th style="text-align: center">Est. Ki</th>
-      <th style="text-align: center">ΔΔG vs Ctrl</th>
-      <th style="text-align: center">LE</th>
-      <th style="text-align: center">Relative</th>
-      <th style="text-align: center">H-B</th>
-      <th style="text-align: center">H-P</th>
-      <th style="text-align: center">π-S</th>
+      <th style="width:32px">Rank</th><th style="width:22%">Compound</th>
+      <th style="text-align:center">Affinity<br>(kcal/mol)</th>
+      <th style="text-align:center">Est. Ki</th>
+      <th style="text-align:center">&Delta;&Delta;G<br>(kcal/mol)</th>
+      <th style="text-align:center">LE</th>
+      <th style="text-align:center">H-B</th>
+      <th style="text-align:center">H-P</th>
+      <th style="text-align:center">&pi;-S</th>
     </tr></thead>
     <tbody>${tableRows}</tbody>
   </table>
-
-  ${diagrams ? `<h2>Protein-Ligand Interaction Mapping</h2>${diagrams}` : ''}
-
-  <div class="footer">
-    <div>Generated by SmileRender Suite · Advanced Cheminformatics Division</div>
-    <div>&copy; ${new Date().getFullYear()} · Professional Research Edition</div>
+  ${heatmapSection?`<div class="sec">Interaction Fingerprint</div>${heatmapSection}`:''}
+  ${detailCards?`<div class="sec">Per-Molecule Binding Analysis</div>${detailCards}`:''}
+  <div class="sec">Methods</div>
+  <div class="methods">
+    <b>Software:</b> AutoDock Vina (Trott &amp; Olson, 2010) via SmileRender Suite. &nbsp;
+    <b>Receptor:</b> PDB ${receptor?.id||'—'} from RCSB; heteroatoms &amp; water removed; converted to PDBQT via Meeko. &nbsp;
+    <b>Ligand prep:</b> SMILES to 3D with RDKit MMFF94 minimization; PDBQT via Meeko. &nbsp;
+    <b>Grid:</b> center (${grid.cx.toFixed(2)}, ${grid.cy.toFixed(2)}, ${grid.cz.toFixed(2)}) Å; box ${grid.sx}&times;${grid.sy}&times;${grid.sz} Å; exhaustiveness ${exhaustiveness}; max poses ${numModes}. &nbsp;
+    <b>PLIP:</b> H-bond &le;3.5 Å/120&deg;; hydrophobic &le;4.0 Å; &pi;-stack &le;5.5 Å. &nbsp;
+    <b>LE</b> = |&Delta;G| / heavy atoms. &nbsp;
+    <b>ΔΔG</b> relative to reference compound.
   </div>
+  <footer>
+    <div>Generated by SmileRender Suite &mdash; ${date}</div>
+    <div>&copy; ${new Date().getFullYear()} SmileRender &mdash; Professional Research Edition</div>
+  </footer>
 </div>
 </body></html>`;
 
@@ -519,7 +576,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `docking_report_${receptor?.id || 'report'}_${Date.now()}.html`;
+    a.download = `drugdesign_report_${receptor?.id||'screening'}_${Date.now()}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -589,6 +646,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
           .join('\n');
 
         setInputText(formattedStr);
+        onSmilesChange?.(formattedStr);
         handleLoad(formattedStr);
         setInputMode('smiles');
       } catch (err) {
@@ -609,27 +667,33 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
       </div>
     );
 
-    // Use the dedicated viewer route with cache bust
     const cacheBust = new Date().getTime();
-    const viewerUrl = `/api/docking/viewer?pdb=${receptor.id}&cx=${grid.cx}&cy=${grid.cy}&cz=${grid.cz}&sx=${grid.sx}&sy=${grid.sy}&sz=${grid.sz}&color=${boxColor}&v=${cacheBust}`.replace(/,/g, '.');
+    const poseIdx = plipData?.poseIdx ?? 0;
+    const bestAff = dockingResults.length > 0 ? dockingResults[poseIdx]?.affinity ?? dockingResults[0]?.affinity : '';
+
+    let viewerUrl = `/api/docking/viewer?pdb=${receptor.id}&cx=${grid.cx}&cy=${grid.cy}&cz=${grid.cz}&sx=${grid.sx}&sy=${grid.sy}&sz=${grid.sz}&color=${boxColor}&v=${cacheBust}`.replace(/,/g, '.');
+    if (sessionInfo?.sessionId) {
+      viewerUrl += `&session=${sessionInfo.sessionId}&pose=${poseIdx}`;
+      if (bestAff) viewerUrl += `&aff=${encodeURIComponent(bestAff)}`;
+    }
 
     return (
       <div style={{ position: 'relative' }}>
-        <iframe 
-          key={receptor.id + grid.cx} // Force refresh
-          src={viewerUrl} 
-          style={{ width: '100%', height: '400px', border: `1px solid ${colors.border}`, borderRadius: radius.md, backgroundColor: 'white' }} 
+        <iframe
+          key={receptor.id + '_' + (sessionInfo?.sessionId || '') + '_' + poseIdx + '_' + grid.cx}
+          src={viewerUrl}
+          style={{ width: '100%', height: '420px', border: 'none', borderRadius: radius.md, backgroundColor: '#1a1a2e' }}
         />
         <div style={{ position: 'absolute', bottom: '10px', right: '10px', display: 'flex', gap: '5px' }}>
-             <button
-              onClick={() => window.open(viewerUrl, "_blank")}
-              style={{
-                padding: '4px 8px', fontSize: '10px', fontWeight: 600,
-                backgroundColor: 'rgba(255,255,255,0.8)', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer'
-              }}
-            >
-              <i className="bi bi-arrows-fullscreen"></i> Full View
-            </button>
+          <button
+            onClick={() => window.open(viewerUrl, "_blank")}
+            style={{
+              padding: '4px 8px', fontSize: '10px', fontWeight: 600,
+              backgroundColor: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', cursor: 'pointer'
+            }}
+          >
+            <i className="bi bi-arrows-fullscreen"></i> Full View
+          </button>
         </div>
       </div>
     );
@@ -1116,13 +1180,47 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                             style={{ width: '100%', padding: '8px', border: `1px solid ${colors.border}`, borderRadius: radius.sm, fontSize: '13px' }} />
                         </div>
                       </div>
-                      <button 
+                      <button
                         onClick={() => runDocking(selectedIdx)}
-                        disabled={isDocking || !receptor || entries.length === 0}
-                        style={{ width: '100%', padding: '12px', backgroundColor: colors.success, color: '#fff', border: 'none', borderRadius: radius.md, fontWeight: 700, fontSize: '14px', marginBottom: '12px', marginTop: '16px' }}
+                        disabled={isDocking || isBatchRunning || !receptor || entries.length === 0}
+                        style={{ width: '100%', padding: '12px', backgroundColor: colors.success, color: '#fff', border: 'none', borderRadius: radius.md, fontWeight: 700, fontSize: '14px', marginBottom: '8px', marginTop: '16px' }}
                       >
                         {isDocking ? 'Simulating...' : '▶ Run AutoDock Vina'}
                       </button>
+
+                      <button
+                        onClick={isBatchRunning ? () => { batchAbortRef.current = true; } : runBatchDocking}
+                        disabled={!isBatchRunning && (!receptor || entries.length === 0)}
+                        style={{
+                          width: '100%', padding: '10px', border: 'none', borderRadius: radius.md,
+                          fontWeight: 700, fontSize: '13px', marginBottom: '12px', cursor: 'pointer',
+                          backgroundColor: isBatchRunning ? '#dc2626' : '#7c3aed', color: '#fff',
+                          opacity: !isBatchRunning && (!receptor || entries.length === 0) ? 0.5 : 1
+                        }}
+                      >
+                        {isBatchRunning
+                          ? `⬛ Cancel (${batchProgress.current}/${batchProgress.total})`
+                          : `⚡ Dock All Library (${entries.length})`
+                        }
+                      </button>
+
+                      {isBatchRunning && batchProgress.total > 0 && (
+                        <div style={{ marginBottom: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: colors.textMuted, marginBottom: '4px' }}>
+                            <span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}>
+                              {batchProgress.name}
+                            </span>
+                            <span>{batchProgress.current}/{batchProgress.total}</span>
+                          </div>
+                          <div style={{ height: '6px', backgroundColor: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%', borderRadius: '3px', transition: 'width 0.4s ease',
+                              backgroundColor: '#7c3aed',
+                              width: `${(batchProgress.current / batchProgress.total) * 100}%`
+                            }} />
+                          </div>
+                        </div>
+                      )}
 
                       {sessionInfo && (
                         <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
@@ -1154,7 +1252,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles }) => {
                               onClick={handleDownloadReport}
                               style={{ padding: '5px 10px', backgroundColor: '#1e3a5f', color: '#fff', border: 'none', borderRadius: radius.sm, fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}
                             >
-                              <i className="bi bi-file-earmark-text me-1"></i> Report
+                              <i className="bi bi-file-earmark-medical me-1"></i> Drug Report
                             </button>
                           </div>
                           {!accumulated.some(r => r.isControl) && (

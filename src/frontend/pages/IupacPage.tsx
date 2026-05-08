@@ -20,7 +20,7 @@ const FIELDS: { key: keyof Result; label: string; mono?: boolean }[] = [
   { key: 'InChI',            label: 'InChI', mono: true },
 ];
 
-function IupacContent({ initialSmiles }: { initialSmiles?: string }) {
+function IupacContent({ initialSmiles, onSmilesChange }: { initialSmiles?: string; onSmilesChange?: (s: string) => void }) {
   const [input, setInput]     = useState(initialSmiles || 'CC(=O)Oc1ccccc1C(=O)O\nCC12CCC3C(C1CCC2O)CCC4=CC(=O)CCC34C');
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
@@ -100,7 +100,7 @@ function IupacContent({ initialSmiles }: { initialSmiles?: string }) {
           className="smiles-input"
           rows={5}
           value={input}
-          onChange={e => setInput(e.target.value)}
+          onChange={e => { setInput(e.target.value); onSmilesChange?.(e.target.value); }}
           style={{
             width: '100%', boxSizing: 'border-box',
             padding: '10px 12px',
@@ -171,7 +171,7 @@ function IupacContent({ initialSmiles }: { initialSmiles?: string }) {
   );
 }
 
-function IupacPage({ onBack, initialSmiles }: { onBack: () => void; initialSmiles?: string }) {
+function IupacPage({ onBack, initialSmiles, onSmilesChange }: { onBack: () => void; initialSmiles?: string; onSmilesChange?: (s: string) => void }) {
   return (
     <PageShell
       icon="bi-tag"
@@ -180,7 +180,7 @@ function IupacPage({ onBack, initialSmiles }: { onBack: () => void; initialSmile
       accentColor="#7c3aed"
       onBack={onBack}
     >
-      <IupacContent initialSmiles={initialSmiles} />
+      <IupacContent initialSmiles={initialSmiles} onSmilesChange={onSmilesChange} />
     </PageShell>
   );
 }

@@ -39,7 +39,7 @@ function saveHistory(entry: { label: string; mols: MolData[] }) {
   localStorage.setItem(HISTORY_KEY, JSON.stringify(hist.slice(0, 5)));
 }
 
-function DirectInput({ initialSmiles, onNavigate }: { initialSmiles?: string; onNavigate?: (page: string, smiles?: string) => void }) {
+function DirectInput({ initialSmiles, onNavigate, onSmilesChange }: { initialSmiles?: string; onNavigate?: (page: string, smiles?: string) => void; onSmilesChange?: (s: string) => void }) {
   const initialData = initialSmiles 
     ? initialSmiles.split('\n').map(s => ({ smiles: s.trim() })).filter(m => m.smiles)
     : defaultSmiles.map(s => ({ smiles: s }));
@@ -88,6 +88,7 @@ function DirectInput({ initialSmiles, onNavigate }: { initialSmiles?: string; on
         }
         setMols(extracted);
         setMolsToRender(extracted);
+        onSmilesChange?.(extracted.map(m => m.name ? `${m.smiles} ${m.name}` : m.smiles).join('\n'));
         fetchMWs(extracted);
         saveHistory({ label: file.name, mols: extracted });
       } catch (err) {
@@ -398,8 +399,15 @@ function DirectInput({ initialSmiles, onNavigate }: { initialSmiles?: string; on
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontWeight: 500 }}>BG:</span>
                 <select value={paperOpts.bgColor} onChange={e => setPaperOpts(prev => ({ ...prev, bgColor: e.target.value as any }))} style={selectStyle}>
-                  <option value="white">White</option>
-                  <option value="transparent">Transparent</option>
+                   <option value="white">White</option>
+                   <option value="transparent">Transparent</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontWeight: 500 }}>Font Size:</span>
+                <select value={paperOpts.nameSize} onChange={e => setPaperOpts(prev => ({ ...prev, nameSize: parseInt(e.target.value) }))} style={selectStyle}>
+                   {[10, 11, 12, 13, 14, 16, 18, 20, 22, 24].map(s => <option key={s} value={s}>{s}px</option>)}
                 </select>
               </div>
 

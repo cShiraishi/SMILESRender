@@ -7,6 +7,7 @@ import Tox21 from '../components/Tox21';
 import DeepADMET from '../components/DeepADMET';
 import GraphB3 from '../components/GraphB3';
 import Dashboard from '../components/Dashboard';
+import MolImage from '../components/MolImage';
 import MoleculeDrawerModal from '../components/MoleculeDrawerModal';
 import RDKitFilters from '../components/RDKitFilters';
 import * as csvTools from '../tools/csv';
@@ -33,7 +34,7 @@ const TOOL_COLORS: Record<ToolName, string> = {
 
 
 // ── Component ────────────────────────────────────────────────────────────────
-function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
+function PredictWithStopTox({ initialSmiles, onSmilesChange }: { initialSmiles?: string; onSmilesChange?: (s: string) => void }) {
   const [smiles, setSmiles] = useState(
     initialSmiles
       ? initialSmiles.split('\n').map(s => s.trim()).filter(Boolean)
@@ -55,6 +56,7 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
   const [toolStatus,     setToolStatus]     = useState<{ [key: string]: ToolState }>({});
   const [activeTab,      setActiveTab]      = useState<'input' | 'results'>('input');
   const [isDrawerOpen,   setIsDrawerOpen]   = useState(false);
+  const [expandedSmi,    setExpandedSmi]    = useState<string | null>(null);
 
   const namesRef = useRef(moleculeNames);
   useEffect(() => { namesRef.current = moleculeNames; }, [moleculeNames]);
@@ -101,6 +103,7 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
 
     // Update state then immediately run predictions
     setSmiles(newSmiles);
+    onSmilesChange?.(newSmiles.join('\n'));
     setMoleculeNames(newNames);
     namesRef.current = newNames;
 
@@ -207,7 +210,10 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
               fontSize: '14px',
               transition: 'all 0.2s'
             }}
-          >{tab === 'input' ? '🧪 SMILES Input' : '📊 Results Dashboard'}</button>
+          >
+            <i className={tab === 'input' ? 'bi bi-input-cursor-text' : 'bi bi-bar-chart-fill'} style={{ marginRight: 7 }} />
+            {tab === 'input' ? 'SMILES Input' : 'Results Dashboard'}
+          </button>
         ))}
       </div>
 
@@ -236,7 +242,7 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
             <>
               {Object.keys(moleculeNames).length > 0 && (
                 <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '13px', color: '#166534' }}>
-                  ✅ {Object.keys(moleculeNames).length} nomes carregados via CSV.{' '}
+                  <i className="bi bi-check-circle-fill" style={{ marginRight: 5 }} />{Object.keys(moleculeNames).length} nomes carregados via CSV.{' '}
                   <button onClick={() => setMoleculeNames({})} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline' }}>Remover</button>
                 </div>
               )}
@@ -254,7 +260,7 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
               <div style={{ padding: '10px 0', display: 'flex', gap: '15px', alignItems: 'center' }}>
                 <button onClick={loadSmiles}
                   style={{ backgroundColor: '#007bff', color: 'white', padding: '10px 25px', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
-                  🚀 Run All Predictions
+                  <i className="bi bi-play-fill" style={{ marginRight: 6 }} />Run All Predictions
                 </button>
                 <button onClick={() => setIsDrawerOpen(true)}
                   style={{ backgroundColor: '#fff', color: '#007bff', border: '1px solid #007bff', padding: '10px 20px', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -296,7 +302,7 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
                     textAlign: 'center', cursor: 'pointer', backgroundColor: '#f8fafc',
                     transition: 'border-color 0.2s',
                   }}>
-                  <div style={{ fontSize: '36px', marginBottom: '8px' }}>📄</div>
+                  <i className="bi bi-file-earmark-text" style={{ fontSize: '36px', color: '#94a3b8', marginBottom: '8px', display: 'block' }} />
                   <div style={{ fontWeight: 'bold', color: '#1a3a5c', marginBottom: '4px' }}>
                     Clique ou arraste um arquivo CSV / TSV / TXT
                   </div>
@@ -369,7 +375,7 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                     <button onClick={importFromCSV}
                       style={{ backgroundColor: '#1a3a5c', color: 'white', border: 'none', padding: '10px 24px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>
-                      🚀 Importar e rodar {csvRows.filter(r => r[csvHeaders.indexOf(smilesCol)]?.trim()).length} moléculas
+                      <i className="bi bi-play-fill" style={{ marginRight: 6 }} />Importar e rodar {csvRows.filter(r => r[csvHeaders.indexOf(smilesCol)]?.trim()).length} moléculas
                     </button>
                   </div>
                 </div>
@@ -385,7 +391,10 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
           <div style={{ marginBottom: '20px', padding: '16px', backgroundColor: '#f8f9fa', borderRadius: '10px', border: '1px solid #e0e0e0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <span style={{ fontWeight: 'bold', fontSize: '15px', color: '#1a3a5c' }}>
-                {isReady ? '✅ Analysis complete' : `⏳ Analysing… ${percentage}%`}
+                {isReady
+                  ? <><i className="bi bi-check-circle-fill" style={{ marginRight: 6, color: '#16a34a' }} />Analysis complete</>
+                  : <><i className="bi bi-hourglass-split" style={{ marginRight: 6 }} />Analysing… {percentage}%</>
+                }
               </span>
               <span style={{ fontSize: '13px', color: '#666' }}>
                 {uniqueSmiles.length} molécula{uniqueSmiles.length !== 1 ? 's' : ''} · {TOOLS.length} tools each
@@ -399,39 +408,104 @@ function PredictWithStopTox({ initialSmiles }: { initialSmiles?: string }) {
 
             {/* Dashboard Overview — only after full analysis */}
             {isReady && (
-              <Dashboard allResults={Object.values(allResults).flat()} uniqueSmiles={uniqueSmiles} />
+              <Dashboard allResults={Object.values(allResults).flat()} uniqueSmiles={uniqueSmiles} moleculeNames={moleculeNames} />
             )}
 
             {/* Per-molecule status cards */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {uniqueSmiles.map(smi => {
-                const name = moleculeNames[smi];
+                const name     = moleculeNames[smi];
+                const isExpanded = expandedSmi === smi;
+                const molDone  = TOOLS.every(t => toolStatus[`${smi}-${t}`] === 'done' || toolStatus[`${smi}-${t}`] === 'error');
+                const molResults = Object.entries(allResults)
+                  .filter(([k]) => k.startsWith(smi + '-'))
+                  .flatMap(([, v]) => v);
                 return (
-                  <div key={smi} style={{ backgroundColor: 'white', borderRadius: '8px', padding: '12px 16px', border: '1px solid #e0e0e0' }}>
-                    <div style={{ marginBottom: '8px' }}>
-                      {name && (
-                        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1a3a5c', marginBottom: '2px' }}>{name}</div>
+                  <div key={smi} style={{ backgroundColor: 'white', borderRadius: '10px', border: `1px solid ${isExpanded ? '#0ea5e9' : '#e0e0e0'}`, overflow: 'hidden', transition: 'border-color 0.2s' }}>
+                    {/* Header — always visible */}
+                    <div
+                      onClick={() => molDone && setExpandedSmi(isExpanded ? null : smi)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', cursor: molDone ? 'pointer' : 'default', userSelect: 'none' }}
+                    >
+                      <MolImage smiles={smi} width={72} height={54} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {name && <div style={{ fontSize: '13px', fontWeight: 700, color: '#1a3a5c', marginBottom: '2px' }}>{name}</div>}
+                        <div style={{ fontSize: '10px', fontFamily: 'monospace', color: '#94a3b8', wordBreak: 'break-all', lineHeight: 1.4 }}>{smi}</div>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                          {TOOLS.map(tool => {
+                            const state = toolStatus[`${smi}-${tool}`] ?? 'queued';
+                            const iconCls = state === 'done' ? 'bi bi-check-circle-fill' : state === 'error' ? 'bi bi-x-circle-fill' : state === 'queued' ? 'bi bi-pause-circle' : 'bi bi-hourglass-split';
+                            return (
+                              <span key={tool} style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '3px',
+                                padding: '2px 8px', borderRadius: '20px', fontSize: '11px',
+                                backgroundColor: state === 'done' ? '#dcfce7' : state === 'error' ? '#fee2e2' : state === 'queued' ? '#f8fafc' : '#f1f5f9',
+                                color: state === 'done' ? '#16a34a' : state === 'error' ? '#dc2626' : state === 'queued' ? '#94a3b8' : '#64748b',
+                                border: `1px solid ${TOOL_COLORS[tool]}22`,
+                              }}>
+                                <i className={iconCls} /> {tool}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      {molDone && (
+                        <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'}`} style={{ fontSize: '14px', color: '#94a3b8', flexShrink: 0 }} />
                       )}
-                      <div style={{ fontSize: '11px', fontFamily: 'monospace', color: '#64748b', wordBreak: 'break-all' }}>{smi}</div>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {TOOLS.map(tool => {
-                        const state = toolStatus[`${smi}-${tool}`] ?? 'queued';
-                        const icon  = state === 'done' ? '✅' : state === 'error' ? '❌' : state === 'queued' ? '⏸️' : '⏳';
-                        return (
-                          <span key={tool}
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', gap: '4px',
-                              padding: '3px 10px', borderRadius: '20px', fontSize: '12px',
-                              backgroundColor: state === 'done' ? '#dcfce7' : state === 'error' ? '#fee2e2' : state === 'queued' ? '#f8fafc' : '#f1f5f9',
-                              color: state === 'done' ? '#16a34a' : state === 'error' ? '#dc2626' : state === 'queued' ? '#94a3b8' : '#64748b',
-                              border: `1px solid ${TOOL_COLORS[tool]}22`,
-                            }}>
-                            {icon} {tool}
-                          </span>
-                        );
-                      })}
-                    </div>
+
+                    {/* Expanded detail panel */}
+                    {isExpanded && molResults.length > 0 && (
+                      <div style={{ borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', padding: '12px 14px' }}>
+                        {TOOLS.map(tool => {
+                          const rows = molResults.filter(r => r && (r.Tool === tool || (tool === 'RDKit' && String(r.Tool).includes('RDKit'))));
+                          if (!rows.length) return null;
+                          return (
+                            <div key={tool} style={{ marginBottom: '14px' }}>
+                              <div style={{ fontSize: '11px', fontWeight: 700, color: TOOL_COLORS[tool], textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
+                                {tool}
+                              </div>
+                              <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                                  <thead>
+                                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                      <th style={{ padding: '4px 8px', textAlign: 'left', color: '#64748b', fontWeight: 600 }}>Property</th>
+                                      <th style={{ padding: '4px 8px', textAlign: 'left', color: '#64748b', fontWeight: 600 }}>Value</th>
+                                      {rows.some(r => r.Probability != null) && (
+                                        <th style={{ padding: '4px 8px', textAlign: 'left', color: '#64748b', fontWeight: 600 }}>Probability</th>
+                                      )}
+                                      {rows.some(r => r.Unit) && (
+                                        <th style={{ padding: '4px 8px', textAlign: 'left', color: '#64748b', fontWeight: 600 }}>Unit</th>
+                                      )}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {rows.map((r, ri) => {
+                                      const prob = r.Probability != null ? parseFloat(r.Probability) : null;
+                                      const isRisk = prob != null && prob >= 0.5;
+                                      return (
+                                        <tr key={ri} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: ri % 2 === 0 ? '#fff' : '#f9fafb' }}>
+                                          <td style={{ padding: '4px 8px', color: '#374151', fontWeight: 500 }}>{r.Property ?? r.Endpoint ?? '—'}</td>
+                                          <td style={{ padding: '4px 8px', fontFamily: 'monospace', color: '#0f172a' }}>{String(r.Value ?? '—')}</td>
+                                          {rows.some(x => x.Probability != null) && (
+                                            <td style={{ padding: '4px 8px', fontWeight: 700, color: isRisk ? '#dc2626' : prob != null && prob >= 0.3 ? '#d97706' : '#16a34a' }}>
+                                              {prob != null ? `${(prob * 100).toFixed(0)}%` : '—'}
+                                            </td>
+                                          )}
+                                          {rows.some(x => x.Unit) && (
+                                            <td style={{ padding: '4px 8px', color: '#94a3b8', fontSize: '10px' }}>{r.Unit ?? '—'}</td>
+                                          )}
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })}

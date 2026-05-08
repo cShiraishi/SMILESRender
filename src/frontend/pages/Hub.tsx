@@ -4,6 +4,7 @@ import AtomicBackground from '../components/AtomicBackground';
 import AppleDock from '../components/AppleDock';
 import DiscoverGrid from '../components/DiscoverGrid';
 import MoleculeDrawerModal from '../components/MoleculeDrawerModal';
+import SmileIcon from '../components/SmileIcon';
 import { parseCSV, autoDetect, detectSmilesColumn } from '../tools/csv';
 
 interface HubApp {
@@ -30,6 +31,7 @@ const apps: HubApp[] = [
 interface Props {
   onNavigate: (id: string, smiles?: string) => void;
 }
+
 
 const Hub: React.FC<Props> = ({ onNavigate }) => {
   const [heroSmiles, setHeroSmiles] = useState('');
@@ -94,11 +96,11 @@ const Hub: React.FC<Props> = ({ onNavigate }) => {
   };
 
   return (
-    <div style={{ 
-      position: 'relative', 
+    <div style={{
+      position: 'relative',
       minHeight: '100vh',
-      backgroundColor: 'transparent', // Now shows the global background
-      overflowX: 'hidden'
+      backgroundColor: 'transparent',
+      overflowX: 'hidden',
     }}>
       {/* Transition Overlay (iOS Style Expansion) */}
       <div style={{
@@ -111,8 +113,11 @@ const Hub: React.FC<Props> = ({ onNavigate }) => {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {isTransitioning && (
-          <div style={{ animation: 'pulseLogo 0.8s ease-out forwards' }}>
-            <img src="static/logo.png" alt="Logo" style={{ height: '80px', filter: 'brightness(0) invert(1)' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', animation: 'pulseLogo 0.8s ease-out forwards' }}>
+            <SmileIcon size={72} color="rgba(255,255,255,0.95)" />
+            <span style={{ color: '#fff', fontWeight: 700, fontSize: '22px', letterSpacing: '0.01em', opacity: 0.95 }}>
+              SMILES <span style={{ fontWeight: 300 }}>Render</span>
+            </span>
           </div>
         )}
       </div>
@@ -173,7 +178,7 @@ const Hub: React.FC<Props> = ({ onNavigate }) => {
                   style={{
                     flex: 1, border: 'none', background: 'none', resize: 'none',
                     padding: '14px 16px', fontSize: '16px', color: colors.text, outline: 'none',
-                    maxHeight: '150px', height: '52px', fontFamily: 'monospace'
+                    maxHeight: '150px', height: '52px', fontFamily: 'monospace',
                   }}
                   onInput={(e) => {
                     const el = e.target as HTMLTextAreaElement;

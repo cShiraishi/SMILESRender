@@ -33,3 +33,4 @@ def predict_tool_task(tool_name, smiles_b64):
         return {"error": "Tool not implemented in worker yet"}
     except Exception as e:
         return {"error": str(e)}
+

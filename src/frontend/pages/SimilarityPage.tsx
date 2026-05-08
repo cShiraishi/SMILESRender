@@ -21,7 +21,7 @@ function bar(v: number) {
   );
 }
 
-function SimContent({ initialSmiles }: { initialSmiles?: string }) {
+function SimContent({ initialSmiles, onSmilesChange }: { initialSmiles?: string; onSmilesChange?: (s: string) => void }) {
   const [ref,     setRef]     = useState(initialSmiles || 'CC(=O)Oc1ccccc1C(=O)O');
   const [input,   setInput]   = useState('CC(=O)Oc1ccccc1C(=O)O\nCc1ccc(cc1)S(=O)(=O)N\nCC12CCC3C(C1CCC2O)CCC4=CC(=O)CCC34C\nCN1C=NC2=C1C(=O)N(C(=O)N2C)C\nC1=CC=CC=C1');
   const [radius2, setRadius2] = useState(2);
@@ -81,7 +81,7 @@ function SimContent({ initialSmiles }: { initialSmiles?: string }) {
           <label style={{ fontSize: '12px', fontWeight: 600, color: colors.textMuted, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
             Query Library — one SMILES per line
           </label>
-          <textarea className="smiles-input" rows={6} value={input} onChange={e => setInput(e.target.value)} style={{
+          <textarea className="smiles-input" rows={6} value={input} onChange={e => { setInput(e.target.value); onSmilesChange?.(e.target.value); }} style={{
             width: '100%', boxSizing: 'border-box', padding: '10px 12px',
             fontFamily: 'monospace', fontSize: '13px',
             border: `1px solid ${colors.border}`, borderRadius: radius.sm,
@@ -140,10 +140,10 @@ function SimContent({ initialSmiles }: { initialSmiles?: string }) {
   );
 }
 
-function SimilarityPage({ onBack, initialSmiles }: { onBack: () => void; initialSmiles?: string }) {
+function SimilarityPage({ onBack, initialSmiles, onSmilesChange }: { onBack: () => void; initialSmiles?: string; onSmilesChange?: (s: string) => void }) {
   return (
     <PageShell icon="bi-intersect" title="Similarity Search" subtitle="Morgan fingerprint · Tanimoto coefficient · ranked results" accentColor={accentColor} onBack={onBack}>
-      <SimContent initialSmiles={initialSmiles} />
+      <SimContent initialSmiles={initialSmiles} onSmilesChange={onSmilesChange} />
     </PageShell>
   );
 }

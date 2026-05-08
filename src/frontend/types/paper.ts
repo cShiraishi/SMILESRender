@@ -14,6 +14,7 @@ export interface PaperOptions {
   cardSize: CardSize;
   theme: PaperTheme;
   bgColor: 'white' | 'transparent';
+  nameSize: number;
 }
 
 export const defaultPaperOptions: PaperOptions = {
@@ -28,6 +29,7 @@ export const defaultPaperOptions: PaperOptions = {
   cardSize: 'md',
   theme: 'light',
   bgColor: 'white',
+  nameSize: 16,
 };
 
 export const cardSizes: Record<CardSize, { width: number; imgSize: number; label: string }> = {

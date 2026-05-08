@@ -156,21 +156,22 @@ function ConvertFromCsv() {
 
     if (!file) return;
 
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext !== 'csv') {
+      setFileInputError({ message: `"${file.name}" is not a CSV file. Please convert it to CSV first.` });
+      setFormFields({ ...formFields, file: null, fileName: file.name, columns: [] });
+      return;
+    }
+
+    setFormFields(prev => ({ ...prev, file, fileName: file.name }));
+
     file.text().then((text: string) => {
       const delimiter = csvTools.getDelimiter(text);
       const content = csvTools.parseCSV(text, delimiter);
       const [header] = content;
 
-      setCsvData({
-        delimiter,
-        content,
-      });
-      setFormFields({
-        ...formFields,
-        file: file,
-        fileName: file ? file.name : '',
-        columns: header,
-      });
+      setCsvData({ delimiter, content });
+      setFormFields(prev => ({ ...prev, columns: header || [] }));
     });
   };
 

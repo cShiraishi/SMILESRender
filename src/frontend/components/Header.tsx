@@ -1,5 +1,6 @@
 import React from 'react';
 import { colors, font, shadow } from '../styles/themes';
+import SmileIcon from './SmileIcon';
 
 function Header() {
   return (
@@ -24,10 +25,21 @@ function Header() {
         boxSizing: 'border-box',
       }}>
         {/* Logo Section */}
-        <a href="/" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '15px', minWidth: 'fit-content' }}>
-          <img src="static/logo.png" alt="SMILESRender" style={{ height: '38px', filter: 'brightness(0) invert(1)' }} />
-          <div style={{ display: 'flex', flexDirection: 'column', borderLeft: '1px solid rgba(255,255,255,0.2)', paddingLeft: '15px' }}>
-            <span style={{ fontWeight: 800, fontSize: '18px', letterSpacing: '0.01em', lineHeight: 1.1 }}>SMILESRender</span>
+        <a href="/" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '12px', minWidth: 'fit-content' }}>
+          <div style={{
+            width: '40px', height: '40px',
+            background: '#1a1a2e',
+            borderRadius: '10px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 10px rgba(255,210,48,0.25)',
+            flexShrink: 0,
+          }}>
+            <SmileIcon size={26} color="#ffffff" />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', borderLeft: '1px solid rgba(255,255,255,0.2)', paddingLeft: '12px' }}>
+            <span style={{ fontWeight: 800, fontSize: '18px', letterSpacing: '-0.01em', lineHeight: 1.1 }}>
+              <span style={{ color: '#fff' }}>SMILES </span><span style={{ color: '#7dd3fc' }}>Render</span>
+            </span>
             <span style={{ fontSize: '10px', color: '#94a8c9', fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
               Molecular Intelligence Platform
             </span>

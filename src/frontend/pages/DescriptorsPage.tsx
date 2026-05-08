@@ -138,7 +138,7 @@ function isBold(col: ColDef) {
   return col.key === 'QED' || col.key === 'LipinskiViolations' || col.key === 'VerberViolations' || col.key === 'EganViolations';
 }
 
-function DescContent({ initialSmiles }: { initialSmiles?: string }) {
+function DescContent({ initialSmiles, onSmilesChange }: { initialSmiles?: string; onSmilesChange?: (s: string) => void }) {
   const [input, setInput]       = useState(initialSmiles || 'CC(=O)Oc1ccccc1C(=O)O\nCc1ccc(cc1)S(=O)(=O)N\nCC12CCC3C(C1CCC2O)CCC4=CC(=O)CCC34C');
   const [results, setResults]   = useState<DescResult[]>([]);
   const [loading, setLoading]   = useState(false);
@@ -278,7 +278,7 @@ function DescContent({ initialSmiles }: { initialSmiles?: string }) {
         <label style={{ fontSize: '12px', fontWeight: 600, color: colors.textMuted, letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
           SMILES Input — one per line (max 20)
         </label>
-        <textarea className="smiles-input" rows={5} value={input} onChange={e => setInput(e.target.value)} style={{
+        <textarea className="smiles-input" rows={5} value={input} onChange={e => { setInput(e.target.value); onSmilesChange?.(e.target.value); }} style={{
           width: '100%', boxSizing: 'border-box', padding: '10px 12px',
           fontFamily: 'monospace', fontSize: '13px',
           border: `1px solid ${colors.border}`, borderRadius: radius.sm,
@@ -615,10 +615,10 @@ function DescContent({ initialSmiles }: { initialSmiles?: string }) {
   );
 }
 
-function DescriptorsPage({ onBack, initialSmiles }: { onBack: () => void; initialSmiles?: string }) {
+function DescriptorsPage({ onBack, initialSmiles, onSmilesChange }: { onBack: () => void; initialSmiles?: string; onSmilesChange?: (s: string) => void }) {
   return (
     <PageShell icon="bi-grid-3x3" title="Molecular Descriptor Calculator" subtitle="50 RDKit descriptors · QSAR-ready · Lipinski · Veber · Egan · Topological · Electronic" accentColor={accentColor} onBack={onBack}>
-      <DescContent initialSmiles={initialSmiles} />
+      <DescContent initialSmiles={initialSmiles} onSmilesChange={onSmilesChange} />
     </PageShell>
   );
 }

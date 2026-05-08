@@ -177,3 +177,4 @@ def get_peptide_metrics(sequence):
         "helical_wheel": generate_helical_wheel(sequence),
         "cleavage_sites": analyze_stability(sequence)
     }
+

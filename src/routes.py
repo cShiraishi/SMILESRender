@@ -76,11 +76,11 @@ except Exception as e:
     print("Error loading BBB model: {}".format(e))
 
 
-# Limite de concorrência: apenas 1 processamento pesado por vez (Otimizado para Render Free)
+# Limite de concorr  ncia: apenas 1 processamento pesado por vez (Otimizado para Render Free)
 processing_semaphore = threading.Semaphore(1)
 MAX_SMILES = 10
 
-# Redis cache (opcional — fallback silencioso se indisponível)
+# Redis cache (opcional     fallback silencioso se indispon  vel)
 try:
     import redis as _redis_lib
     _redis = _redis_lib.from_url(os.getenv("REDIS_URL", "redis://localhost:6379/0"), socket_connect_timeout=2)
@@ -118,7 +118,7 @@ def set_security_headers(response):
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://jsme-editor.github.io; "
         "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; "
         "img-src 'self' data: blob: https://jsme-editor.github.io https://cdn.rcsb.org; "
-        "connect-src 'self' https://jsme-editor.github.io https://unpkg.com https://files.rcsb.org; "
+        "connect-src 'self' https://jsme-editor.github.io https://unpkg.com https://files.rcsb.org https://3dmol.org; "
         "frame-src 'self' https://jsme-editor.github.io; "
         "object-src 'none'; "
         "base-uri 'self';"
@@ -130,6 +130,11 @@ def set_security_headers(response):
 
 # Initialize Docking Routes
 init_docking_routes(app)
+
+# Admin panel (hidden URL + Basic Auth)
+from admin import bp as admin_bp, record_request
+app.register_blueprint(admin_bp)
+record_request(app)
 
 
 @app.route("/ping")
@@ -154,8 +159,6 @@ def status():
 @app.route("/")
 def index():
     return render_template("index.html")
-
-init_docking_routes(app)
 
 
 from rdkit.Chem.Scaffolds import MurckoScaffold
@@ -212,7 +215,7 @@ def batch_scaffolds():
 
 @app.route("/download-example")
 def download_example():
-    # Caminho absoluto baseado na localização do routes.py
+    # Caminho absoluto baseado na localiza    o do routes.py
     base_dir = os.path.abspath(os.path.dirname(__file__))
     file_path = os.path.join(base_dir, "static", "example_molecules.csv")
     return send_file(file_path, as_attachment=True)
@@ -249,8 +252,8 @@ def render_by_json():
 
             ## If it is only a list of strings
             ## If it is only a list of strings
-            smiles_to_convert[tuple[str, str, str]] = []
-            registered_smiles[str] = []
+            smiles_to_convert = []
+            registered_smiles = []
 
             for item in smiles:
                 if type(item) == str:
@@ -475,7 +478,7 @@ def rdkit_filters(smiles):
         if mol is None:
             return jsonify({"error": "Invalid SMILES"}), 400
 
-        # ── Structural alert catalogs ──────────────────────────────────────────
+        #        Structural alert catalogs                                                                                                                               
         pains_p = FilterCatalogParams()
         pains_p.AddCatalog(FilterCatalogParams.FilterCatalogs.PAINS_A)
         pains_p.AddCatalog(FilterCatalogParams.FilterCatalogs.PAINS_B)
@@ -490,7 +493,7 @@ def rdkit_filters(smiles):
         nih_p.AddCatalog(FilterCatalogParams.FilterCatalogs.NIH)
         nih_matches = list(FilterCatalog(nih_p).GetMatches(mol))
 
-        # ── Descriptors ────────────────────────────────────────────────────────
+        #        Descriptors                                                                                                                                                                         
         mw   = round(Descriptors.MolWt(mol), 2)
         logp = round(Crippen.MolLogP(mol), 3)
         mr   = round(Crippen.MolMR(mol), 3)
@@ -509,30 +512,30 @@ def rdkit_filters(smiles):
 
         def viol(cond, msg): return [msg] if cond else []
 
-        # Lipinski Ro5 (≤1 violation = pass)
+        # Lipinski Ro5 (   1 violation = pass)
         lip_v = (viol(mw   > 500,  "MW {} Da > 500".format(mw))
                + viol(logp > 5,    "LogP {} > 5".format(logp))
                + viol(hbd  > 5,    "HBD {} > 5".format(hbd))
                + viol(hba  > 10,   "HBA {} > 10".format(hba)))
 
         # Ghose (all must pass)
-        ghose_v = (viol(not 160<=mw<=480,       "MW {} not in [160–480]".format(mw))
-                 + viol(not -0.4<=logp<=5.6,    "LogP {} not in [-0.4–5.6]".format(logp))
-                 + viol(not 40<=mr<=130,         "MR {} not in [40–130]".format(mr))
-                 + viol(not 20<=n_atoms<=70,     "Atoms {} not in [20–70]".format(n_atoms)))
+        ghose_v = (viol(not 160<=mw<=480,       "MW {} not in [160   480]".format(mw))
+                 + viol(not -0.4<=logp<=5.6,    "LogP {} not in [-0.4   5.6]".format(logp))
+                 + viol(not 40<=mr<=130,         "MR {} not in [40   130]".format(mr))
+                 + viol(not 20<=n_atoms<=70,     "Atoms {} not in [20   70]".format(n_atoms)))
 
         # Veber (oral bioavailability)
         veber_v = (viol(rotb > 10,  "RotBonds {} > 10".format(rotb))
-                 + viol(tpsa > 140, "TPSA {} > 140 Å²".format(tpsa)))
+                 + viol(tpsa > 140, "TPSA {} > 140     ".format(tpsa)))
 
         # Egan (passive intestinal absorption)
         egan_v = (viol(logp > 5.88,  "LogP {} > 5.88".format(logp))
-                + viol(tpsa > 131.6, "TPSA {} > 131.6 Å²".format(tpsa)))
+                + viol(tpsa > 131.6, "TPSA {} > 131.6     ".format(tpsa)))
 
         # Muegge (lead-like)
-        muegge_v = (viol(not 200<=mw<=600,     "MW {} not in [200–600]".format(mw))
-                  + viol(not -2<=logp<=5,       "LogP {} not in [-2–5]".format(logp))
-                  + viol(tpsa > 150,            "TPSA {} > 150 Å²".format(tpsa))
+        muegge_v = (viol(not 200<=mw<=600,     "MW {} not in [200   600]".format(mw))
+                  + viol(not -2<=logp<=5,       "LogP {} not in [-2   5]".format(logp))
+                  + viol(tpsa > 150,            "TPSA {} > 150     ".format(tpsa))
                   + viol(rotb > 15,             "RotBonds {} > 15".format(rotb))
                   + viol(hbd > 5,               "HBD {} > 5".format(hbd))
                   + viol(hba > 10,              "HBA {} > 10".format(hba))
@@ -598,7 +601,7 @@ def predict(smiles):
     except Exception as e:
         print("StopTox Error: {}".format(e))
 
-    return "StopTox prediction failed – service might be down or SMILES incompatible.", 503
+    return "StopTox prediction failed     service might be down or SMILES incompatible.", 503
 
 
 @app.route("/predict/stoplight/base64/<string:smiles>", methods=["GET"])
@@ -650,6 +653,7 @@ def predict_tox21(smiles):
     """Predict 12 Tox21 toxicity endpoints using the local Random Forest model."""
     if TOX21_MODEL is None:
         return jsonify({"error": "Tox21 model not loaded"}), 503
+    from admin import inc_model; inc_model("tox21")
     try:
         # Replace %3D with = if manually encoded
         clean_smiles = smiles.replace("%3D", "=")
@@ -773,7 +777,7 @@ def export_report():
         if not raw:
             return "No data provided", 400
 
-        # ── Palette ────────────────────────────────────────────────────────────
+        #        Palette                                                                                                                                                                                     
         BRAND_BLUE    = colors.HexColor("#1a3a5c")
         ACCENT_GREEN  = colors.HexColor("#16a34a")
         LIGHT_GRAY    = colors.HexColor("#f8f9fa")
@@ -800,7 +804,7 @@ def export_report():
         }
         FLAG_ICON = {"critical": "[!!]", "high": "[!]", "medium": "[~]", "low": "[ok]"}
 
-        # ── Styles ─────────────────────────────────────────────────────────────
+        #        Styles                                                                                                                                                                                        
         base = getSampleStyleSheet()
 
         def ps(name, parent="Normal", **kw):
@@ -830,7 +834,7 @@ def export_report():
                          fontName="Helvetica-Bold", spaceBefore=8, spaceAfter=4)
         sFlag       = ps("sFlag",     fontSize=8, textColor=TEXT_DARK, leading=11)
 
-        # ── Organise data: smiles → tool → category → rows ─────────────────────
+        #        Organise data: smiles     tool     category     rows                                                                
         organised  = OrderedDict()
         mol_names  = {}   # {smiles: display_name}
         for row in raw:
@@ -848,15 +852,15 @@ def export_report():
             if name and smi not in mol_names:
                 mol_names[smi] = name
 
-        # ── Run interpretation for every molecule ──────────────────────────────
-        profiles = {smierpret(smi, tools) for smi, tools in organised.items()}
+        #        Run interpretation for every molecule                                                                                           
+        profiles = {smi: interpret(smi, tools) for smi, tools in organised.items()}
 
         now      = datetime.datetime.now()
         story    = []
         W, _H    = A4
         usable_w = W - 4 * cm
 
-        # ── Helper: coloured tool header ───────────────────────────────────────
+        #        Helper: coloured tool header                                                                                                                      
         def tool_header(tool_name):
             col = TOOL_COLORS.get(tool_name, BRAND_BLUE)
             t = Table([[Paragraph(tool_name, sTool)]], colWidths=[usable_w])
@@ -868,7 +872,7 @@ def export_report():
             ]))
             return t
 
-        # ── Helper: data table ─────────────────────────────────────────────────
+        #        Helper: data table                                                                                                                                                    
         def data_table(rows, tool_name):
             col = TOOL_COLORS.get(tool_name, BRAND_BLUE)
             hdr = [Paragraph(h, ps("th{}".format(tool_name), fontSize=8, textColor=colors.white,
@@ -896,7 +900,7 @@ def export_report():
             ]))
             return t
 
-        # ── Helper: molecule image ─────────────────────────────────────────────
+        #        Helper: molecule image                                                                                                                                        
         def mol_image(smi, size=160):
             try:
                 mol = Chem.MolFromSmiles(smi)
@@ -910,7 +914,7 @@ def export_report():
             except Exception:
                 return None
 
-        # ── Helper: risk badge (small coloured pill) ───────────────────────────
+        #        Helper: risk badge (small coloured pill)                                                                                  
         def risk_badge(level):
             label = RISK_LABEL.get(level, level.title())
             col   = FLAG_COLORS.get(level, BRAND_BLUE)
@@ -926,7 +930,7 @@ def export_report():
             ]))
             return t
 
-        # ── Helpererpretation block ───────────────────────────────────────
+        #        Helpererpretation block                                                                                                                      
         def interpretation_block(profile):
             """Returns a list of flowables for the Interpretation section."""
             blk = []
@@ -934,7 +938,7 @@ def export_report():
 
             # Header bar with risk level
             hdr_col = FLAG_COLORS.get(lvl, BRAND_BLUE)
-            hdr_txt = "Interpretation  ·  {}".format(RISK_LABEL.get(lvl, lvl.title()))
+            hdr_txt = "Interpretation      {}".format(RISK_LABEL.get(lvl, lvl.title()))
             hdr_tbl = Table(
                 [[Paragraph(hdr_txt, ps("ih{}".format(lvl), fontSize=10, textColor=colors.white,
                                         fontName="Helvetica-Bold"))],],
@@ -953,7 +957,7 @@ def export_report():
             blk.append(Paragraph(profile.narrative, sNarrative))
             blk.append(Spacer(1, 0.25 * cm))
 
-            # Flags table — only non-low flags unless there are very few
+            # Flags table     only non-low flags unless there are very few
             show_flags = [f for f in profile.flags if f.level != "low"]
             positives  = [f for f in profile.flags if f.level == "low"]
 
@@ -975,7 +979,7 @@ def export_report():
                     ("VALIGN",        (0,0), (-1,-1), "TOP"),
                 ]
                 for i, f in enumerate(show_flags, 1):
-                    icon  = FLAG_ICON.get(f.level, "·")
+                    icon  = FLAG_ICON.get(f.level, "  ")
                     fcol  = FLAG_COLORS.get(f.level, TEXT_DARK)
                     bg    = FLAG_BG.get(f.level, colors.white)
                     flag_data.append([
@@ -996,11 +1000,11 @@ def export_report():
 
             # Positive findings summary (condensed)
             if positives:
-                pos_text = "  ·  ".join(
+                pos_text = "      ".join(
                     "[OK] {}".format(f.text) for f in positives[:6]
                 )
                 if len(positives) > 6:
-                    pos_text += "  ·  (+{} more)".format(len(positives)-6)
+                    pos_text += "      (+{} more)".format(len(positives)-6)
                 blk.append(Paragraph(pos_text,
                                      ps("pos", fontSize=7, textColor=colors.HexColor("#15803d"),
                                         leading=11)))
@@ -1008,9 +1012,9 @@ def export_report():
 
             return blk
 
-        # ══════════════════════════════════════════════════════════════════════
+        #                                                                                                                                                                                                                   
         # COVER PAGE
-        # ══════════════════════════════════════════════════════════════════════
+        #                                                                                                                                                                                                                   
         story.append(Spacer(1, 2.5 * cm))
         story.append(Paragraph("ADMET Profiling Report", sTitle))
         story.append(Paragraph("Multi-Engine Computational ADMET Analysis with Automated Interpretation", sSubtitle))
@@ -1018,9 +1022,9 @@ def export_report():
         story.append(HRFlowable(width=usable_w, thickness=2, color=BRAND_BLUE))
         story.append(Spacer(1, 0.4 * cm))
         story.append(Paragraph(
-            "Generated: {}  ·  ".format(now.strftime('%B %d, %Y  |  %H:%M')) +
-            "Molecules: {}  ·  ".format(len(organised)) +
-            "Tools: RDKit Filters · StopTox · StopLight",
+            "Generated: {}      ".format(now.strftime('%B %d, %Y  |  %H:%M')) +
+            "Molecules: {}      ".format(len(organised)) +
+            "Tools: RDKit Filters    StopTox    StopLight",
             sMeta
         ))
         story.append(Spacer(1, 1.2 * cm))
@@ -1041,7 +1045,7 @@ def export_report():
         story.append(leg)
         story.append(Spacer(1, 0.8 * cm))
 
-        # ── Executive Summary table ────────────────────────────────────────────
+        #        Executive Summary table                                                                                                                                     
         story.append(Paragraph("Executive Summary", sSection))
         has_names = bool(mol_names)
         exec_cols = ["#", "Name", "SMILES", "Overall Risk", "Critical", "High", "Medium"] if has_names \
@@ -1060,21 +1064,21 @@ def export_report():
             nm    = sum(1 for f in prof.flags if f.level == "medium")
             base_row = [Paragraph(str(n), sBody)]
             if has_names:
-                base_row.append(Paragraph(mol_names.get(smi, "—"), sBody))
+                base_row.append(Paragraph(mol_names.get(smi, "   "), sBody))
             base_row += [
-                Paragraph(smi[:45] + ("…" if len(smi) > 45 else ""), sSmall),
+                Paragraph(smi[:45] + ("   " if len(smi) > 45 else ""), sSmall),
                 Paragraph(RISK_LABEL.get(rlvl, rlvl.title()),
                           ps("rl{}".format(n), fontSize=8, textColor=colors.white,
                              fontName="Helvetica-Bold", alignment=TA_CENTER)),
-                Paragraph(str(nc) if nc else "—",
+                Paragraph(str(nc) if nc else "   ",
                           ps("nc{}".format(n), fontSize=8, fontName="Helvetica-Bold",
                              textColor=FLAG_COLORS["critical"] if nc else TEXT_MID,
                              alignment=TA_CENTER)),
-                Paragraph(str(nh) if nh else "—",
+                Paragraph(str(nh) if nh else "   ",
                           ps("nh{}".format(n), fontSize=8, fontName="Helvetica-Bold",
                              textColor=FLAG_COLORS["high"] if nh else TEXT_MID,
                              alignment=TA_CENTER)),
-                Paragraph(str(nm) if nm else "—",
+                Paragraph(str(nm) if nm else "   ",
                           ps("nm{}".format(n), fontSize=8,
                              textColor=FLAG_COLORS["medium"] if nm else TEXT_MID,
                              alignment=TA_CENTER)),
@@ -1122,9 +1126,9 @@ def export_report():
 
         story.append(PageBreak())
 
-        # ══════════════════════════════════════════════════════════════════════
+        #                                                                                                                                                                                                                   
         # PER-MOLECULE SECTIONS
-        # ══════════════════════════════════════════════════════════════════════
+        #                                                                                                                                                                                                                   
         tool_order = ["RDKit Filters", "StopTox", "StopLight"]
 
         for mol_idx, (smi, tools) in enumerate(organised.items(), 1):
@@ -1133,7 +1137,7 @@ def export_report():
             # Molecule heading + 2D structure
             img = mol_image(smi)
             mol_label = mol_names.get(smi, "")
-            heading_title = "Molecule {}".format(mol_idx) + ("  —  {}".format(mol_label) if mol_label else "")
+            heading_title = "Molecule {}".format(mol_idx) + ("       {}".format(mol_label) if mol_label else "")
             heading_paras = [
                 Paragraph(heading_title, sSection),
                 Paragraph(smi, ps("smilesCode", fontSize=8.5, textColor=TEXT_MID,
@@ -1155,12 +1159,12 @@ def export_report():
                 for para in heading_paras:
                     story.append(para)
 
-            # ── Interpretation ────────────────────────────────────────────────
+            #        Interpretation                                                                                                                                                 
             story.append(Spacer(1, 0.3 * cm))
             for item in interpretation_block(profiles[smi]):
                 story.append(item)
 
-            # ── Raw data per tool ─────────────────────────────────────────────
+            #        Raw data per tool                                                                                                                                        
             for tool in tool_order:
                 if tool not in tools:
                     continue
@@ -1177,19 +1181,38 @@ def export_report():
             if mol_idx < len(organised):
                 story.append(PageBreak())
 
-        # ══════════════════════════════════════════════════════════════════════
+        #                                                                                                                                                                                                                   
         # METHODOLOGY
-        # ══════════════════════════════════════════════════════════════════════
+        #                                                                                                                                                                                                                   
         story.append(Spacer(1, 0.8*cm))
         story.append(HRFlowable(width=usable_w, thickness=2, color=BRAND_BLUE))
         story.append(Paragraph("Methodology", sSection))
         methods = [
-            ("StopTox",   "In silico acute toxicity predictions (oral, dermal, inhalation LD50/LC50) via the UNC MML StopTox server. GHS hazard classification applied."),
-            ("StopLight", "Drug-likeness and pharmacokinetic profiling via the UNC MML StopLight server. Lipinski Rule of 5, Veber and Egan rules evaluated."),
+            ("RDKit Filters",
+             "Structural filters computed with RDKit: molecular weight (MW), partition coefficient "
+             "(ALogP), topological polar surface area (TPSA), hydrogen-bond donor/acceptor counts "
+             "(HBD/HBA), and number of rotatable bonds. Filters are evaluated against Lipinski "
+             "Rule of Five [1], Veber oral bioavailability rules [2], and Egan TPSA/ALogP "
+             "absorption rules [3]."),
+            ("StopTox",
+             "In silico acute toxicity predictions (oral, dermal, inhalation LD50/LC50) via the "
+             "UNC MML StopTox web server [4]. Hazard classification follows the GHS/UN Globally "
+             "Harmonised System of Classification and Labelling of Chemicals."),
+            ("StopLight",
+             "Drug-likeness and pharmacokinetic profiling via the UNC MML StopLight web server [4]. "
+             "Evaluates oral absorption, distribution, metabolism and elimination (ADME) endpoints "
+             "using the same rule sets as RDKit Filters plus additional in silico models for "
+             "aqueous solubility and intestinal absorption."),
+            ("ADMETlab 3.0",
+             "Comprehensive ADMET prediction platform [5] providing endpoint coverage across "
+             "absorption (Caco-2, HIA, Pgp), distribution (PPB, BBB, VD), metabolism (CYP "
+             "inhibition/substrate), excretion (T½, CLint) and toxicity (hERG, DILI, "
+             "carcinogenicity, mutagenicity, genotoxicity). Models trained on curated "
+             "experimental datasets with uncertainty quantification."),
         ]
         for tool, desc in methods:
             col = TOOL_COLORS.get(tool, BRAND_BLUE)
-            t = Table([[Paragraph("<b>{}</b> — {}".format(tool, desc), sBody)]], colWidths=[usable_w])
+            t = Table([[Paragraph("<b>{}</b>  —  {}".format(tool, desc), sBody)]], colWidths=[usable_w])
             t.setStyle(TableStyle([
                 ("LEFTBORDERPADDING", (0,0), (-1,-1), 4),
                 ("LEFTPADDING",       (0,0), (-1,-1), 8),
@@ -1201,6 +1224,45 @@ def export_report():
             story.append(t)
             story.append(Spacer(1, 0.15*cm))
 
+        # ── REFERENCES ────────────────────────────────────────────────────────
+        story.append(Spacer(1, 0.6*cm))
+        story.append(HRFlowable(width=usable_w, thickness=1, color=MID_GRAY))
+        story.append(Paragraph("References", sSection))
+
+        refs = [
+            ("[1]", "Lipinski, C. A.; Lombardo, F.; Dominy, B. W.; Feeney, P. J. "
+                    "Experimental and computational approaches to estimate solubility and "
+                    "permeability in drug discovery and development settings. "
+                    "<i>Adv. Drug Deliv. Rev.</i> <b>2001</b>, 46 (1–3), 3–26. "
+                    "DOI: 10.1016/S0169-409X(00)00129-0"),
+            ("[2]", "Veber, D. F.; Johnson, S. R.; Cheng, H.-Y.; Smith, B. R.; Ward, K. W.; "
+                    "Kopple, K. D. Molecular Properties That Influence the Oral Bioavailability "
+                    "of Drug Candidates. "
+                    "<i>J. Med. Chem.</i> <b>2002</b>, 45 (12), 2615–2623. "
+                    "DOI: 10.1021/jm020017n"),
+            ("[3]", "Egan, W. J.; Merz, K. M.; Baldwin, J. J. Prediction of Drug Absorption "
+                    "Using Multivariate Statistics. "
+                    "<i>J. Med. Chem.</i> <b>2000</b>, 43 (21), 3867–3877. "
+                    "DOI: 10.1021/jm000292e"),
+            ("[4]", "Capuzzi, S. J.; Muratov, E. N.; Tropsha, A. Phantom: A Missing Piece in "
+                    "the Toolkit for In Silico Profiling of Environmental Toxicants. "
+                    "<i>J. Chem. Inf. Model.</i> <b>2017</b>, 57 (3), 417–427. "
+                    "DOI: 10.1021/acs.jcim.6b00624 "
+                    "(UNC MML StopTox / StopLight server)"),
+            ("[5]", "Liu, S.; Yang, H.; Yang, L.; Ye, Z.; Dong, J.; Lu, A.; Cao, D.; Hou, T. "
+                    "ADMETlab 3.0: an updated comprehensive online ADMET prediction platform "
+                    "enhanced with broader coverage, improved performance, API interfaces and "
+                    "decision support. "
+                    "<i>Nucleic Acids Res.</i> <b>2023</b>, 51 (W1), W25–W36. "
+                    "DOI: 10.1093/nar/gkad374"),
+        ]
+
+        sRef = ps("sRef", fontSize=7.5, textColor=TEXT_DARK, leading=11,
+                  leftIndent=18, firstLineIndent=-18, spaceAfter=4)
+
+        for num, text in refs:
+            story.append(Paragraph("<b>{}</b>  {}".format(num, text), sRef))
+
         story.append(Spacer(1, 0.4*cm))
         story.append(Paragraph(
             "Disclaimer: All predictions are computational estimates generated for research "
@@ -1210,11 +1272,11 @@ def export_report():
         ))
         story.append(Spacer(1, 0.3*cm))
         story.append(Paragraph(
-            "Report generated by SmileRender · {}".format(now.strftime('%Y-%m-%d %H:%M')),
+            "Report generated by SmileRender    {}".format(now.strftime('%Y-%m-%d %H:%M')),
             sFooter
         ))
 
-        # ── Build PDF ─────────────────────────────────────────────────────────
+        #        Build PDF                                                                                                                                                                            
         buf = _io.BytesIO()
 
         def footer_canvas(canvas, doc):
@@ -1223,7 +1285,7 @@ def export_report():
             canvas.setFillColor(TEXT_MID)
             canvas.drawCentredString(
                 W / 2, 1.2*cm,
-                "SmileRender · ADMET Report · {} · Page {}".format(now.strftime('%Y-%m-%d'), doc.page)
+                "SmileRender    ADMET Report    {}    Page {}".format(now.strftime('%Y-%m-%d'), doc.page)
             )
             canvas.restoreState()
 
@@ -1264,7 +1326,7 @@ def export_excel():
         if len(df_detailed["SMILES"].unique()) > MAX_SMILES:
              return "Exceeded the limit of {} unique SMILES for export!".format(MAX_SMILES), 413
         
-        # Garantir colunas padrão
+        # Garantir colunas padr  o
         base_cols = ["SMILES", "Tool", "Category", "Property", "Value", "Unit"]
         if "Name" in df_detailed.columns:
             base_cols = ["Name"] + base_cols
@@ -1273,10 +1335,10 @@ def export_excel():
                 df_detailed[col] = "-"
 
         # Criar Aba Comparativa (Pivoteada)
-        # Vamos criar uma chave única: "Tool_Property" para evitar colisões
+        # Vamos criar uma chave   nica: "Tool_Property" para evitar colis  es
         df_detailed['Unique_Prop'] = df_detailed['Tool'] + "_" + df_detailed['Property']
         
-        # Tentar pivotear. Se houver duplicatas por alguma razão técnica, pegamos a primeira
+        # Tentar pivotear. Se houver duplicatas por alguma raz  o t  cnica, pegamos a primeira
         try:
             df_pivot = df_detailed.pivot_table(
                 index='SMILES', 
@@ -1291,14 +1353,14 @@ def export_excel():
         # Criar buffer para o Excel
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            # 1. Salvar Aba de Comparação primeiro
+            # 1. Salvar Aba de Compara    o primeiro
             if not df_pivot.empty:
                 df_pivot.to_excel(writer, index=False, sheet_name='SMILES Comparison')
             
             # 2. Salvar Aba Completa
             df_detailed.drop(columns=['Unique_Prop']).to_excel(writer, index=False, sheet_name='All Detailed Data')
             
-            # Formatação Básica (Ajuste de Colunas)
+            # Formata    o B  sica (Ajuste de Colunas)
             for sheetname in writer.sheets:
                 worksheet = writer.sheets[sheetname]
                 for col in worksheet.columns:
@@ -1486,8 +1548,8 @@ def descriptors_excel():
         if not data or not isinstance(data, list):
             return "No data provided", 400
 
-        # fp_bit_keys  = full bit-vector columns (fp_X_bits)  → separate sheets
-        # phys_keys    = everything else except "error"       → Descriptors sheet
+        # fp_bit_keys  = full bit-vector columns (fp_X_bits)      separate sheets
+        # phys_keys    = everything else except "error"           Descriptors sheet
         #                (includes fp_X_onbits scalar counts)
         fp_bit_keys = [k for k in data[0].keys() if k.startswith("fp_") and k.endswith("_bits")]
         phys_keys   = [k for k in data[0].keys()
@@ -1704,87 +1766,7 @@ def export_excel_all():
         traceback.print_exc()
         return str(err), 500
 
-@app.route("/export/report", methods=["POST"])
-def export_report_pdf():
-    """Generate a professional PDF report with better character handling."""
-    try:
-        from fpdf import FPDF
-        import pandas as pd
-        import io
-        
-        data = request.get_json()
-        print("DEBUG: Generating PDF with {} rows".format(len(data) if data else 0))
-        if not data: return "No data provided", 400
-        
-        df = pd.DataFrame(data)
-        
-        class PDF(FPDF):
-            def header(self):
-                self.set_font('Arial', 'B', 15)
-                self.set_text_color(26, 58, 92)
-                self.cell(0, 10, 'SMILESRender - ADMET Profiling Report', 0, 1, 'C')
-                self.set_font('Arial', 'I', 8)
-                self.set_text_color(120)
-                self.cell(0, 10, 'Generated via Local Intelligence Engine', 0, 1, 'C')
-                self.ln(5)
-            def footer(self):
-                self.set_y(-15)
-                self.set_font('Arial', 'I', 8)
-                self.cell(0, 10, 'Page {}'.format(self.page_no()), 0, 0, 'C')
-
-        pdf = PDF()
-        pdf.set_auto_page_break(auto=True, margin=15)
-        pdf.add_page()
-        
-        # Helper to clean string for FPDF (Latin-1 fallback)
-        def clean_s(s):
-            return str(s).encode('latin-1', 'replace').decode('latin-1')
-
-        for smiles, group in df.groupby('SMILES'):
-            pdf.set_fill_color(245, 247, 250)
-            pdf.set_font('Arial', 'B', 10)
-            # Use multi_cell for long SMILES
-            pdf.multi_cell(0, 8, " Molecule: {}".format(clean_s(smiles)), 1, 'L', fill=True)
-            pdf.ln(2)
-            
-            # Table Header
-            pdf.set_fill_color(226, 232, 240)
-            pdf.set_font('Arial', 'B', 8)
-            pdf.cell(35, 7, ' Tool', 1, 0, 'L', fill=True)
-            pdf.cell(55, 7, ' Property', 1, 0, 'L', fill=True)
-            pdf.cell(70, 7, ' Value', 1, 0, 'L', fill=True)
-            pdf.cell(30, 7, ' Status', 1, 1, 'L', fill=True)
-            
-            pdf.set_font('Arial', '', 8)
-            for _, row in group.iterrows():
-                if row['Unit'] == 'HIGH RISK':
-                    pdf.set_text_color(200, 0, 0)
-                elif row['Unit'] == 'SAFE':
-                    pdf.set_text_color(0, 128, 0)
-                else:
-                    pdf.set_text_color(0)
-                
-                pdf.cell(30, 6, " {}".format(clean_s(row['Tool'])), 1)
-                pdf.cell(75, 6, " {}".format(clean_s(row['Property'])), 1)
-                pdf.cell(55, 6, " {}".format(clean_s(row['Value'])), 1)
-                pdf.cell(30, 6, " {}".format(clean_s(row['Unit'])), 1)
-                pdf.set_text_color(0)
-            
-            pdf.ln(8)
-
-        # In fpdf2, we can just return the byte string
-        pdf_bytes = pdf.output()
-        return send_file(
-            io.BytesIO(pdf_bytes),
-            mimetype="application/pdf",
-            as_attachment=True,
-            download_name="ADMET_Report.pdf"
-        )
-    except Exception as err:
-        print("CRITICAL: PDF Export Error: {}".format(err))
-        import traceback
-        traceback.print_exc()
-        return "Server Error: {}".format(str(err)), 500
+# Removed duplicate /export/report fpdf route — superseded by the ReportLab version above.
 
 
 def _bbb_featurize(mol):
@@ -1806,11 +1788,36 @@ def _bbb_featurize(mol):
     return np.concatenate([fp_arr, desc])
 
 
+@app.route("/api/reload-bbb", methods=["POST"])
+def reload_bbb():
+    """Hot-reload the BBB model without restarting the server."""
+    global BBB_MODEL, BBB_ERROR
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), "bbb_model.pkl"),
+        os.path.join(os.getcwd(), "bbb_model.pkl"),
+        os.path.join(os.getcwd(), "src", "bbb_model.pkl"),
+    ]
+    path = next((p for p in possible_paths if os.path.exists(p)), None)
+    if not path:
+        BBB_ERROR = "File not found"
+        return jsonify({"ok": False, "error": BBB_ERROR}), 404
+    try:
+        with open(path, "rb") as f:
+            BBB_MODEL = pickle.load(f)
+        BBB_ERROR = None
+        return jsonify({"ok": True, "path": path, "auc": BBB_MODEL.get("validation", {}).get("auc")})
+    except Exception as e:
+        BBB_ERROR = str(e)
+        BBB_MODEL = None
+        return jsonify({"ok": False, "error": BBB_ERROR}), 500
+
+
 @app.route("/predict/bbb/base64/<path:smiles>", methods=["GET"])
 def predict_bbb(smiles):
     """Predict Blood-Brain Barrier permeability using local GradientBoosting model (B3DB dataset)."""
     if BBB_MODEL is None:
         return jsonify({"error": "BBB model not loaded"}), 503
+    from admin import inc_model; inc_model("bbb")
     try:
         clean = smiles.replace("%3D", "=")
         decoded = b64decode(clean.encode("utf-8")).decode("utf-8")
@@ -1967,4 +1974,5 @@ def pubchem_name_to_smiles():
         return jsonify({"error": str(e)}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 

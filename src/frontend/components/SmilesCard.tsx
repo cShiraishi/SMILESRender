@@ -52,7 +52,7 @@ function SmilesCard(props: { smiles: string; name?: string; mode?: 'grid' | 'pap
     }
     if (opts.showName && !isTop(opts.namePos)) {
       bottomItems.push({ key: 'name', align: getBottomAlign(opts.namePos), content: (
-        <p style={{ fontSize: '13px', fontWeight: 700, color: textColor, margin: 0, lineHeight: 1.2 }}>{props.name || 'Unnamed'}</p>
+        <p style={{ fontSize: `${opts.nameSize}px`, fontWeight: 700, color: textColor, margin: 0, lineHeight: 1.2 }}>{props.name || 'Unnamed'}</p>
       )});
     }
     if (opts.showMW && props.mw != null && !isTop(opts.mwPos)) {
@@ -83,7 +83,7 @@ function SmilesCard(props: { smiles: string; name?: string; mode?: 'grid' | 'pap
           <span style={getTopStyle(opts.numberPos)}>{props.index}</span>
         )}
         {opts.showName && isTop(opts.namePos) && (
-          <span style={{ ...getTopStyle(opts.namePos), fontFamily: 'serif', fontSize: '12px', color: textColor }}>{props.name || 'Unnamed'}</span>
+          <span style={{ ...getTopStyle(opts.namePos), fontFamily: 'serif', fontSize: `${opts.nameSize - 1}px`, color: textColor }}>{props.name || 'Unnamed'}</span>
         )}
         {opts.showMW && props.mw != null && isTop(opts.mwPos) && (
           <span style={{ ...getTopStyle(opts.mwPos), fontSize: '9px', color: mutedColor }}>MW: {props.mw.toFixed(2)}</span>
@@ -171,13 +171,14 @@ function SmilesCard(props: { smiles: string; name?: string; mode?: 'grid' | 'pap
         )}
       </div>
       <p style={{
-        fontSize: '11px',
-        color: colors.textMuted,
+        fontSize: mode === 'paper' ? `${opts.nameSize}px` : '13px',
+        color: colors.text,
+        fontWeight: 600,
         textAlign: 'center',
         overflowWrap: 'break-word',
         width: '100%',
         margin: '0 0 10px 0',
-        fontFamily: 'monospace',
+        fontFamily: font,
       }}>
         {label}
       </p>

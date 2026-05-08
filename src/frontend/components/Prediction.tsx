@@ -137,8 +137,8 @@ function Prediction(props: { smiles: string; onDataLoaded?: (data: any[]) => voi
     return () => worker.terminate();
   }, [props.smiles]);
 
-  if (isLoading) return <div style={{ padding: '20px', color: '#64748b' }}>⏳ Capturando perfil ADMET (StopTox)...</div>;
-  if (isError) return <div style={{ padding: '20px', color: '#ef4444' }}>⚠️ Falha na conexão StopTox</div>;
+  if (isLoading) return <div style={{ padding: '20px', color: '#64748b' }}><i className="bi bi-hourglass-split" style={{ marginRight: 6 }} />Capturando perfil ADMET (StopTox)...</div>;
+  if (isError) return <div style={{ padding: '20px', color: '#ef4444' }}><i className="bi bi-exclamation-triangle" style={{ marginRight: 6 }} />Falha na conexão StopTox</div>;
 
   return (
     <div style={{ margin: '15px', padding: '20px', backgroundColor: '#fff', borderRadius: '15px', border: '1px solid #e2e8f0' }}>

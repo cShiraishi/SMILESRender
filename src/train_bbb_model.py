@@ -59,7 +59,7 @@ print(f"Loaded {len(df)} records. Columns: {list(df.columns)}")
 label_col  = "BBB+/BBB-"
 smiles_col = "SMILES"
 
-# ── Featurize + compute Murcko scaffolds ─────────────────────────────────────
+#        Featurize + compute Murcko scaffolds                                                                                                                
 print("Featurizing and computing Murcko scaffolds...")
 records = []
 for _, row in df.iterrows():
@@ -77,7 +77,7 @@ for _, row in df.iterrows():
 
 print(f"Valid molecules: {len(records)}")
 
-# ── Scaffold-based split ──────────────────────────────────────────────────────
+#        Scaffold-based split                                                                                                                                                                   
 # Group molecule indices by scaffold
 scaffold_to_idx = {}
 for i, rec in enumerate(records):
@@ -111,7 +111,7 @@ print(f"Unique scaffolds: {n_scaffolds}  (train and test sets are scaffold-disjo
 print(f"BBB+ train: {y_train.sum()}  BBB- train: {(y_train==0).sum()}")
 print(f"BBB+ test : {y_test.sum()}   BBB- test : {(y_test==0).sum()}")
 
-# ── Train main model ──────────────────────────────────────────────────────────
+#        Train main model                                                                                                                                                                               
 print("\nTraining GradientBoostingClassifier...")
 model = GradientBoostingClassifier(
     n_estimators=300,
@@ -145,7 +145,7 @@ print(f"  Specificity (TNR)  : {spec:.4f}")
 ci_lo, ci_hi = 0.0, 0.0
 null_mean, null_std, p_value = 0.0, 0.0, 0.0
 
-# ── Applicability Domain — save training fingerprints ─────────────────────────
+#        Applicability Domain     save training fingerprints                                                                            
 print("\nBuilding Applicability Domain (Tanimoto NN, threshold={})...".format(AD_THRESHOLD))
 train_fps = []
 for i in train_idx:
@@ -166,7 +166,7 @@ for i in test_idx:
 ad_coverage = in_ad_count / len(test_idx)
 print(f"Test set AD coverage at threshold {AD_THRESHOLD}: {ad_coverage:.1%} ({in_ad_count}/{len(test_idx)})")
 
-# ── Save bundle ────────────────────────────────────────────────────────────────
+#        Save bundle                                                                                                                                                                                                 
 bundle = {
     "model":        model,
     "fp_bits":      FP_BITS,
@@ -206,3 +206,4 @@ print(f"Specificity  : {spec:.4f}")
 print(f"Y-scramble p : {p_value:.2e}")
 print(f"AD coverage  : {ad_coverage:.1%}")
 print("Saved -> " + OUTPUT_PKL)
+

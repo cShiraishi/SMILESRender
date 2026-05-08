@@ -63,7 +63,7 @@ function PageShell({ icon, title, subtitle, accentColor = colors.blue, onBack, c
         </div>
       </div>
       {/* Content */}
-      <div style={{ width: '100%', padding: '20px 40px', boxSizing: 'border-box' }}>
+      <div style={{ width: '100%', padding: 'clamp(12px, 3vw, 20px) clamp(12px, 4vw, 40px)', boxSizing: 'border-box' }}>
         {children}
       </div>
     </div>

@@ -15,7 +15,7 @@ function Header() {
       width: '100%',
       borderBottom: '1px solid rgba(255,255,255,0.1)',
     }}>
-      <div style={{
+      <div className="header-inner" style={{
         width: '100%',
         padding: '0 40px',
         height: '70px',
@@ -48,7 +48,7 @@ function Header() {
 
         {/* Navigation Section */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '30px' }}>
-          <nav style={{ display: 'flex', gap: '25px', marginRight: '10px' }}>
+          <nav className="header-nav" style={{ display: 'flex', gap: '25px', marginRight: '10px' }}>
             <a href="/#renderer" style={{ color: '#cbd5e1', textDecoration: 'none', fontSize: '14px', fontWeight: 500, transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = '#fff'} onMouseOut={e => e.currentTarget.style.color = '#cbd5e1'}>
               Rendering
             </a>
@@ -59,7 +59,7 @@ function Header() {
               Nomenclature
             </a>
           </nav>
-          
+
           <a
             href="https://github.com/cShiraishi/SMILESRender"
             target="_blank"
@@ -88,10 +88,18 @@ function Header() {
             }}
           >
             <i className="bi bi-github" style={{ fontSize: '16px' }}></i>
-            GitHub
+            <span className="header-github-text">GitHub</span>
           </a>
         </div>
       </div>
+
+      <style>{`
+        @media (max-width: 640px) {
+          .header-inner { padding: 0 16px !important; }
+          .header-nav { display: none !important; }
+          .header-github-text { display: none !important; }
+        }
+      `}</style>
     </header>
   );
 }

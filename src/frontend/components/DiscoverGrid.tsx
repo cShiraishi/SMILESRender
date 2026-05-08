@@ -18,9 +18,9 @@ const DiscoverGrid: React.FC<Props> = ({ apps, onNavigate }) => {
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-      gap: '24px',
-      padding: '24px 0 60px',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))',
+      gap: 'clamp(12px, 3vw, 24px)',
+      padding: 'clamp(16px, 3vw, 24px) 0 60px',
       maxWidth: '96%',
       margin: '0 auto',
     }}>

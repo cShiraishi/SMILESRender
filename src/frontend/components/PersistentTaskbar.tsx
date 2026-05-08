@@ -34,7 +34,7 @@ const PersistentTaskbar: React.FC<Props> = ({ apps, activePage, onNavigate, onHo
       zIndex: 500,
       display: 'flex',
       justifyContent: 'center',
-      padding: '8px 16px 12px',
+      padding: '8px 16px max(12px, env(safe-area-inset-bottom))',
       backgroundColor: 'rgba(248, 250, 252, 0.88)',
       backdropFilter: 'blur(24px) saturate(200%)',
       WebkitBackdropFilter: 'blur(24px) saturate(200%)',
@@ -53,7 +53,7 @@ const PersistentTaskbar: React.FC<Props> = ({ apps, activePage, onNavigate, onHo
             onPointerDown={() => setPressedId('home')}
             onPointerUp={() => setPressedId(null)}
             style={{
-              width: '40px', height: '40px',
+              width: '44px', height: '44px',
               borderRadius: '10px',
               border: 'none',
               background: hoveredId === 'home' ? 'rgba(0,0,0,0.09)' : 'rgba(0,0,0,0.04)',
@@ -92,7 +92,7 @@ const PersistentTaskbar: React.FC<Props> = ({ apps, activePage, onNavigate, onHo
                 onPointerDown={() => !isActive && setPressedId(app.id)}
                 onPointerUp={() => setPressedId(null)}
                 style={{
-                  width: '40px', height: '40px',
+                  width: '44px', height: '44px',
                   borderRadius: '11px',
                   border: 'none',
                   background: isActive

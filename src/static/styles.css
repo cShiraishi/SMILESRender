@@ -163,7 +163,48 @@ h2 {
   flex-direction: column;
   justify-content: center;
   align-content: center;
-  max-width: 90%;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .page-content {
+    padding: 16px;
+    width: 100%;
+  }
+
+  .smilesrender {
+    font-size: 18px;
+  }
+
+  .page-logo {
+    width: 60px;
+    padding: 8px;
+  }
+
+  h2 {
+    font-size: 20px;
+  }
+
+  .github-link {
+    margin-right: 12px;
+  }
+
+  .rendered-images {
+    margin: 8px;
+  }
+
+  .smiles-image {
+    width: 100%;
+    margin: 8px 0;
+  }
+
+  .input-container {
+    padding: 14px;
+  }
+
+  .card-head {
+    padding: 14px;
+  }
 }
 
 .smiles-image p {

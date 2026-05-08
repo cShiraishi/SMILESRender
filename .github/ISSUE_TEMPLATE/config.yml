@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://shiraishicarlos.github.io/smilesrender
+    about: Read the docs before opening an issue
+  - name: Discussions
+    url: https://github.com/shiraishicarlos/smilesrender/discussions
+    about: Ask questions or share ideas in Discussions

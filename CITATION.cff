@@ -1,0 +1,37 @@
+cff-version: 1.2.0
+message: "If you use SmileRender in your research, please cite it as below."
+type: software
+title: "SmileRender: A Unified Open-Source Cheminformatics Platform"
+version: 2.0.0
+date-released: "2025-01-01"
+authors:
+  - family-names: Shiraishi
+    given-names: Carlos Seiti
+    email: carlos.seiti.shiraishi@gmail.com
+    orcid: ""
+abstract: >
+  SmileRender is an open-source web platform that consolidates multiple
+  cheminformatics workflows into a single interface: SMILES-to-image rendering
+  (8 formats), ADMET profiling via 5 prediction engines, molecular descriptors,
+  fingerprint-based similarity search, IUPAC nomenclature conversion, reaction
+  visualization, peptide engineering, and AutoDock Vina molecular docking with
+  PLIP interaction analysis.
+keywords:
+  - cheminformatics
+  - SMILES
+  - ADMET
+  - drug-discovery
+  - molecular-docking
+  - RDKit
+  - open-source
+license: MIT
+repository-code: "https://github.com/shiraishicarlos/smilesrender"
+url: "https://smiles-render.onrender.com"
+preferred-citation:
+  type: software
+  title: "SmileRender: A Unified Open-Source Cheminformatics Platform"
+  authors:
+    - family-names: Shiraishi
+      given-names: Carlos Seiti
+  year: 2025
+  url: "https://github.com/shiraishicarlos/smilesrender"

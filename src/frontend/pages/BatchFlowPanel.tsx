@@ -136,9 +136,10 @@ const CHUNK_SIZE = 4;
 
 interface BatchFlowPanelProps {
   onSmilesChange?: (s: string) => void;
+  onAnalyzeSingle?: (smiles: string) => void;
 }
 
-const BatchFlowPanel: React.FC<BatchFlowPanelProps> = () => {
+const BatchFlowPanel: React.FC<BatchFlowPanelProps> = ({ onAnalyzeSingle }) => {
   const [textInput,  setTextInput]  = useState('');
   const [mols,       setMols]       = useState<BatchMol[]>([]);
   const [running,    setRunning]    = useState(false);
@@ -181,12 +182,12 @@ const BatchFlowPanel: React.FC<BatchFlowPanelProps> = () => {
 
   const processMol = async (mol: BatchMol): Promise<void> => {
     updateMol(mol.id, { status: 'processing' });
-    const enc = encodeURIComponent(b64(mol.smiles));
     try {
+      const enc = encodeURIComponent(b64(mol.smiles));
       const [rdkitRes, bbbRes, deepRes] = await Promise.allSettled([
-        fetch(`/predict/rdkit-filters/base64/${enc}`).then(r => r.json()),
-        fetch(`/predict/bbb/base64/${enc}`).then(r => r.json()),
-        fetch(`/deep/${enc}`).then(r => r.json()),
+        fetch(`/predict/rdkit-filters/base64/${enc}`).then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(`${r.status}: ${t.slice(0,120)}`); })),
+        fetch(`/predict/bbb/base64/${enc}`).then(r => r.ok ? r.json() : r.json().catch(() => ({ error: `HTTP ${r.status}` }))),
+        fetch(`/deep/${enc}`).then(r => r.ok ? r.json() : r.json().catch(() => ({ error: `HTTP ${r.status}` }))),
       ]);
 
       const patch: Partial<BatchMol> = { status: 'done' };
@@ -515,6 +516,7 @@ const BatchFlowPanel: React.FC<BatchFlowPanelProps> = () => {
                     { l: 'hERG',    w: 52  },
                     { l: 'ESOL',    w: 80  },
                     { l: '',        w: 28  },
+                    ...(onAnalyzeSingle ? [{ l: 'Flow', w: 52 }] : []),
                   ].map(({ l, w }) => (
                     <th key={l} style={{
                       padding: '7px 8px', textAlign: 'left', fontSize: 10, width: w,
@@ -625,6 +627,25 @@ const BatchFlowPanel: React.FC<BatchFlowPanelProps> = () => {
                       {m.status === 'done'       && <i className="bi bi-check-circle-fill" style={{ color: '#059669', fontSize: 12 }} />}
                       {m.status === 'error'      && <span title={m.error} style={{ fontSize: 11, color: '#dc2626' }}>✗</span>}
                     </td>
+
+                    {/* Analisar em modo single */}
+                    {onAnalyzeSingle && (
+                      <td style={{ padding: '5px 6px', verticalAlign: 'middle', textAlign: 'center' }}>
+                        <button
+                          onClick={() => onAnalyzeSingle(m.smiles)}
+                          title={`Analisar "${m.name}" em detalhe (SMILESFlow)`}
+                          style={{
+                            padding: '3px 7px', borderRadius: 6, border: '1px solid #6366f1',
+                            backgroundColor: '#fff', color: '#6366f1',
+                            fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 3,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <i className="bi bi-arrow-right-circle" style={{ fontSize: 12 }} />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

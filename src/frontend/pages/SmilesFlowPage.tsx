@@ -2255,7 +2255,15 @@ const SmilesFlowPage: React.FC<Props> = ({ onBack, initialSmiles, onSmilesChange
 
       {/* Batch mode */}
       {flowMode === 'batch' && (
-        <BatchFlowPanel onSmilesChange={onSmilesChange} />
+        <BatchFlowPanel
+          onSmilesChange={onSmilesChange}
+          onAnalyzeSingle={smi => {
+            setSmiles(smi);
+            setSteps(initSteps());
+            setAdmetSmiles('');
+            setFlowMode('single');
+          }}
+        />
       )}
 
       {/* Single-molecule mode */}

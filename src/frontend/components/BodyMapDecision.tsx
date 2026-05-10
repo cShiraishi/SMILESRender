@@ -25,10 +25,10 @@ function rv(results: any[], smi: string, prop: string): string | null {
 type RiskLevel = 'ok' | 'warn' | 'high' | 'info' | 'none';
 
 const RS: Record<RiskLevel, { bg: string; border: string; dot: string; text: string; label: string }> = {
-  ok:   { bg: '#f0fdf4', border: '#86efac', dot: '#22c55e', text: '#166534', label: 'Seguro' },
-  warn: { bg: '#fffbeb', border: '#fcd34d', dot: '#f59e0b', text: '#92400e', label: 'Atenção' },
-  high: { bg: '#fef2f2', border: '#fca5a5', dot: '#ef4444', text: '#991b1b', label: 'Risco Alto' },
-  info: { bg: '#f0f9ff', border: '#7dd3fc', dot: '#0ea5e9', text: '#075985', label: 'Neutro' },
+  ok:   { bg: '#f0fdf4', border: '#86efac', dot: '#22c55e', text: '#166534', label: 'Safe' },
+  warn: { bg: '#fffbeb', border: '#fcd34d', dot: '#f59e0b', text: '#92400e', label: 'Caution' },
+  high: { bg: '#fef2f2', border: '#fca5a5', dot: '#ef4444', text: '#991b1b', label: 'High Risk' },
+  info: { bg: '#f0f9ff', border: '#7dd3fc', dot: '#0ea5e9', text: '#075985', label: 'Neutral' },
   none: { bg: '#f8fafc', border: '#e2e8f0', dot: '#94a3b8', text: '#64748b', label: '—' },
 };
 
@@ -98,81 +98,81 @@ const ORGAN_DEF: Record<string, {
   rdkitVals?: { key: string; label: string }[];
 }> = {
   brain: {
-    label: 'Cérebro / SNC',
-    note: 'BBB+ indica penetração na barreira hematoencefálica. Desejável para alvos neurológicos; indesejável para fármacos de ação periférica (risco de efeitos no SNC).',
+    label: 'Brain / CNS',
+    note: 'BBB+ indicates penetration of the blood-brain barrier. Desirable for neurological targets; undesirable for peripherally-acting drugs (risk of CNS side effects).',
     deepProbs: [
-      { key: 'BBB_Martins', label: 'Barreira Hematoencefálica (BBB)', invert: false },
+      { key: 'BBB_Martins', label: 'Blood-Brain Barrier (BBB)', invert: false },
     ],
   },
   heart: {
-    label: 'Coração',
-    note: 'Bloqueio do canal hERG prolonga o intervalo QT e pode causar Torsades de Pointes. Risco crítico em desenvolvimento clínico.',
+    label: 'Heart',
+    note: 'hERG channel blockade prolongs the QT interval and may cause Torsades de Pointes. Critical risk in clinical development.',
     deepProbs: [
-      { key: 'hERG',    label: 'hERG Cardiotoxicidade', invert: true },
-      { key: 'ClinTox', label: 'ClinTox',               invert: true },
+      { key: 'hERG',    label: 'hERG Cardiotoxicity', invert: true },
+      { key: 'ClinTox', label: 'ClinTox',             invert: true },
     ],
   },
   lung: {
-    label: 'Pulmão / Via Inalatória',
-    note: 'Para aerossol: PM < 400 Da e LogP 1–4 favorecem deposição alveolar. Partículas MMAD 1–5 µm são ideais para distribuição pulmonar.',
+    label: 'Lung / Inhaled Route',
+    note: 'For aerosols: MW < 400 Da and LogP 1–4 favour alveolar deposition. MMAD particles 1–5 µm are ideal for pulmonary distribution.',
     rdkitVals: [
-      { key: 'MW',    label: 'Peso Molecular (Da)' },
+      { key: 'MW',    label: 'Molecular Weight (Da)' },
       { key: 'LogP',  label: 'LogP' },
-      { key: 'Class', label: 'Solubilidade ESOL' },
+      { key: 'Class', label: 'ESOL Solubility' },
     ],
   },
   liver: {
-    label: 'Fígado / Metabolismo',
-    note: 'DILI alto e inibição de CYPs aumentam risco de toxicidade hepática e interações medicamentosas. CYP3A4 metaboliza ~50% dos fármacos em uso clínico.',
+    label: 'Liver / Metabolism',
+    note: 'High DILI and CYP inhibition increase risk of hepatic toxicity and drug-drug interactions. CYP3A4 metabolises ~50% of clinically used drugs.',
     deepProbs: [
-      { key: 'DILI',          label: 'Lesão Hepática (DILI)',  invert: true },
-      { key: 'CYP1A2_Veith',  label: 'Inibição CYP1A2',       invert: true },
-      { key: 'CYP2C9_Veith',  label: 'Inibição CYP2C9',       invert: true },
-      { key: 'CYP2C19_Veith', label: 'Inibição CYP2C19',      invert: true },
-      { key: 'CYP2D6_Veith',  label: 'Inibição CYP2D6',       invert: true },
-      { key: 'CYP3A4_Veith',  label: 'Inibição CYP3A4',       invert: true },
+      { key: 'DILI',          label: 'Liver Injury (DILI)',  invert: true },
+      { key: 'CYP1A2_Veith',  label: 'CYP1A2 Inhibition',   invert: true },
+      { key: 'CYP2C9_Veith',  label: 'CYP2C9 Inhibition',   invert: true },
+      { key: 'CYP2C19_Veith', label: 'CYP2C19 Inhibition',  invert: true },
+      { key: 'CYP2D6_Veith',  label: 'CYP2D6 Inhibition',   invert: true },
+      { key: 'CYP3A4_Veith',  label: 'CYP3A4 Inhibition',   invert: true },
     ],
   },
   gi: {
-    label: 'Trato GI / Absorção Oral',
-    note: 'Alta permeabilidade intestinal e biodisponibilidade indicam boa candidatura oral. Pgp >0.5 sinaliza efluxo ativo que reduz absorção. PAMPA >0.7 indica boa permeabilidade passiva.',
+    label: 'GI Tract / Oral Absorption',
+    note: 'High intestinal permeability and bioavailability indicate good oral candidacy. Pgp >0.5 signals active efflux reducing absorption. PAMPA >0.7 indicates good passive permeability.',
     deepProbs: [
-      { key: 'Bioavailability_Ma',           label: 'Biodisponibilidade Oral',       invert: false },
-      { key: 'HIA_Hou',                      label: 'Absorção Intestinal (HIA)',      invert: false },
-      { key: 'PAMPA_NCATS',                  label: 'Permeabilidade PAMPA',          invert: false },
-      { key: 'Pgp_Broccatelli',              label: 'Substrato Pgp (efluxo)',        invert: true  },
-      { key: 'CYP3A4_Substrate_CarbonMangels', label: 'Substrato CYP3A4 (1ª pass.)', invert: true  },
+      { key: 'Bioavailability_Ma',             label: 'Oral Bioavailability',       invert: false },
+      { key: 'HIA_Hou',                        label: 'Intestinal Absorption (HIA)', invert: false },
+      { key: 'PAMPA_NCATS',                    label: 'PAMPA Permeability',          invert: false },
+      { key: 'Pgp_Broccatelli',                label: 'Pgp Substrate (efflux)',      invert: true  },
+      { key: 'CYP3A4_Substrate_CarbonMangels', label: 'CYP3A4 Substrate (1st pass)', invert: true  },
     ],
     deepVals: [
-      { key: 'Caco2_Wang', label: 'Permeab. Caco-2 (log Papp)', unit: 'cm/s', decimals: 2 },
+      { key: 'Caco2_Wang', label: 'Caco-2 Permeability (log Papp)', unit: 'cm/s', decimals: 2 },
     ],
     rdkitVals: [
       { key: 'Lipinski Ro5', label: 'Lipinski Ro5' },
-      { key: 'Class',        label: 'Solubilidade ESOL' },
+      { key: 'Class',        label: 'ESOL Solubility' },
       { key: 'LogP',         label: 'LogP' },
     ],
   },
   kidney: {
-    label: 'Rim / Excreção',
-    note: 'Clearance e meia-vida determinam frequência de dose e risco de acúmulo. PPB >95% reduz fração livre disponível. VDss alto indica ampla distribuição tecidual.',
+    label: 'Kidney / Excretion',
+    note: 'Clearance and half-life determine dosing frequency and accumulation risk. PPB >95% reduces the free fraction available. High VDss indicates extensive tissue distribution.',
     deepVals: [
-      { key: 'Clearance_Hepatocyte_AZ', label: 'Clearance Hepático', unit: 'mL/min/kg', decimals: 2 },
-      { key: 'Half_Life_Obach',      label: 'Meia-vida (t½)',     unit: 'h',          decimals: 1 },
-      { key: 'PPBR_AZ',              label: 'Ligação a Proteínas Plasmáticas', unit: '%', decimals: 1 },
-      { key: 'VDss_Lombardo',        label: 'Volume de Distribuição (VDss)', unit: 'log L/kg', decimals: 2 },
+      { key: 'Clearance_Hepatocyte_AZ', label: 'Hepatic Clearance',       unit: 'mL/min/kg', decimals: 2 },
+      { key: 'Half_Life_Obach',         label: 'Half-life (t½)',           unit: 'h',         decimals: 1 },
+      { key: 'PPBR_AZ',                 label: 'Plasma Protein Binding',   unit: '%',         decimals: 1 },
+      { key: 'VDss_Lombardo',           label: 'Volume of Distribution (VDss)', unit: 'log L/kg', decimals: 2 },
     ],
   },
   skin: {
-    label: 'Pele / Via Transdérmica',
-    note: 'LogP 1–3 e PM < 500 Da favorecem penetração cutânea. TPSA < 60 Å² e HBD < 3 melhoram a permeação. Skin_Reaction alta contraindica aplicação tópica prolongada.',
+    label: 'Skin / Transdermal Route',
+    note: 'LogP 1–3 and MW < 500 Da favour cutaneous penetration. TPSA < 60 Å² and HBD < 3 improve permeation. High Skin_Reaction contraindicates prolonged topical application.',
     deepProbs: [
-      { key: 'Skin_Reaction', label: 'Sensibilização Cutânea', invert: true },
+      { key: 'Skin_Reaction', label: 'Skin Sensitization', invert: true },
     ],
     rdkitVals: [
       { key: 'LogP',  label: 'LogP' },
-      { key: 'MW',    label: 'Peso Molecular (Da)' },
+      { key: 'MW',    label: 'Molecular Weight (Da)' },
       { key: 'TPSA',  label: 'TPSA (Å²)' },
-      { key: 'HBD',   label: 'Doadores H-Bond (HBD)' },
+      { key: 'HBD',   label: 'H-Bond Donors (HBD)' },
     ],
   },
 };
@@ -206,28 +206,28 @@ function computeROA(results: any[], smi: string) {
   const oF: Factor[] = [];
   let os = 0;
   if (bioav != null) {
-    if (bioav >= 0.7)      { os += 28; oF.push({ label: `Biodisponib. ${(bioav * 100).toFixed(0)}%`, ok: true }); }
-    else if (bioav >= 0.5) { os += 14; oF.push({ label: `Biodisponib. ${(bioav * 100).toFixed(0)}%`, ok: 'warn' }); }
-    else                   {           oF.push({ label: `Biodisponib. baixa (${(bioav * 100).toFixed(0)}%)`, ok: false }); }
+    if (bioav >= 0.7)      { os += 28; oF.push({ label: `Bioavail. ${(bioav * 100).toFixed(0)}%`, ok: true }); }
+    else if (bioav >= 0.5) { os += 14; oF.push({ label: `Bioavail. ${(bioav * 100).toFixed(0)}%`, ok: 'warn' }); }
+    else                   {           oF.push({ label: `Low bioavail. (${(bioav * 100).toFixed(0)}%)`, ok: false }); }
   }
   if (lip) { os += lip === 'PASS' ? 22 : 0; oF.push({ label: `Lipinski ${lip}`, ok: lip === 'PASS' }); }
   if (pampa != null) {
     if (pampa >= 0.7)      { os += 10; oF.push({ label: `PAMPA ${(pampa * 100).toFixed(0)}%`, ok: true }); }
     else if (pampa >= 0.4) { os +=  5; oF.push({ label: `PAMPA ${(pampa * 100).toFixed(0)}%`, ok: 'warn' }); }
-    else                   {           oF.push({ label: `PAMPA baixo (${(pampa * 100).toFixed(0)}%)`, ok: false }); }
+    else                   {           oF.push({ label: `Low PAMPA (${(pampa * 100).toFixed(0)}%)`, ok: false }); }
   }
   if (caco2 != null) {
     if (caco2 > -5.15)     { os += 10; oF.push({ label: `Caco-2 ${caco2.toFixed(1)}`, ok: true }); }
-    else                   {           oF.push({ label: `Caco-2 baixo (${caco2.toFixed(1)})`, ok: false }); }
+    else                   {           oF.push({ label: `Low Caco-2 (${caco2.toFixed(1)})`, ok: false }); }
   }
   if (pgp != null) {
-    if (pgp < 0.4)         { os +=  8; oF.push({ label: 'Pgp: não substrato', ok: true }); }
-    else if (pgp < 0.6)    {           oF.push({ label: `Pgp substrato (${(pgp * 100).toFixed(0)}%)`, ok: 'warn' }); }
-    else                   { os -= 15; oF.push({ label: `Pgp efluxo alto (${(pgp * 100).toFixed(0)}%)`, ok: false }); }
+    if (pgp < 0.4)         { os +=  8; oF.push({ label: 'Pgp: non-substrate', ok: true }); }
+    else if (pgp < 0.6)    {           oF.push({ label: `Pgp substrate (${(pgp * 100).toFixed(0)}%)`, ok: 'warn' }); }
+    else                   { os -= 15; oF.push({ label: `High Pgp efflux (${(pgp * 100).toFixed(0)}%)`, ok: false }); }
   }
   if (cyp3a4s != null) {
-    if (cyp3a4s >= 0.5)    { os -=  8; oF.push({ label: `CYP3A4 1ª passagem (${(cyp3a4s * 100).toFixed(0)}%)`, ok: 'warn' }); }
-    else                   { os +=  5; oF.push({ label: 'Baixo metab. 1ª passagem', ok: true }); }
+    if (cyp3a4s >= 0.5)    { os -=  8; oF.push({ label: `CYP3A4 1st pass (${(cyp3a4s * 100).toFixed(0)}%)`, ok: 'warn' }); }
+    else                   { os +=  5; oF.push({ label: 'Low 1st-pass metabolism', ok: true }); }
   }
   if (sol) {
     const sl = sol.toLowerCase();
@@ -242,42 +242,42 @@ function computeROA(results: any[], smi: string) {
   const iF: Factor[] = [];
   let is = 50;
   if (herg != null) {
-    if (herg < 0.3)      { is += 20; iF.push({ label: `hERG seguro (${(herg * 100).toFixed(0)}%)`, ok: true }); }
-    else if (herg < 0.5) { is +=  5; iF.push({ label: `hERG moderado (${(herg * 100).toFixed(0)}%)`, ok: 'warn' }); }
-    else                 { is -= 20; iF.push({ label: `hERG alto (${(herg * 100).toFixed(0)}%)`, ok: false }); }
+    if (herg < 0.3)      { is += 20; iF.push({ label: `hERG safe (${(herg * 100).toFixed(0)}%)`, ok: true }); }
+    else if (herg < 0.5) { is +=  5; iF.push({ label: `hERG moderate (${(herg * 100).toFixed(0)}%)`, ok: 'warn' }); }
+    else                 { is -= 20; iF.push({ label: `hERG high (${(herg * 100).toFixed(0)}%)`, ok: false }); }
   }
   if (dili != null) {
-    if (dili < 0.3)      { is += 15; iF.push({ label: 'DILI baixo', ok: true }); }
-    else if (dili < 0.5) { is +=  5; iF.push({ label: `DILI moderado (${(dili * 100).toFixed(0)}%)`, ok: 'warn' }); }
-    else                 { is -= 15; iF.push({ label: `DILI alto (${(dili * 100).toFixed(0)}%)`, ok: false }); }
+    if (dili < 0.3)      { is += 15; iF.push({ label: 'Low DILI', ok: true }); }
+    else if (dili < 0.5) { is +=  5; iF.push({ label: `Moderate DILI (${(dili * 100).toFixed(0)}%)`, ok: 'warn' }); }
+    else                 { is -= 15; iF.push({ label: `High DILI (${(dili * 100).toFixed(0)}%)`, ok: false }); }
   }
   if (clintx != null) { is += clintx < 0.3 ? 10 : -10; iF.push({ label: `ClinTox ${(clintx * 100).toFixed(0)}%`, ok: clintx < 0.3 }); }
   if (hl != null) {
-    if (hl >= 4)         { is += 7; iF.push({ label: `t½ ${hl.toFixed(0)}h — durável`, ok: true }); }
-    else                 {          iF.push({ label: `t½ ${hl.toFixed(1)}h — curto`, ok: 'warn' }); }
+    if (hl >= 4)         { is += 7; iF.push({ label: `t½ ${hl.toFixed(0)}h — durable`, ok: true }); }
+    else                 {          iF.push({ label: `t½ ${hl.toFixed(1)}h — short`, ok: 'warn' }); }
   }
   if (ppbr != null) iF.push({ label: `PPB ${ppbr.toFixed(0)}%`, ok: 'info' });
   if (vdss != null) iF.push({ label: `VDss ${vdss.toFixed(2)} log L/kg`, ok: 'info' });
-  iF.push({ label: 'Solubilidade contornável por formulação', ok: 'info' });
+  iF.push({ label: 'Solubility addressable by formulation', ok: 'info' });
 
   // ── Inhalation ──────────────────────────────────────────────────────────────
   const nhF: Factor[] = [];
   let nhs = 0;
   if (!isNaN(mwN)) {
-    if (mwN < 300)      { nhs += 35; nhF.push({ label: `PM ${mwN.toFixed(0)} Da (ideal aerossol)`, ok: true }); }
-    else if (mwN < 500) { nhs += 15; nhF.push({ label: `PM ${mwN.toFixed(0)} Da (aceitável)`, ok: 'warn' }); }
-    else                {            nhF.push({ label: `PM ${mwN.toFixed(0)} Da — alto para aerossol`, ok: false }); }
+    if (mwN < 300)      { nhs += 35; nhF.push({ label: `MW ${mwN.toFixed(0)} Da (ideal aerosol)`, ok: true }); }
+    else if (mwN < 500) { nhs += 15; nhF.push({ label: `MW ${mwN.toFixed(0)} Da (acceptable)`, ok: 'warn' }); }
+    else                {            nhF.push({ label: `MW ${mwN.toFixed(0)} Da — too high for aerosol`, ok: false }); }
   }
   if (!isNaN(logpN)) {
-    if (logpN >= 1 && logpN <= 4)      { nhs += 30; nhF.push({ label: `LogP ${logpN.toFixed(1)} — ótimo pulmonar`, ok: true }); }
+    if (logpN >= 1 && logpN <= 4)      { nhs += 30; nhF.push({ label: `LogP ${logpN.toFixed(1)} — ideal for lung`, ok: true }); }
     else if (logpN >= 0 && logpN <= 6) { nhs += 10; nhF.push({ label: `LogP ${logpN.toFixed(1)} — marginal`, ok: 'warn' }); }
-    else                               {            nhF.push({ label: `LogP ${logpN.toFixed(1)} — fora do ideal`, ok: false }); }
+    else                               {            nhF.push({ label: `LogP ${logpN.toFixed(1)} — out of range`, ok: false }); }
   }
   if (sol) {
     const sl = sol.toLowerCase();
     if (sl.includes('soluble') && !sl.includes('poorly')) { nhs += 20; nhF.push({ label: `Sol.: ${sol}`, ok: true }); }
     else if (sl.includes('mod'))                          { nhs += 10; nhF.push({ label: `Sol.: ${sol}`, ok: 'warn' }); }
-    else                                                  {            nhF.push({ label: 'Sol. insuficiente', ok: false }); }
+    else                                                  {            nhF.push({ label: 'Insufficient solubility', ok: false }); }
   }
   if (pains && pains !== 'PASS') { nhs -= 15; nhF.push({ label: 'PAINS alert', ok: false }); }
 
@@ -288,9 +288,9 @@ function computeROA(results: any[], smi: string) {
 
   if (logkp != null) {
     const kpClass =
-      logkp >= -2 ? 'Alto' :
-      logkp >= -3 ? 'Moderado' :
-      logkp >= -5 ? 'Baixo' : 'Muito baixo';
+      logkp >= -2 ? 'High' :
+      logkp >= -3 ? 'Moderate' :
+      logkp >= -5 ? 'Low' : 'Very low';
     if (logkp >= -2)      { tds += 45; tdF.push({ label: `logKp ${logkp.toFixed(1)} — ${kpClass}`, ok: true }); }
     else if (logkp >= -3) { tds += 30; tdF.push({ label: `logKp ${logkp.toFixed(1)} — ${kpClass}`, ok: true }); }
     else if (logkp >= -4) { tds += 18; tdF.push({ label: `logKp ${logkp.toFixed(1)} — ${kpClass}`, ok: 'warn' }); }
@@ -298,29 +298,29 @@ function computeROA(results: any[], smi: string) {
     else                  {            tdF.push({ label: `logKp ${logkp.toFixed(1)} — ${kpClass}`, ok: false }); }
   }
   if (!isNaN(logpN)) {
-    if (logpN >= 1 && logpN <= 3)      { tds += 20; tdF.push({ label: `LogP ${logpN.toFixed(1)} — ótimo transdérmico`, ok: true }); }
-    else if (logpN > 3 && logpN <= 5)  { tds += 10; tdF.push({ label: `LogP ${logpN.toFixed(1)} — lipofílico`, ok: 'warn' }); }
-    else                               {            tdF.push({ label: `LogP ${logpN.toFixed(1)} — fora do ideal (1–3)`, ok: false }); }
+    if (logpN >= 1 && logpN <= 3)      { tds += 20; tdF.push({ label: `LogP ${logpN.toFixed(1)} — ideal transdermal`, ok: true }); }
+    else if (logpN > 3 && logpN <= 5)  { tds += 10; tdF.push({ label: `LogP ${logpN.toFixed(1)} — lipophilic`, ok: 'warn' }); }
+    else                               {            tdF.push({ label: `LogP ${logpN.toFixed(1)} — out of range (1–3)`, ok: false }); }
   }
   if (!isNaN(tpsaN)) {
-    if (tpsaN < 60)       { tds += 15; tdF.push({ label: `TPSA ${tpsaN.toFixed(0)} Å² — favorável`, ok: true }); }
+    if (tpsaN < 60)       { tds += 15; tdF.push({ label: `TPSA ${tpsaN.toFixed(0)} Å² — favorable`, ok: true }); }
     else if (tpsaN < 100) { tds +=  5; tdF.push({ label: `TPSA ${tpsaN.toFixed(0)} Å²`, ok: 'warn' }); }
-    else                  { tds -= 10; tdF.push({ label: `TPSA ${tpsaN.toFixed(0)} Å² — desfavorável (>100)`, ok: false }); }
+    else                  { tds -= 10; tdF.push({ label: `TPSA ${tpsaN.toFixed(0)} Å² — unfavorable (>100)`, ok: false }); }
   }
   if (!isNaN(hbdN)) {
-    if (hbdN <= 2)        { tds += 10; tdF.push({ label: `HBD ${hbdN} — baixo`, ok: true }); }
+    if (hbdN <= 2)        { tds += 10; tdF.push({ label: `HBD ${hbdN} — low`, ok: true }); }
     else if (hbdN <= 3)   {            tdF.push({ label: `HBD ${hbdN}`, ok: 'warn' }); }
-    else                  { tds -= 10; tdF.push({ label: `HBD ${hbdN} — alto (reduz permeação)`, ok: false }); }
+    else                  { tds -= 10; tdF.push({ label: `HBD ${hbdN} — high (reduces permeation)`, ok: false }); }
   }
   if (!isNaN(mwN)) {
-    if (mwN <= 350)       { tds +=  8; tdF.push({ label: `PM ${mwN.toFixed(0)} Da — ideal`, ok: true }); }
-    else if (mwN <= 500)  { tds +=  3; tdF.push({ label: `PM ${mwN.toFixed(0)} Da`, ok: 'warn' }); }
-    else                  { tds -= 10; tdF.push({ label: `PM ${mwN.toFixed(0)} Da — alto para pele`, ok: false }); }
+    if (mwN <= 350)       { tds +=  8; tdF.push({ label: `MW ${mwN.toFixed(0)} Da — ideal`, ok: true }); }
+    else if (mwN <= 500)  { tds +=  3; tdF.push({ label: `MW ${mwN.toFixed(0)} Da`, ok: 'warn' }); }
+    else                  { tds -= 10; tdF.push({ label: `MW ${mwN.toFixed(0)} Da — too high for skin`, ok: false }); }
   }
   if (skinR != null) {
-    if (skinR >= 0.6)     { tds -= 25; tdF.push({ label: `Sensibil. cutânea ${(skinR * 100).toFixed(0)}%`, ok: false }); }
-    else if (skinR >= 0.4){ tds -=  8; tdF.push({ label: `Sensibil. moderada ${(skinR * 100).toFixed(0)}%`, ok: 'warn' }); }
-    else                  { tds += 10; tdF.push({ label: `Sem sensibil. (${(skinR * 100).toFixed(0)}%)`, ok: true }); }
+    if (skinR >= 0.6)     { tds -= 25; tdF.push({ label: `Skin sensitization ${(skinR * 100).toFixed(0)}%`, ok: false }); }
+    else if (skinR >= 0.4){ tds -=  8; tdF.push({ label: `Moderate sensitization ${(skinR * 100).toFixed(0)}%`, ok: 'warn' }); }
+    else                  { tds += 10; tdF.push({ label: `No sensitization (${(skinR * 100).toFixed(0)}%)`, ok: true }); }
   }
 
   return {
@@ -416,7 +416,7 @@ function BestMoleculesForOrgan({ organ, allResults, uniqueSmiles, moleculeNames,
         fontSize: '10px', fontWeight: 700, color: '#64748b',
         textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px',
       }}>
-        Melhores moléculas — {def.label}
+        Best molecules — {def.label}
       </div>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         {scored.slice(0, 5).map(({ smi, score }, i) => {
@@ -634,8 +634,8 @@ function BodySVG({ risks, selected, onSelect }: BodySVGProps) {
           fill={bc('kidney')} stroke={oStroke('kidney')} strokeWidth={oSW('kidney')}
           filter="url(#f-organ)" />
         <ellipse cx="124" cy="193" rx="11" ry="17" fill="url(#og-shine)" />
-        <text x="56"  y="196" textAnchor="middle" fontSize="5.5" fill="#fff" fontWeight="700" pointerEvents="none">Rim</text>
-        <text x="124" y="196" textAnchor="middle" fontSize="5.5" fill="#fff" fontWeight="700" pointerEvents="none">Rim</text>
+        <text x="56"  y="196" textAnchor="middle" fontSize="5.5" fill="#fff" fontWeight="700" pointerEvents="none">Kid.</text>
+        <text x="124" y="196" textAnchor="middle" fontSize="5.5" fill="#fff" fontWeight="700" pointerEvents="none">Kid.</text>
       </g>
 
       {/* GI tract */}
@@ -655,7 +655,7 @@ function BodySVG({ risks, selected, onSelect }: BodySVGProps) {
           fill={bc('liver')} stroke={oStroke('liver')} strokeWidth={oSW('liver')}
           filter="url(#f-organ)" />
         <ellipse cx="113" cy="163" rx="27" ry="17" fill="url(#og-shine)" />
-        <text x="113" y="166" textAnchor="middle" fontSize="8" fill="#fff" fontWeight="700" pointerEvents="none">Fígado</text>
+        <text x="113" y="166" textAnchor="middle" fontSize="8" fill="#fff" fontWeight="700" pointerEvents="none">Liver</text>
       </g>
 
       {/* lungs */}
@@ -669,8 +669,8 @@ function BodySVG({ risks, selected, onSelect }: BodySVGProps) {
           fill={bc('lung')} stroke={oStroke('lung')} strokeWidth={oSW('lung')}
           filter="url(#f-organ)" />
         <ellipse cx="116" cy="132" rx="17" ry="30" fill="url(#og-shine)" />
-        <text x="64"  y="134" textAnchor="middle" fontSize="6.5" fill="#fff" fontWeight="700" pointerEvents="none">Pulm.</text>
-        <text x="116" y="134" textAnchor="middle" fontSize="6.5" fill="#fff" fontWeight="700" pointerEvents="none">Pulm.</text>
+        <text x="64"  y="134" textAnchor="middle" fontSize="6.5" fill="#fff" fontWeight="700" pointerEvents="none">Lung</text>
+        <text x="116" y="134" textAnchor="middle" fontSize="6.5" fill="#fff" fontWeight="700" pointerEvents="none">Lung</text>
       </g>
 
       {/* heart */}
@@ -690,7 +690,7 @@ function BodySVG({ risks, selected, onSelect }: BodySVGProps) {
           fill={bc('brain')} stroke={oStroke('brain')} strokeWidth={oSW('brain')}
           filter="url(#f-organ)" />
         <ellipse cx="90" cy="33" rx="22" ry="25" fill="url(#og-shine)" />
-        <text x="90" y="36" textAnchor="middle" fontSize="8" fill="#fff" fontWeight="700" pointerEvents="none">SNC</text>
+        <text x="90" y="36" textAnchor="middle" fontSize="8" fill="#fff" fontWeight="700" pointerEvents="none">CNS</text>
       </g>
 
       {/* skin patch — right forearm */}
@@ -701,7 +701,7 @@ function BodySVG({ risks, selected, onSelect }: BodySVGProps) {
           filter="url(#f-organ)" />
         <rect x="151" y="138" width="20" height="30" rx="6" fill="url(#og-shine)" />
         <text x="161" y="157" textAnchor="middle" fontSize="5.5" fill="#fff" fontWeight="700"
-          pointerEvents="none" transform="rotate(-14,161,148)">Pele</text>
+          pointerEvents="none" transform="rotate(-14,161,148)">Skin</text>
       </g>
     </svg>
   );
@@ -731,7 +731,7 @@ function OrganPanel({ organ, results, smi, risks }: { organ: string; results: an
   const def = ORGAN_DEF[organ];
   if (!def) return (
     <div style={{ color: '#94a3b8', fontSize: '12px', textAlign: 'center', padding: '20px 0', lineHeight: 1.6 }}>
-      Clique em um órgão no corpo humano<br />para ver os dados ADMET do sistema
+      Click an organ on the body map<br />to view ADMET data for that system
     </div>
   );
 
@@ -780,7 +780,7 @@ function OrganPanel({ organ, results, smi, risks }: { organ: string; results: an
         const mw   = parseFloat(rv(results, smi, 'MW')   ?? 'NaN');
         if (isNaN(logp) || isNaN(mw)) return null;
         const logkp = 0.71 * logp - 0.0061 * mw - 6.3;
-        const kpClass = logkp >= -2 ? 'Alto' : logkp >= -3 ? 'Moderado' : logkp >= -5 ? 'Baixo' : 'Muito baixo';
+        const kpClass = logkp >= -2 ? 'High' : logkp >= -3 ? 'Moderate' : logkp >= -5 ? 'Low' : 'Very low';
         const col = logkp >= -3 ? '#22c55e' : logkp >= -5 ? '#f59e0b' : '#94a3b8';
         return (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
@@ -803,7 +803,7 @@ function ROABar({ icon, label, score, factors, recommended }: {
   icon: string; label: string; score: number; factors: Factor[]; recommended: boolean;
 }) {
   const color   = score >= 65 ? '#22c55e' : score >= 40 ? '#f59e0b' : '#ef4444';
-  const verdict = score >= 65 ? 'Viável' : score >= 40 ? 'Marginal' : 'Não indicado';
+  const verdict = score >= 65 ? 'Viable' : score >= 40 ? 'Borderline' : 'Not recommended';
   return (
     <div style={{
       backgroundColor: recommended ? '#f0fdf4' : '#fafafa',
@@ -815,7 +815,7 @@ function ROABar({ icon, label, score, factors, recommended }: {
         <span style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a', flex: 1 }}>{label}</span>
         {recommended && (
           <span style={{ fontSize: '9px', backgroundColor: '#22c55e', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.04em' }}>
-            MELHOR
+            BEST
           </span>
         )}
         <span style={{ fontSize: '11px', fontWeight: 700, color, marginLeft: '4px' }}>{verdict}</span>
@@ -877,13 +877,13 @@ function BodyMapDecision({ allResults, uniqueSmiles, moleculeNames = {} }: BodyM
       {/* header */}
       <div style={{ background: 'linear-gradient(135deg, #1a3a5c 0%, #23527a 100%)', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
         <div style={{ flex: 1 }}>
-          <div style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Mapa ADMET — Tomada de Decisão</div>
+          <div style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>ADMET Map — Decision Support</div>
           <div style={{ color: '#93c5fd', fontSize: '11px', marginTop: '2px' }}>
-            Clique nos órgãos para detalhar o perfil de risco · Via de administração calculada automaticamente
+            Click organs to view risk profile · Route of administration calculated automatically
           </div>
         </div>
         <div style={{ fontSize: '10px', color: '#93c5fd', fontStyle: 'italic' }}>
-          {uniqueSmiles.length} molécula{uniqueSmiles.length !== 1 ? 's' : ''}
+          {uniqueSmiles.length} molecule{uniqueSmiles.length !== 1 ? 's' : ''}
         </div>
       </div>
 
@@ -964,12 +964,12 @@ function BodyMapDecision({ allResults, uniqueSmiles, moleculeNames = {} }: BodyM
 
           <div>
             <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>
-              Via de Administração
+              Route of Administration
             </div>
-            <ROABar icon="bi bi-capsule"      label="Oral"                     score={roa.oral.score}        factors={roa.oral.factors}        recommended={best === 'oral'} />
-            <ROABar icon="bi bi-droplet-half" label="Injetável (IV / SC / IM)" score={roa.injectable.score}  factors={roa.injectable.factors}  recommended={best === 'injectable'} />
-            <ROABar icon="bi bi-wind"         label="Inalatória"               score={roa.inhalation.score}  factors={roa.inhalation.factors}  recommended={best === 'inhalation'} />
-            <ROABar icon="bi bi-bandaid"      label="Transdérmica (tópica)"    score={roa.transdermal.score} factors={roa.transdermal.factors} recommended={best === 'transdermal'} />
+            <ROABar icon="bi bi-capsule"      label="Oral"                      score={roa.oral.score}        factors={roa.oral.factors}        recommended={best === 'oral'} />
+            <ROABar icon="bi bi-droplet-half" label="Injectable (IV / SC / IM)" score={roa.injectable.score}  factors={roa.injectable.factors}  recommended={best === 'injectable'} />
+            <ROABar icon="bi bi-wind"         label="Inhalation"                score={roa.inhalation.score}  factors={roa.inhalation.factors}  recommended={best === 'inhalation'} />
+            <ROABar icon="bi bi-bandaid"      label="Transdermal (topical)"     score={roa.transdermal.score} factors={roa.transdermal.factors} recommended={best === 'transdermal'} />
           </div>
         </div>
       </div>

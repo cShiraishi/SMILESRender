@@ -120,29 +120,38 @@ def _prepare_receptor_pdbqt(pdb_path: str, out_prefix: str) -> tuple[str, str | 
     Returns (pdbqt_path, error_message_or_None).
     """
     pdbqt_path = out_prefix + ".pdbqt"
+    mk_stderr_p = ""
+    mk_stderr_2 = ""
+    mk_missing = False
 
     # ── attempt 1: mk_prepare_receptor with partial charges ───────────────────
-    proc = subprocess.run(
-        ["mk_prepare_receptor", "--read_pdb", pdb_path,
-         "-o", out_prefix, "--default_altloc", "A", "--allow_bad_res", "-p"],
-        capture_output=True, text=True, timeout=120,
-    )
-    if os.path.exists(pdbqt_path) and os.path.getsize(pdbqt_path) > 50:
-        return pdbqt_path, None
-
-    mk_stderr_p = (proc.stderr or "").strip()[:600]
+    try:
+        proc = subprocess.run(
+            ["mk_prepare_receptor", "--read_pdb", pdb_path,
+             "-o", out_prefix, "--default_altloc", "A", "--allow_bad_res", "-p"],
+            capture_output=True, text=True, timeout=120,
+        )
+        if os.path.exists(pdbqt_path) and os.path.getsize(pdbqt_path) > 50:
+            return pdbqt_path, None
+        mk_stderr_p = (proc.stderr or "").strip()[:600]
+    except FileNotFoundError:
+        mk_missing = True
 
     # ── attempt 2: mk_prepare_receptor without -p (for zinc/metalloproteins) ──
-    # Remove stale empty file so we can detect fresh output
-    if os.path.exists(pdbqt_path):
-        os.remove(pdbqt_path)
-    proc2 = subprocess.run(
-        ["mk_prepare_receptor", "--read_pdb", pdb_path,
-         "-o", out_prefix, "--default_altloc", "A", "--allow_bad_res"],
-        capture_output=True, text=True, timeout=120,
-    )
-    if os.path.exists(pdbqt_path) and os.path.getsize(pdbqt_path) > 50:
-        return pdbqt_path, None
+    if not mk_missing:
+        if os.path.exists(pdbqt_path):
+            os.remove(pdbqt_path)
+        try:
+            proc2 = subprocess.run(
+                ["mk_prepare_receptor", "--read_pdb", pdb_path,
+                 "-o", out_prefix, "--default_altloc", "A", "--allow_bad_res"],
+                capture_output=True, text=True, timeout=120,
+            )
+            if os.path.exists(pdbqt_path) and os.path.getsize(pdbqt_path) > 50:
+                return pdbqt_path, None
+            mk_stderr_2 = (proc2.stderr or "").strip()[:600]
+        except FileNotFoundError:
+            mk_missing = True
 
     # ── attempt 3: obabel fallback ────────────────────────────────────────────
     try:
@@ -155,10 +164,13 @@ def _prepare_receptor_pdbqt(pdb_path: str, out_prefix: str) -> tuple[str, str | 
     except FileNotFoundError:
         pass  # obabel not installed
 
-    mk_stderr = mk_stderr_p or (proc2.stderr or "").strip()[:600]
+    if mk_missing:
+        return "", "Falha ao converter receptor para PDBQT: mk_prepare_receptor não encontrado no PATH. Instale o pacote meeko no ambiente Docker."
+
+    mk_stderr = mk_stderr_p or mk_stderr_2
     return "", (
         f"Falha ao converter receptor para PDBQT.\n"
-        f"mk_prepare_receptor (exit {proc.returncode}/{proc2.returncode}): {mk_stderr or '(sem saída)'}"
+        f"mk_prepare_receptor: {mk_stderr or '(sem saída)'}"
     )
 
 def _find_vina():

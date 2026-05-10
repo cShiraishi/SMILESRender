@@ -1,5 +1,6 @@
 import React from 'react';
 import { colors, font, shadow } from '../styles/themes';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface Props {
   icon: string;
@@ -11,6 +12,8 @@ interface Props {
 }
 
 function PageShell({ icon, title, subtitle, accentColor = colors.blue, onBack, children }: Props) {
+  const { t } = useLanguage();
+
   return (
     <div style={{ width: '100%', fontFamily: font, backgroundColor: colors.bg, minHeight: '100%' }}>
       {/* Page header */}
@@ -45,7 +48,7 @@ function PageShell({ icon, title, subtitle, accentColor = colors.blue, onBack, c
               backgroundColor: '#fff',
             }}
           >
-            <i className="bi bi-arrow-left"></i> All Tools
+            <i className="bi bi-arrow-left"></i> {t('nav.allTools')}
           </button>
           <div style={{ width: '1px', height: '24px', backgroundColor: colors.border, margin: '0 8px' }} />
           <div style={{

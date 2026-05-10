@@ -130,6 +130,12 @@ function ADMETlab(props: { smiles: string; onDataLoaded?: (data: any[]) => void 
           </div>
         ))}
       </div>
+
+      <div style={{ marginTop: '14px', padding: '10px 12px', backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '8px', fontSize: '10px', color: '#92400e', lineHeight: 1.6 }}>
+        <strong style={{ display: 'block', marginBottom: '3px' }}><i className="bi bi-book" style={{ marginRight: '4px' }} />Ao utilizar estes resultados, cite:</strong>
+        <span>Xiong G et al. ADMETlab 2.0: an integrated online platform for accurate and comprehensive predictions of ADMET properties. <em>Nucleic Acids Res</em>. 2021.</span><br />
+        <span>Fang J et al. Geometry-enhanced molecular representation learning for property prediction. <em>Nat Mach Intell</em>. 2022.</span>
+      </div>
     </div>
   );
 }

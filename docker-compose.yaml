@@ -1,15 +1,66 @@
 services:
+
+  # ── Database ─────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: smiles-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=smilerender
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=smilerender
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smilerender -d smilerender"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Migrations (runs once, then exits) ───────────────────────────────────────
+  db-migrate:
+    build:
+      context: apps/api
+    container_name: smiles-db-migrate
+    command: npx prisma migrate deploy
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://smilerender:${POSTGRES_PASSWORD}@postgres:5432/smilerender
+
+  # ── Seed (runs once after migrations, then exits) ────────────────────────────
+  db-seed:
+    build:
+      context: apps/admin-api
+    container_name: smiles-db-seed
+    command: node ace db:seed
+    restart: "no"
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    environment:
+      - NODE_ENV=production
+      - APP_KEY=${ADMIN_APP_KEY}
+      - DATABASE_URL=postgresql://smilerender:${POSTGRES_PASSWORD}@postgres:5432/smilerender
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@smilesrender.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+
+  # ── Message broker ───────────────────────────────────────────────────────────
   redis:
     image: redis:7.4-alpine
-    container_name: smiles-render-redis
-    ports:
-      - 6379:6379
+    container_name: smiles-redis
+    restart: unless-stopped
 
-  smiles-render-web:
+  # ── Chemistry service (internal) ─────────────────────────────────────────────
+  # Flask + RDKit + AutoDock Vina + ML models.
+  # Never exposed externally — only the API gateway talks to it.
+  chemistry:
     build: .
-    container_name: smiles-render-web
-    env_file:
-      - .env
+    container_name: smiles-chemistry
+    restart: unless-stopped
+    env_file: .env
     expose:
       - 3000
     depends_on:
@@ -17,26 +68,91 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379/0
 
+  # ── Celery worker ────────────────────────────────────────────────────────────
   celery-worker:
     build: .
-    container_name: smiles-render-worker
+    container_name: smiles-celery
+    restart: unless-stopped
     command: celery -A src.tasks worker --loglevel=info --pool=solo
-    env_file:
-      - .env
+    env_file: .env
     depends_on:
       - redis
+      - chemistry
     environment:
       - REDIS_URL=redis://redis:6379/0
 
+  # ── API gateway (public) ─────────────────────────────────────────────────────
+  api:
+    build:
+      context: apps/api
+    container_name: smiles-api
+    restart: unless-stopped
+    env_file: .env
+    expose:
+      - 4000
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      chemistry:
+        condition: service_started
+      redis:
+        condition: service_started
+    environment:
+      - PORT=4000
+      - CHEMISTRY_URL=http://chemistry:3000
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://smilerender:${POSTGRES_PASSWORD}@postgres:5432/smilerender
+
+  # ── Admin API (internal) ──────────────────────────────────────────────────────
+  admin-api:
+    build:
+      context: apps/admin-api
+    container_name: smiles-admin-api
+    restart: unless-stopped
+    expose:
+      - 5000
+    depends_on:
+      db-seed:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      chemistry:
+        condition: service_started
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - HOST=0.0.0.0
+      - APP_KEY=${ADMIN_APP_KEY}
+      - DATABASE_URL=postgresql://smilerender:${POSTGRES_PASSWORD}@postgres:5432/smilerender
+      - REDIS_URL=redis://redis:6379/0
+      - CHEMISTRY_URL=http://chemistry:3000
+
+  # ── Admin web (internal) ──────────────────────────────────────────────────────
+  admin-web:
+    build:
+      context: apps/admin-web
+    container_name: smiles-admin-web
+    restart: unless-stopped
+    expose:
+      - 80
+    depends_on:
+      - admin-api
+
+  # ── Reverse proxy ────────────────────────────────────────────────────────────
   nginx:
     image: nginx:stable-alpine
-    container_name: smiles-render-nginx
+    container_name: smiles-nginx
     restart: always
     ports:
-      - 80:80
-      - 443:443
+      - "80:80"
+      - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
-      - smiles-render-web
+      - api
+      - admin-web
+      - admin-api
+
+volumes:
+  postgres_data:

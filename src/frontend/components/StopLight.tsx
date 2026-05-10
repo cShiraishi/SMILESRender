@@ -215,6 +215,13 @@ function StopLight(props: { smiles: string; onDataLoaded?: (data: any[]) => void
           </div>
         ))}
       </div>
+
+      <div style={{ marginTop: '14px', padding: '10px 12px', backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '8px', fontSize: '10px', color: '#92400e', lineHeight: 1.6 }}>
+        <strong style={{ display: 'block', marginBottom: '3px' }}><i className="bi bi-book" style={{ marginRight: '4px' }} />Ao utilizar estes resultados, cite:</strong>
+        <span>Lipinski CA et al. Experimental and computational approaches to estimate solubility and permeability in drug discovery and development settings. <em>Adv Drug Deliv Rev</em>. 1997.</span><br />
+        <span>Veber DF et al. Molecular properties that influence the oral bioavailability of drug candidates. <em>J Med Chem</em>. 2002.</span><br />
+        <span>Egan WJ et al. Prediction of drug absorption using multivariate statistics. <em>J Med Chem</em>. 2000.</span>
+      </div>
     </div>
   );
 }

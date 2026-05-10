@@ -6,7 +6,9 @@ import pytest
 os.environ.setdefault("TESTING", "1")
 os.environ.setdefault("SKIP_MODELS", "1")
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+_here = os.path.dirname(__file__)
+sys.path.insert(0, _here)  # make conftest importable as a module
+sys.path.insert(0, os.path.join(_here, "..", "src"))
 
 
 @pytest.fixture(scope="session")

@@ -108,7 +108,13 @@ function GraphB3({ smiles, onDataLoaded }: { smiles: string; onDataLoaded?: (dat
       </div>
 
       <div style={{ marginTop: '14px', padding: '10px 14px', backgroundColor: '#f8fafc', borderRadius: '8px', fontSize: '11px', color: '#94a3b8' }}>
-        Model: GradientBoosting · Features: ECFP4 (2048 bits) + 9 pharmacokinetic descriptors · AUC-ROC 0.95 · F1 0.90
+        Modelo: GradientBoosting · Features: ECFP4 (2048 bits) + 9 descritores · AUC-ROC 0.95 · F1 0.90
+      </div>
+
+      <div style={{ marginTop: '10px', padding: '10px 12px', backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '8px', fontSize: '10px', color: '#92400e', lineHeight: 1.6 }}>
+        <strong style={{ display: 'block', marginBottom: '3px' }}><i className="bi bi-book" style={{ marginRight: '4px' }} />Ao utilizar estes resultados, cite:</strong>
+        <span>Dataset: Meng F et al. B3DB: A multifunctional reference database of blood-brain barrier permeability. <em>Sci Data</em>. 2021.</span><br />
+        <span>Modelo local: GradientBoostingClassifier (scikit-learn) treinado no B3DB com fingerprints ECFP4 + descritores físico-químicos RDKit.</span>
       </div>
     </div>
   );

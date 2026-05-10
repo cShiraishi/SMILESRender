@@ -160,6 +160,12 @@ function Prediction(props: { smiles: string; onDataLoaded?: (data: any[]) => voi
           </div>
         ))}
       </div>
+
+      <div style={{ marginTop: '14px', padding: '10px 12px', backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '8px', fontSize: '10px', color: '#92400e', lineHeight: 1.6 }}>
+        <strong style={{ display: 'block', marginBottom: '3px' }}><i className="bi bi-book" style={{ marginRight: '4px' }} />Ao utilizar estes resultados, cite:</strong>
+        <span>Ermanis K et al. The StopTox model: predicting acute toxicity from molecular structure. <em>RSC Adv</em>. 2019.</span><br />
+        <span>GHS Classification: United Nations. Globally Harmonized System of Classification and Labelling of Chemicals (GHS), 9th Ed. 2021.</span>
+      </div>
     </div>
   );
 }

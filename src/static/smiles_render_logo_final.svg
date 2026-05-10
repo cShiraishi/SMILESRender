@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="300" viewBox="0 0 680 300">
+  <title>SMILES Render Logo</title>
+  <desc>Logo SMILES Render com hexágono e rosto sorridente</desc>
+
+  <g transform="translate(340, 150)">
+
+    <!-- SÍMBOLO -->
+    <g transform="translate(-210, 0)">
+      <polygon
+        points="0,-70 60.6,-35 60.6,35 0,70 -60.6,35 -60.6,-35"
+        fill="none" stroke="#ffd230" stroke-width="2.2" stroke-linejoin="round"/>
+      <circle cx="-18" cy="-18" r="5.5" fill="#ffd230"/>
+      <circle cx="18" cy="-18" r="5.5" fill="#ffd230"/>
+      <path d="M -28 5 Q -14 30 0 34 Q 14 30 28 5" fill="none" stroke="#ffd230" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+
+    <!-- Linha divisória -->
+    <line x1="-134" y1="-62" x2="-134" y2="62" stroke="#cccccc" stroke-width="0.5"/>
+
+    <!-- SMILES -->
+    <text x="-118" y="20"
+      font-family="Arial, Helvetica, sans-serif" font-size="72" font-weight="500"
+      fill="#1a1a1a" letter-spacing="-1.5">SMILES</text>
+
+    <!-- RENDER -->
+    <text x="-112" y="52"
+      font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="400"
+      fill="#888888" letter-spacing="10">RENDER</text>
+
+  </g>
+</svg>

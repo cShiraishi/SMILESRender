@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model UsageEvent {
+  id          Int      @id @default(autoincrement())
+  ts          DateTime @default(now())
+  method      String   @db.VarChar(10)
+  path        String   @db.VarChar(255)
+  status_code Int
+  duration_ms Int
+  ip          String?  @db.VarChar(45)
+
+  @@map("usage_events")
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  email         String   @unique @db.VarChar(255)
+  password_hash String   @db.VarChar(255)
+  role          String   @default("user") @db.VarChar(50)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@map("users")
+}

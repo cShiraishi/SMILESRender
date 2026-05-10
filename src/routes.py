@@ -26,6 +26,7 @@ import threading
 import hashlib
 import os
 import subprocess
+import joblib
 from PepLink import aa_seqs_to_smiles, smiles_to_aa_seqs
 from peptide_utils import get_peptide_metrics
 from admet_interpreter import interpret, RISK_LABEL
@@ -54,6 +55,25 @@ try:
 except Exception as e:
     TOX21_ERROR = str(e)
     print("Error loading Tox21 model: {}".format(e))
+
+# Load Transdermal Permeability Model (Flynn 1990 / Potts-Guy 1992, GBM on RDKit descriptors)
+TRANSDERMAL_MODEL = None
+TRANSDERMAL_ERROR = None
+try:
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), "transdermal_model.pkl"),
+        os.path.join(os.getcwd(), "transdermal_model.pkl"),
+        os.path.join(os.getcwd(), "src", "transdermal_model.pkl"),
+    ]
+    td_model_path = next((p for p in possible_paths if os.path.exists(p)), None)
+    if td_model_path:
+        TRANSDERMAL_MODEL = joblib.load(td_model_path)
+        print("Transdermal Model loaded successfully from {}.".format(td_model_path))
+    else:
+        TRANSDERMAL_ERROR = "File not found"
+except Exception as e:
+    TRANSDERMAL_ERROR = str(e)
+    print("Error loading Transdermal model: {}".format(e))
 
 # Load BBB Model (GraphB3-inspired, GradientBoosting on B3DB dataset)
 BBB_MODEL = None
@@ -131,15 +151,24 @@ def set_security_headers(response):
 # Initialize Docking Routes
 init_docking_routes(app)
 
+# Generation Routes (REINVENT 4)
+from generation_routes import generation_bp
+app.register_blueprint(generation_bp)
+
 # Admin panel (hidden URL + Basic Auth)
 from admin import bp as admin_bp, record_request
 app.register_blueprint(admin_bp)
 record_request(app)
 
+# Game leaderboard
+from game_routes import game_bp, init_game_db
+app.register_blueprint(game_bp)
+init_game_db()
+
 
 @app.route("/ping")
 def ping():
-    return "pong", 200
+    return jsonify({"status": "ok"})
 
 @app.route("/api/status")
 def status():
@@ -149,6 +178,8 @@ def status():
         "tox21_error": TOX21_ERROR,
         "bbb_loaded": BBB_MODEL is not None,
         "bbb_error": BBB_ERROR,
+        "transdermal_loaded": TRANSDERMAL_MODEL is not None,
+        "transdermal_error": TRANSDERMAL_ERROR,
         "deep_admet_loaded": ADMET_AI_MODEL is not None,
         "environment": "production" if os.getenv("PORT") else "development",
         "timestamp": time.time()
@@ -169,6 +200,8 @@ def batch_mw():
     try:
         data = request.get_json()
         smiles_list = data.get("smiles", [])
+        if not isinstance(smiles_list, list):
+            return jsonify({"error": "Field 'smiles' must be a list of SMILES strings"}), 400
         results = []
         for smi in smiles_list[:100]:
             mol = Chem.MolFromSmiles(smi)
@@ -240,7 +273,7 @@ def render_by_json():
         smiles = data["smiles"] if "smiles" in list(data) else None
 
         if not smiles:
-            return 'Invalid request! The payload should contain a "smiles" field!', 412
+            return 'Invalid request! The payload should contain a "smiles" field!', 422
 
         elif type(smiles) == str:
             image = convert_smiles(smiles, format.lower())
@@ -295,7 +328,7 @@ def render_by_json():
 
     except Exception as err:
         print(err)
-        return 'Could not convert smiles: "{}"'.format(err), 412
+        return 'Could not convert smiles: "{}"'.format(err), 422
 
 
 @app.route("/render/<string:smiles>", methods=["GET"])
@@ -308,7 +341,7 @@ def render_smiles(smiles):
 
     except Exception as err:
         print(err)
-        return 'Could not convert smiles: "{}"'.format(err), 412
+        return 'Could not convert smiles: "{}"'.format(err), 422
 
 
 @app.route("/render/csv", methods=["POST"])
@@ -357,7 +390,7 @@ def render_by_csv():
 
     except Exception as err:
         print(err)
-        return 'Could not convert smiles: "{}"'.format(err), 412
+        return 'Could not convert smiles: "{}"'.format(err), 422
 
 
 @app.route("/render/base64/<string:smiles>", methods=["GET"])
@@ -371,7 +404,7 @@ def render_base64_smiles(smiles):
 
     except Exception as err:
         print(err)
-        return 'Could not convert smiles: "{}"'.format(err), 412
+        return 'Could not convert smiles: "{}"'.format(err), 422
 
 
 PROTOX_MODELS = {
@@ -661,10 +694,10 @@ def predict_tox21(smiles):
         mol = Chem.MolFromSmiles(decoded_smiles)
         if mol is None:
             return jsonify({"error": "Invalid SMILES"}), 400
-        
+
         # Generate fingerprints (Morgan, radius 2, 1024 bits)
         fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024)
-        arr = np.zeros((1,))
+        arr = np.zeros((1024,))
         from rdkit import DataStructs
         DataStructs.ConvertToNumpyArray(fp, arr)
         
@@ -706,13 +739,22 @@ except Exception as e:
     traceback.print_exc()
 
 @app.route("/deep/<path:smiles>", methods=["GET"])
-def predict_deep_admet(smiles):
+@app.route("/deep", methods=["POST"])
+def predict_deep_admet(smiles=None):
     """Predict 100+ ADMET properties using the Deep Learning Chemprop engine (ADMET-AI)."""
     if ADMET_AI_MODEL is None:
         return jsonify({"error": "Deep Engine not available"}), 503
+    from admin import inc_model; inc_model("deep_admet")
     try:
-        clean_smiles = smiles.replace("%3D", "=")
-        decoded_smiles = b64decode(clean_smiles.encode("utf-8")).decode("utf-8")
+        if request.method == "POST":
+            body = request.get_json()
+            decoded_smiles = (body or {}).get("smiles", "")
+        else:
+            clean_smiles = smiles.replace("%3D", "=").replace("%2B", "+").replace("%2F", "/")
+            try:
+                decoded_smiles = b64decode(clean_smiles.encode("utf-8")).decode("utf-8")
+            except Exception:
+                decoded_smiles = urllib.parse.unquote(clean_smiles)
         
         # ADMET-AI handles RDKit internally
         preds = ADMET_AI_MODEL.predict(decoded_smiles)
@@ -872,23 +914,25 @@ def export_report():
             ]))
             return t
 
-        #        Helper: data table                                                                                                                                                    
+        #        Helper: data table (with risk-coloured value cells)
+        _RISK_WORDS = {
+            "active": ("high", FLAG_COLORS["high"], FLAG_BG["high"]),
+            "high risk": ("high", FLAG_COLORS["high"], FLAG_BG["high"]),
+            "inactive": ("low",  ACCENT_GREEN,        colors.HexColor("#f0fdf4")),
+            "safe":     ("low",  ACCENT_GREEN,        colors.HexColor("#f0fdf4")),
+            "yes":      ("medium", FLAG_COLORS["medium"], FLAG_BG["medium"]),
+            "positive": ("high", FLAG_COLORS["high"], FLAG_BG["high"]),
+            "negative": ("low",  ACCENT_GREEN,        colors.HexColor("#f0fdf4")),
+        }
+
         def data_table(rows, tool_name):
             col = TOOL_COLORS.get(tool_name, BRAND_BLUE)
-            hdr = [Paragraph(h, ps("th{}".format(tool_name), fontSize=8, textColor=colors.white,
+            hdr = [Paragraph(h, ps("th_{}_{}".format(tool_name, h),
+                                   fontSize=8, textColor=colors.white,
                                    fontName="Helvetica-Bold"))
-                   for h in ["Property", "Value", "Unit"]]
-            data = [hdr]
-            for r in rows:
-                data.append([
-                    Paragraph(str(r.get("Property", "")), sBody),
-                    Paragraph(str(r.get("Value", "")),
-                              ps("tv{}".format(tool_name), fontSize=8, textColor=TEXT_DARK,
-                                 fontName="Helvetica-Bold")),
-                    Paragraph(str(r.get("Unit", "-")), sSmall),
-                ])
-            t = Table(data, colWidths=[usable_w * 0.55, usable_w * 0.30, usable_w * 0.15])
-            t.setStyle(TableStyle([
+                   for h in ["Property", "Value", "Unit / Status"]]
+            tbl_data   = [hdr]
+            style_cmds = [
                 ("BACKGROUND",     (0,0), (-1,0),  col),
                 ("TEXTCOLOR",      (0,0), (-1,0),  colors.white),
                 ("ROWBACKGROUNDS", (0,1), (-1,-1), [LIGHT_GRAY, colors.white]),
@@ -897,20 +941,125 @@ def export_report():
                 ("BOTTOMPADDING",  (0,0), (-1,-1), 3),
                 ("LEFTPADDING",    (0,0), (-1,-1), 6),
                 ("FONTSIZE",       (0,0), (-1,-1), 8),
-            ]))
+                ("VALIGN",         (0,0), (-1,-1), "MIDDLE"),
+            ]
+            for i, r in enumerate(rows, 1):
+                val_str  = str(r.get("Value", ""))
+                unit_str = str(r.get("Unit", "-"))
+                risk_key = val_str.strip().lower()
+                if risk_key in _RISK_WORDS:
+                    _lvl, v_col, v_bg = _RISK_WORDS[risk_key]
+                    val_para = Paragraph(val_str,
+                                        ps("vp_{}_{}".format(tool_name, i),
+                                           fontSize=8, textColor=v_col,
+                                           fontName="Helvetica-Bold"))
+                    style_cmds.append(("BACKGROUND", (1,i), (1,i), v_bg))
+                else:
+                    val_para = Paragraph(val_str,
+                                        ps("vp_{}_{}".format(tool_name, i),
+                                           fontSize=8, textColor=TEXT_DARK,
+                                           fontName="Helvetica-Bold"))
+                tbl_data.append([
+                    Paragraph(str(r.get("Property", "")), sBody),
+                    val_para,
+                    Paragraph(unit_str, sSmall),
+                ])
+            t = Table(tbl_data,
+                      colWidths=[usable_w * 0.55, usable_w * 0.28, usable_w * 0.17])
+            t.setStyle(TableStyle(style_cmds))
             return t
 
-        #        Helper: molecule image                                                                                                                                        
-        def mol_image(smi, size=160):
+        #        Helper: molecule image
+        def mol_image(smi, size=220):
             try:
                 mol = Chem.MolFromSmiles(smi)
                 if mol is None:
                     return None
-                pil = Draw.MolToImage(mol, size=(size, size))
-                buf = _io.BytesIO()
-                pil.save(buf, format="PNG")
+                from rdkit.Chem.Draw import rdMolDraw2D
+                drawer = rdMolDraw2D.MolDraw2DCairo(size, size)
+                drawer.drawOptions().addStereoAnnotation = True
+                drawer.drawOptions().padding = 0.12
+                drawer.DrawMolecule(mol)
+                drawer.FinishDrawing()
+                buf = _io.BytesIO(drawer.GetDrawingText())
                 buf.seek(0)
-                return RLImage(buf, width=size * 0.4, height=size * 0.4)
+                return RLImage(buf, width=5.0 * cm, height=5.0 * cm)
+            except Exception:
+                try:
+                    mol = Chem.MolFromSmiles(smi)
+                    pil = Draw.MolToImage(mol, size=(size, size))
+                    buf = _io.BytesIO()
+                    pil.save(buf, format="PNG")
+                    buf.seek(0)
+                    return RLImage(buf, width=5.0 * cm, height=5.0 * cm)
+                except Exception:
+                    return None
+
+        #        Helper: Lipinski radar chart
+        def radar_chart_image(tools_data):
+            try:
+                import matplotlib
+                matplotlib.use('Agg')
+                import matplotlib.pyplot as plt
+                import numpy as np
+                import re as _re
+
+                def _get(*kws):
+                    for tool in tools_data.values():
+                        for cat_rows in tool.values():
+                            for row in cat_rows:
+                                prop = row.get("Property", "").lower()
+                                if all(k.lower() in prop for k in kws):
+                                    m = _re.search(r"[-+]?\d*\.?\d+",
+                                                   str(row.get("Value", "")).replace(",", "."))
+                                    return float(m.group()) if m else None
+                    return None
+
+                limits = [500, 5, 140, 5, 10, 10]
+                labels = ["MW\n≤500", "LogP\n≤5", "TPSA\n≤140", "HBD\n≤5", "HBA\n≤10", "RotB\n≤10"]
+                raw = [
+                    _get("molecular weight"),
+                    _get("alogp") or _get("logp"),
+                    _get("polar surface area") or _get("tpsa"),
+                    _get("hbd") or _get("hydrogen bond donor"),
+                    _get("hba") or _get("hydrogen bond acceptor"),
+                    _get("rotatable"),
+                ]
+                vals = [min((v / lim) if v is not None and lim else 0.0, 1.35)
+                        for v, lim in zip(raw, limits)]
+
+                N = len(labels)
+                angles = [n / N * 2 * np.pi for n in range(N)] + [0]
+                vals_plot = vals + vals[:1]
+
+                fig, ax = plt.subplots(figsize=(2.6, 2.6), subplot_kw=dict(polar=True))
+                fig.patch.set_facecolor('white')
+                ax.set_facecolor('#f8f9fa')
+
+                ideal = [1.0] * N + [1.0]
+                ax.fill(angles, ideal, alpha=0.10, color='#16a34a')
+                ax.plot(angles, ideal, color='#16a34a', linewidth=1.2,
+                        linestyle='--', alpha=0.7, label='Lipinski limit')
+
+                ax.fill(angles, vals_plot, alpha=0.28, color='#1a3a5c')
+                ax.plot(angles, vals_plot, 'o-', color='#1a3a5c',
+                        linewidth=2, markersize=4)
+
+                ax.set_xticks(angles[:-1])
+                ax.set_xticklabels(labels, fontsize=6, color='#1e293b', fontfamily='sans-serif')
+                ax.set_ylim(0, 1.4)
+                ax.set_yticks([0.5, 1.0])
+                ax.set_yticklabels(['50%', '100%'], fontsize=5, color='#94a3b8')
+                ax.grid(color='#cbd5e1', linewidth=0.5)
+                ax.spines['polar'].set_color('#cbd5e1')
+
+                plt.tight_layout(pad=0.3)
+                buf = _io.BytesIO()
+                plt.savefig(buf, format='PNG', dpi=150,
+                            bbox_inches='tight', facecolor='white')
+                plt.close(fig)
+                buf.seek(0)
+                return RLImage(buf, width=4.8 * cm, height=4.8 * cm)
             except Exception:
                 return None
 
@@ -1012,36 +1161,101 @@ def export_report():
 
             return blk
 
-        #                                                                                                                                                                                                                   
-        # COVER PAGE
-        #                                                                                                                                                                                                                   
-        story.append(Spacer(1, 2.5 * cm))
-        story.append(Paragraph("ADMET Profiling Report", sTitle))
-        story.append(Paragraph("Multi-Engine Computational ADMET Analysis with Automated Interpretation", sSubtitle))
-        story.append(Spacer(1, 0.4 * cm))
-        story.append(HRFlowable(width=usable_w, thickness=2, color=BRAND_BLUE))
-        story.append(Spacer(1, 0.4 * cm))
-        story.append(Paragraph(
-            "Generated: {}      ".format(now.strftime('%B %d, %Y  |  %H:%M')) +
-            "Molecules: {}      ".format(len(organised)) +
-            "Tools: RDKit Filters    StopTox    StopLight",
-            sMeta
-        ))
-        story.append(Spacer(1, 1.2 * cm))
-
-        # Tool legend
-        leg_data = [[Paragraph(t, ps("leg{}".format(t), fontSize=9, textColor=colors.white,
-                                      alignment=TA_CENTER, fontName="Helvetica-Bold"))
-                     for t in ["RDKit Filters", "StopTox", "StopLight"]]]
-        leg = Table(leg_data, colWidths=[usable_w / 3] * 3)
-        leg.setStyle(TableStyle([
-            ("BACKGROUND",    (0,0), (0,0), colors.HexColor("#0d9488")),
-            ("BACKGROUND",    (1,0), (1,0), TOOL_COLORS["StopTox"]),
-            ("BACKGROUND",    (2,0), (2,0), TOOL_COLORS["StopLight"]),
-            ("TOPPADDING",    (0,0), (-1,-1), 8),
-            ("BOTTOMPADDING", (0,0), (-1,-1), 8),
-            ("INNERGRID",     (0,0), (-1,-1), 1, colors.white),
+        # ── COVER PAGE ────────────────────────────────────────────────────────
+        # Top banner
+        banner = Table(
+            [[Paragraph("ADMET Profiling Report",
+                        ps("cvTitle", fontSize=28, textColor=colors.white,
+                           fontName="Helvetica-Bold", alignment=TA_CENTER,
+                           spaceAfter=4, leading=32))],
+             [Paragraph("Multi-Engine Computational ADMET Analysis  ·  Automated Risk Interpretation",
+                        ps("cvSub", fontSize=10, textColor=colors.HexColor("#93c5fd"),
+                           alignment=TA_CENTER, leading=14))]],
+            colWidths=[usable_w]
+        )
+        banner.setStyle(TableStyle([
+            ("BACKGROUND",    (0,0), (-1,-1), BRAND_BLUE),
+            ("TOPPADDING",    (0,0), (-1,-1), 22),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 22),
+            ("LEFTPADDING",   (0,0), (-1,-1), 12),
+            ("RIGHTPADDING",  (0,0), (-1,-1), 12),
         ]))
+        story.append(Spacer(1, 1.5 * cm))
+        story.append(banner)
+        story.append(Spacer(1, 0.6 * cm))
+
+        # Meta info strip
+        story.append(Paragraph(
+            "Generated: <b>{}</b>    |    Molecules analysed: <b>{}</b>    |    "
+            "Tools: RDKit Filters · StopTox · StopLight · ADMETlab 3.0".format(
+                now.strftime('%d %b %Y  %H:%M'), len(organised)),
+            ps("cvMeta", fontSize=8.5, textColor=TEXT_MID, alignment=TA_CENTER)
+        ))
+        story.append(Spacer(1, 0.8 * cm))
+        story.append(HRFlowable(width=usable_w, thickness=0.5, color=MID_GRAY))
+        story.append(Spacer(1, 0.6 * cm))
+
+        # Risk distribution stats boxes
+        risk_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+        for smi in organised:
+            risk_counts[profiles[smi].overall] += 1
+
+        stats_labels = [
+            ("Critical", "critical", "#7f1d1d", "#fef2f2"),
+            ("High Risk", "high",     "#dc2626", "#fff1f1"),
+            ("Moderate",  "medium",   "#d97706", "#fffbeb"),
+            ("Low Risk",  "low",      "#16a34a", "#f0fdf4"),
+        ]
+        stats_cells = []
+        for label, key, fg, bg in stats_labels:
+            stats_cells.append(Table(
+                [[Paragraph(str(risk_counts[key]),
+                            ps("sc_n_{}".format(key), fontSize=22, fontName="Helvetica-Bold",
+                               textColor=colors.HexColor(fg), alignment=TA_CENTER))],
+                 [Paragraph(label,
+                            ps("sc_l_{}".format(key), fontSize=7.5,
+                               textColor=colors.HexColor(fg), alignment=TA_CENTER))]],
+                colWidths=[(usable_w - 0.6*cm) / 4]
+            ))
+            stats_cells[-1].setStyle(TableStyle([
+                ("BACKGROUND",    (0,0), (-1,-1), colors.HexColor(bg)),
+                ("TOPPADDING",    (0,0), (-1,-1), 10),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+                ("LEFTPADDING",   (0,0), (-1,-1), 4),
+                ("RIGHTPADDING",  (0,0), (-1,-1), 4),
+            ]))
+
+        stats_row = Table([stats_cells],
+                          colWidths=[(usable_w - 0.6*cm) / 4] * 4,
+                          spaceBefore=0)
+        stats_row.setStyle(TableStyle([
+            ("INNERGRID",  (0,0), (-1,-1), 2, colors.white),
+            ("TOPPADDING", (0,0), (-1,-1), 0),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 0),
+        ]))
+        story.append(stats_row)
+        story.append(Spacer(1, 0.8 * cm))
+
+        # Tool colour legend strip
+        tool_leg_items = [
+            ("RDKit Filters", "#0d9488"),
+            ("StopTox",       "#b45309"),
+            ("StopLight",     "#1d4ed8"),
+            ("ADMETlab 3.0",  "#6d28d9"),
+        ]
+        leg_cells = [Paragraph(name,
+                               ps("lg_{}".format(name), fontSize=8, textColor=colors.white,
+                                  fontName="Helvetica-Bold", alignment=TA_CENTER))
+                     for name, _ in tool_leg_items]
+        leg = Table([leg_cells], colWidths=[usable_w / 4] * 4)
+        leg_style = [
+            ("TOPPADDING",    (0,0), (-1,-1), 7),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 7),
+            ("INNERGRID",     (0,0), (-1,-1), 2, colors.white),
+        ]
+        for i, (_, hex_col) in enumerate(tool_leg_items):
+            leg_style.append(("BACKGROUND", (i,0), (i,0), colors.HexColor(hex_col)))
+        leg.setStyle(TableStyle(leg_style))
         story.append(leg)
         story.append(Spacer(1, 0.8 * cm))
 
@@ -1126,45 +1340,91 @@ def export_report():
 
         story.append(PageBreak())
 
-        #                                                                                                                                                                                                                   
-        # PER-MOLECULE SECTIONS
-        #                                                                                                                                                                                                                   
-        tool_order = ["RDKit Filters", "StopTox", "StopLight"]
+        # ── PER-MOLECULE SECTIONS ─────────────────────────────────────────────
+        tool_order = ["RDKit Filters", "StopTox", "StopLight", "ADMETlab 3.0"]
+        ADMET_COL  = colors.HexColor("#6d28d9")
+        TOOL_COLORS["ADMETlab 3.0"] = ADMET_COL
 
         for mol_idx, (smi, tools) in enumerate(organised.items(), 1):
-            story.append(HRFlowable(width=usable_w, thickness=1.5, color=BRAND_BLUE))
-
-            # Molecule heading + 2D structure
-            img = mol_image(smi)
+            # Molecule header band
             mol_label = mol_names.get(smi, "")
-            heading_title = "Molecule {}".format(mol_idx) + ("       {}".format(mol_label) if mol_label else "")
-            heading_paras = [
-                Paragraph(heading_title, sSection),
-                Paragraph(smi, ps("smilesCode", fontSize=8.5, textColor=TEXT_MID,
-                                  fontName="Courier", leading=12)),
-            ]
-            if img:
-                mol_tbl = Table(
-                    [[heading_paras, img]],
-                    colWidths=[usable_w - 6.5*cm, 6.5*cm]
-                )
-                mol_tbl.setStyle(TableStyle([
-                    ("VALIGN",       (0,0), (-1,-1), "TOP"),
-                    ("TOPPADDING",   (0,0), (-1,-1), 0),
-                    ("LEFTPADDING",  (0,0), (-1,-1), 0),
-                    ("RIGHTPADDING", (0,0), (-1,-1), 0),
-                ]))
-                story.append(mol_tbl)
-            else:
-                for para in heading_paras:
-                    story.append(para)
-
-            #        Interpretation                                                                                                                                                 
+            heading_txt = "Molecule {}{}".format(
+                mol_idx, "  —  {}".format(mol_label) if mol_label else "")
+            hdr_band = Table(
+                [[Paragraph(heading_txt,
+                            ps("mh{}".format(mol_idx), fontSize=13, textColor=colors.white,
+                               fontName="Helvetica-Bold"))],
+                 [Paragraph(smi,
+                            ps("ms{}".format(mol_idx), fontSize=7.5,
+                               textColor=colors.HexColor("#bfdbfe"),
+                               fontName="Courier", leading=10))]],
+                colWidths=[usable_w]
+            )
+            hdr_band.setStyle(TableStyle([
+                ("BACKGROUND",    (0,0), (-1,-1), BRAND_BLUE),
+                ("TOPPADDING",    (0,0), (0,0),   10),
+                ("BOTTOMPADDING", (0,0), (0,0),   2),
+                ("TOPPADDING",    (0,1), (0,1),   2),
+                ("BOTTOMPADDING", (0,1), (0,1),   10),
+                ("LEFTPADDING",   (0,0), (-1,-1), 12),
+            ]))
+            story.append(hdr_band)
             story.append(Spacer(1, 0.3 * cm))
-            for item in interpretation_block(profiles[smi]):
+
+            # 2D structure | radar chart | overall risk
+            img    = mol_image(smi)
+            radar  = radar_chart_image(tools)
+            prof   = profiles[smi]
+            rlvl   = prof.overall
+            risk_col = FLAG_COLORS.get(rlvl, BRAND_BLUE)
+            risk_bg  = FLAG_BG.get(rlvl, colors.white)
+
+            risk_cell = Table(
+                [[Paragraph("Overall Risk",
+                            ps("or_lbl_{}".format(mol_idx), fontSize=7.5,
+                               textColor=TEXT_MID, alignment=TA_CENTER))],
+                 [Paragraph(RISK_LABEL.get(rlvl, rlvl.title()),
+                            ps("or_val_{}".format(mol_idx), fontSize=13,
+                               fontName="Helvetica-Bold", textColor=colors.white,
+                               alignment=TA_CENTER))],
+                 [Paragraph("{} critical  ·  {} high  ·  {} moderate".format(
+                               sum(1 for f in prof.flags if f.level=="critical"),
+                               sum(1 for f in prof.flags if f.level=="high"),
+                               sum(1 for f in prof.flags if f.level=="medium")),
+                            ps("or_cnt_{}".format(mol_idx), fontSize=7,
+                               textColor=colors.white, alignment=TA_CENTER))]],
+                colWidths=[4.2 * cm]
+            )
+            risk_cell.setStyle(TableStyle([
+                ("BACKGROUND",    (0,0), (-1,-1), risk_col),
+                ("TOPPADDING",    (0,0), (-1,-1), 8),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 8),
+                ("LEFTPADDING",   (0,0), (-1,-1), 4),
+                ("RIGHTPADDING",  (0,0), (-1,-1), 4),
+            ]))
+
+            left_col  = [img]   if img   else [Spacer(1, 0.1*cm)]
+            mid_col   = [radar] if radar else [Spacer(1, 0.1*cm)]
+
+            top_row_data = [[left_col[0], mid_col[0], risk_cell]]
+            top_row = Table(top_row_data,
+                            colWidths=[5.2*cm, 5.2*cm, 4.4*cm])
+            top_row.setStyle(TableStyle([
+                ("VALIGN",       (0,0), (-1,-1), "MIDDLE"),
+                ("ALIGN",        (2,0), (2,0),   "CENTER"),
+                ("TOPPADDING",   (0,0), (-1,-1), 0),
+                ("LEFTPADDING",  (0,0), (-1,-1), 2),
+                ("RIGHTPADDING", (0,0), (-1,-1), 2),
+                ("BOTTOMPADDING",(0,0), (-1,-1), 0),
+            ]))
+            story.append(top_row)
+            story.append(Spacer(1, 0.35 * cm))
+
+            # Interpretation block
+            for item in interpretation_block(prof):
                 story.append(item)
 
-            #        Raw data per tool                                                                                                                                        
+            # Raw data per tool
             for tool in tool_order:
                 if tool not in tools:
                     continue
@@ -1429,6 +1689,8 @@ def calc_descriptors():
         from rdkit.Chem import Descriptors, rdMolDescriptors, Crippen, Lipinski, QED
         body = request.get_json()
         smiles_list = body.get("smiles", [])
+        if isinstance(smiles_list, str):
+            smiles_list = [smiles_list]
         if not smiles_list:
             return jsonify({"error": "No SMILES provided"}), 400
 
@@ -1532,6 +1794,11 @@ def calc_descriptors():
                 entry["fp_atompair_bits"] = bits
                 entry["fp_atompair_onbits"] = bits.count("1")
 
+        if len(smiles_list) == 1:
+            single = results[0] if results else {"error": "No result"}
+            if "error" in single:
+                return jsonify(single), 422
+            return jsonify(single)
         return jsonify(results)
     except Exception as err:
         print("Descriptors Error: {}".format(err))
@@ -1840,6 +2107,57 @@ def predict_bbb(smiles):
     except Exception as err:
         return jsonify({"error": str(err)}), 500
 
+def _transdermal_featurize(mol):
+    """7 RDKit physico-chemical descriptors for transdermal permeation model."""
+    from rdkit.Chem import Crippen, Descriptors, rdMolDescriptors
+    return [
+        Descriptors.MolLogP(mol),
+        Descriptors.ExactMolWt(mol),
+        rdMolDescriptors.CalcTPSA(mol),
+        rdMolDescriptors.CalcNumHBD(mol),
+        rdMolDescriptors.CalcNumHBA(mol),
+        rdMolDescriptors.CalcNumRotatableBonds(mol),
+        Crippen.MolMR(mol),
+    ]
+
+
+@app.route("/predict/transdermal/base64/<path:smiles>", methods=["GET"])
+def predict_transdermal(smiles):
+    """Predict skin permeability logKp (log10 cm/s) using Flynn (1990) / Potts-Guy (1992) GBM model."""
+    if TRANSDERMAL_MODEL is None:
+        return jsonify({"error": "Transdermal model not loaded", "detail": TRANSDERMAL_ERROR}), 503
+    try:
+        clean = smiles.replace("%3D", "=")
+        decoded = b64decode(clean.encode("utf-8")).decode("utf-8")
+        mol = Chem.MolFromSmiles(decoded)
+        if mol is None:
+            return jsonify({"error": "Invalid SMILES"}), 400
+
+        feat = _transdermal_featurize(mol)
+        logkp = float(TRANSDERMAL_MODEL["model"].predict([feat])[0])
+
+        # GHS-inspired classification based on logKp thresholds
+        if logkp >= -2:
+            classification = "high"       # Kp > 10⁻² cm/s — easily penetrates skin
+        elif logkp >= -3:
+            classification = "moderate"   # 10⁻³–10⁻² cm/s
+        elif logkp >= -5:
+            classification = "low"        # 10⁻⁵–10⁻³ cm/s
+        else:
+            classification = "very_low"   # < 10⁻⁵ cm/s — poor skin penetration
+
+        return jsonify({
+            "logKp": round(logkp, 3),
+            "kp_cm_s": float(f"{10**logkp:.2e}"),
+            "classification": classification,
+            "model": "GBM/Flynn-1990",
+            "loo_r2": TRANSDERMAL_MODEL.get("loo_r2"),
+            "n_train": TRANSDERMAL_MODEL.get("n_train"),
+        })
+    except Exception as err:
+        return jsonify({"error": str(err)}), 500
+
+
 # --- LibPrep Integration ---
 from libprep_engine import (
     standardize_mol, compute_descriptors, generate_3d_block, create_export_zip
@@ -1960,7 +2278,7 @@ def pubchem_name_to_smiles():
 
         props = raw["PropertyTable"]["Properties"][0]
         result = json.dumps({
-            "smiles": props.get("IsomericSMILES", ""),
+            "smiles": props.get("IsomericSMILES") or props.get("CanonicalSMILES") or props.get("SMILES", ""),
             "iupac": props.get("IUPACName", name),
             "mw": props.get("MolecularWeight", ""),
             "cid": props.get("CID", ""),

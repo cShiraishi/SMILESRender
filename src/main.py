@@ -1,5 +1,7 @@
-from waitress import serve
 from dotenv import load_dotenv
+load_dotenv()  # must run before any module reads os.getenv at import time
+
+from waitress import serve
 from routes import app
 import os
 from os import getenv
@@ -12,9 +14,6 @@ try:
         torch.serialization.add_safe_globals([argparse.Namespace])
 except:
     pass
-
-
-load_dotenv()
 
 
 def main():

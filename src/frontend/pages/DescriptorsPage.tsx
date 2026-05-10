@@ -224,14 +224,15 @@ function DescContent({ initialSmiles, onSmilesChange }: { initialSmiles?: string
         }),
       });
       if (!res.ok) throw new Error('Failed to generate figure');
-      const blob = await res.json().catch(() => res.blob());
-      const url = window.URL.createObjectURL(blob as Blob);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `publication_figure.${figFormat === 'JPEG' ? 'jpg' : 'png'}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
+      window.URL.revokeObjectURL(url);
     } catch (e) {
       setError('Figure export failed');
     } finally {
@@ -255,6 +256,7 @@ function DescContent({ initialSmiles, onSmilesChange }: { initialSmiles?: string
       a.href = URL.createObjectURL(blob);
       a.download = 'descriptors_qsar.xlsx';
       a.click();
+      URL.revokeObjectURL(a.href);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Export failed');
     } finally {
@@ -555,7 +557,7 @@ function DescContent({ initialSmiles, onSmilesChange }: { initialSmiles?: string
                       display: 'flex', flexDirection: 'column', alignItems: 'center'
                     }}
                   >
-                    <img src={`/render/${btoa(r.smiles)}`} alt="mol" style={{ width: '80px', height: '80px', objectFit: 'contain' }} />
+                    <img src={`/render/base64/${btoa(unescape(encodeURIComponent(r.smiles)))}`} alt="mol" style={{ width: '80px', height: '80px', objectFit: 'contain' }} />
                     <span style={{ fontSize: '0.75rem', marginTop: '0.5rem', color: colors.text, fontWeight: 500 }}>
                       Compound {i+1}
                     </span>

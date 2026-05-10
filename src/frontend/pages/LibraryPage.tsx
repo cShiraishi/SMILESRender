@@ -322,8 +322,8 @@ function ChemicalSpaceChart({ data, xProp, yProp, sizeProp, mode, xLabel, yLabel
 
   const xs0 = data.map(d => d[xProp] as number).filter(isFinite);
   const ys0 = data.map(d => d[yProp] as number).filter(isFinite);
-  const xR0 = niceTicks(Math.min(...xs0), Math.max(...xs0));
-  const yR0 = niceTicks(Math.min(...ys0), Math.max(...ys0));
+  const xR0 = xs0.length > 0 ? niceTicks(Math.min(...xs0), Math.max(...xs0)) : { min: 0, max: 1, ticks: [0, 1] };
+  const yR0 = ys0.length > 0 ? niceTicks(Math.min(...ys0), Math.max(...ys0)) : { min: 0, max: 1, ticks: [0, 1] };
 
   const [view, setView] = useState({ xMin: xR0.min, xMax: xR0.max, yMin: yR0.min, yMax: yR0.max });
   const [dragging, setDragging] = useState(false);
@@ -334,8 +334,8 @@ function ChemicalSpaceChart({ data, xProp, yProp, sizeProp, mode, xLabel, yLabel
   useEffect(() => {
     const xs = data.map(d => d[xProp] as number).filter(isFinite);
     const ys = data.map(d => d[yProp] as number).filter(isFinite);
-    const xR = niceTicks(Math.min(...xs), Math.max(...xs));
-    const yR = niceTicks(Math.min(...ys), Math.max(...ys));
+    const xR = xs.length > 0 ? niceTicks(Math.min(...xs), Math.max(...xs)) : { min: 0, max: 1 };
+    const yR = ys.length > 0 ? niceTicks(Math.min(...ys), Math.max(...ys)) : { min: 0, max: 1 };
     setView({ xMin: xR.min, xMax: xR.max, yMin: yR.min, yMax: yR.max });
   }, [xProp, yProp, sizeProp, data]);
 
@@ -2118,7 +2118,7 @@ function LibraryPage({ onBack, initialSmiles, onSmilesChange }: { onBack: () => 
   return (
     <PageShell
       icon="bi-grid-1x2"
-      title="SMILES Library Analytics"
+      title="SMILES Library Dashboard"
       subtitle="Advanced cheminformatics analysis — chemical space, multi-filter compliance, property distributions and descriptor correlations."
       accentColor="#0ea5e9"
       onBack={onBack}

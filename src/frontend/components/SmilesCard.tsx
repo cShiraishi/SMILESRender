@@ -4,7 +4,7 @@ import { PaperOptions, LabelPosition, defaultPaperOptions, cardSizes } from '../
 
 function SmilesCard(props: { smiles: string; name?: string; mode?: 'grid' | 'paper'; index?: number; paperOptions?: PaperOptions; mw?: number }) {
   const [isLoading, setIsLoading] = useState(true);
-  const [smileImage, setSmileImage] = useState(new Blob());
+  const [imgSrc, setImgSrc] = useState('');
   const [error, setError] = useState(false);
   const mode = props.mode || 'grid';
   const opts = props.paperOptions || defaultPaperOptions;
@@ -12,10 +12,13 @@ function SmilesCard(props: { smiles: string; name?: string; mode?: 'grid' | 'pap
   const isDark = opts.theme === 'dark';
 
   useEffect(() => {
+    let objUrl = '';
+    setIsLoading(true); setError(false);
     fetch(`/render?smiles=${encodeURIComponent(props.smiles)}`)
       .then(r => r.blob())
-      .then(img => { setSmileImage(img); setIsLoading(false); })
+      .then(blob => { objUrl = URL.createObjectURL(blob); setImgSrc(objUrl); setIsLoading(false); })
       .catch(() => { setError(true); setIsLoading(false); });
+    return () => { if (objUrl) URL.revokeObjectURL(objUrl); };
   }, [props.smiles]);
 
   const label = props.name || props.smiles;
@@ -102,7 +105,7 @@ function SmilesCard(props: { smiles: string; name?: string; mode?: 'grid' | 'pap
           borderRadius: isDark ? '4px' : '0',
         }}>
           {!isLoading && !error && (
-            <img src={URL.createObjectURL(smileImage)} alt={props.smiles} style={{ maxWidth: '100%', maxHeight: '100%', filter: isDark ? 'invert(1) contrast(1.1)' : 'contrast(1.2)' }} />
+            <img src={imgSrc} alt={props.smiles} style={{ maxWidth: '100%', maxHeight: '100%', filter: isDark ? 'invert(1) contrast(1.1)' : 'contrast(1.2)' }} />
           )}
           {isLoading && (
             <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
@@ -167,7 +170,7 @@ function SmilesCard(props: { smiles: string; name?: string; mode?: 'grid' | 'pap
           <span style={{ fontSize: '12px', color: colors.danger }}>Invalid SMILES</span>
         )}
         {!isLoading && !error && (
-          <img src={URL.createObjectURL(smileImage)} alt={props.smiles} style={{ maxWidth: '100%', maxHeight: '100%' }} />
+          <img src={imgSrc} alt={props.smiles} style={{ maxWidth: '100%', maxHeight: '100%' }} />
         )}
       </div>
       <p style={{

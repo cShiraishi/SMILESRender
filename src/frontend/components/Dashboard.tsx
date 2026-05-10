@@ -1,5 +1,6 @@
 import React from 'react';
 import MolImage from './MolImage';
+import BodyMapDecision from './BodyMapDecision';
 
 interface DashboardProps {
   allResults: any[];
@@ -258,6 +259,9 @@ function Dashboard({ allResults = [], uniqueSmiles = [], moleculeNames = {} }: D
   const SOL_COLORS: Record<string, string> = { Soluble: '#22c55e', Moderately: '#3b82f6', Poorly: '#f59e0b', Insoluble: '#ef4444' };
 
   return (
+    <>
+      <BodyMapDecision allResults={allResults} uniqueSmiles={uniqueSmiles} moleculeNames={moleculeNames} />
+
     <div style={{ padding: '20px', backgroundColor: '#f1f5f9', borderRadius: '15px', marginBottom: '30px', border: '1px solid #cbd5e1' }}>
 
       {/* Header */}
@@ -554,11 +558,8 @@ function Dashboard({ allResults = [], uniqueSmiles = [], moleculeNames = {} }: D
         </div>
       )}
     </div>
+    </>
   );
-}
-
-function hergHitsUnused(allResults: any[], uniqueSmiles: string[]): number {
-  return uniqueSmiles.filter(s => { const p = deepProb(allResults, s, 'hERG'); return p != null && p >= 0.4; }).length;
 }
 
 export default Dashboard;

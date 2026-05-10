@@ -1,5 +1,4 @@
-import React, { useRef } from 'react';
-import { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import Prediction from '../components/Prediction';
 import StopLight from '../components/StopLight';
 import ToolErrorBoundary from '../components/ToolErrorBoundary';
@@ -11,6 +10,150 @@ import MolImage from '../components/MolImage';
 import MoleculeDrawerModal from '../components/MoleculeDrawerModal';
 import RDKitFilters from '../components/RDKitFilters';
 import * as csvTools from '../tools/csv';
+
+// ── Science quotes shown during ADMET analysis ────────────────────────────────
+
+const SCIENCE_QUOTES: { text: string; author: string }[] = [
+  { text: "The good thing about science is that it's true whether or not you believe in it.", author: "Neil deGrasse Tyson" },
+  { text: "Science is not only a disciple of reason but, also, one of romance and passion.", author: "Stephen Hawking" },
+  { text: "In science there are no shortcuts to truth.", author: "Karl Popper" },
+  { text: "Research is what I'm doing when I don't know what I'm doing.", author: "Wernher von Braun" },
+  { text: "The most exciting phrase to hear in science is not 'Eureka!' but 'That's funny...'", author: "Isaac Asimov" },
+  { text: "Science is the great antidote to the poison of enthusiasm and superstition.", author: "Adam Smith" },
+  { text: "The important thing is to not stop questioning. Curiosity has its own reason for existing.", author: "Albert Einstein" },
+  { text: "Equipped with his five senses, man explores the universe around him and calls the adventure Science.", author: "Edwin Powell Hubble" },
+  { text: "To know what you know and what you do not know — that is true knowledge.", author: "Confucius" },
+  { text: "In every walk with nature, one receives far more than he seeks.", author: "John Muir" },
+  { text: "An experiment is a question which science poses to Nature, and a measurement is the recording of Nature's answer.", author: "Max Planck" },
+  { text: "The aim of science is not to open the door to infinite wisdom, but to set a limit to infinite error.", author: "Bertolt Brecht" },
+  { text: "Somewhere, something incredible is waiting to be known.", author: "Carl Sagan" },
+  { text: "Nothing in life is to be feared, it is only to be understood.", author: "Marie Curie" },
+  { text: "Science is a way of thinking much more than it is a body of knowledge.", author: "Carl Sagan" },
+  { text: "The first gulp from the glass of natural sciences will turn you into an atheist, but at the bottom of the glass God is waiting.", author: "Werner Heisenberg" },
+  { text: "I am not ashamed to confess that I am ignorant of what I do not know.", author: "Marcus Tullius Cicero" },
+  { text: "Science knows no country, because knowledge belongs to humanity, and is the torch which illuminates the world.", author: "Louis Pasteur" },
+  { text: "The physician who knows only medicine knows not even medicine.", author: "Sir William Osler" },
+  { text: "In theory, there is no difference between theory and practice. In practice, there is.", author: "Yogi Berra" },
+  { text: "The strength of a theory is not what it allows, but what it does not allow.", author: "Karl Popper" },
+  { text: "If you thought that science was certain — well, that is just an error on your part.", author: "Richard Feynman" },
+  { text: "I would rather have questions that can't be answered than answers that can't be questioned.", author: "Richard Feynman" },
+  { text: "Life is not easy for any of us. But what of that? We must have perseverance and above all confidence in ourselves.", author: "Marie Curie" },
+  { text: "Look deep into nature, and then you will understand everything better.", author: "Albert Einstein" },
+  { text: "The cosmos is within us. We are made of star-stuff.", author: "Carl Sagan" },
+  { text: "One, remember to look up at the stars and not down at your feet.", author: "Stephen Hawking" },
+  { text: "No great discovery was ever made without a bold guess.", author: "Isaac Newton" },
+  { text: "I have no special talent. I am only passionately curious.", author: "Albert Einstein" },
+  { text: "Facts do not cease to exist because they are ignored.", author: "Aldous Huxley" },
+  { text: "Science is built up with facts, as a house is with stones. But a collection of facts is no more a science than a heap of stones is a house.", author: "Henri Poincaré" },
+  { text: "It doesn't matter how beautiful your theory is... if it disagrees with experiment, it's wrong.", author: "Richard Feynman" },
+  { text: "The art of medicine consists of amusing the patient while nature cures the disease.", author: "Voltaire" },
+  { text: "To raise new questions, new possibilities, to regard old problems from a new angle requires creative imagination.", author: "Albert Einstein" },
+  { text: "We especially need imagination in science. It is not all mathematics, nor all logic, but it is somewhat beauty and poetry.", author: "Maria Montessori" },
+  { text: "Imagination is more important than knowledge. Knowledge is limited. Imagination encircles the world.", author: "Albert Einstein" },
+  { text: "The scientist is not a person who gives the right answers, he's one who asks the right questions.", author: "Claude Lévi-Strauss" },
+  { text: "Thousands of candles can be lighted from a single candle, and the life of the candle will not be shortened.", author: "Buddha" },
+  { text: "A thinker sees his own actions as experiments and questions — as attempts to find out something.", author: "Friedrich Nietzsche" },
+  { text: "Science and everyday life cannot and should not be separated.", author: "Rosalind Franklin" },
+  { text: "The day science begins to study non-physical phenomena, it will make more progress in one decade than in all the previous centuries.", author: "Nikola Tesla" },
+  { text: "Men love to wonder, and that is the seed of science.", author: "Ralph Waldo Emerson" },
+  { text: "The most incomprehensible thing about the world is that it is comprehensible.", author: "Albert Einstein" },
+  { text: "Nature uses only the longest threads to weave her patterns, so each small piece of her fabric reveals the organization of the entire tapestry.", author: "Richard Feynman" },
+  { text: "Science is simply the word we use to describe a method of organizing our curiosity.", author: "Tim Minchin" },
+  { text: "The saddest aspect of life right now is that science gathers knowledge faster than society gathers wisdom.", author: "Isaac Asimov" },
+  { text: "The most beautiful thing we can experience is the mysterious. It is the source of all true art and science.", author: "Albert Einstein" },
+  { text: "An investment in knowledge pays the best interest.", author: "Benjamin Franklin" },
+  { text: "In questions of science, the authority of a thousand is not worth the humble reasoning of a single individual.", author: "Galileo Galilei" },
+  { text: "Science is organized knowledge. Wisdom is organized life.", author: "Immanuel Kant" },
+  { text: "The effort to understand the universe is one of the very few things that lifts human life a little above the level of farce.", author: "Steven Weinberg" },
+  { text: "What we observe is not nature itself, but nature exposed to our method of questioning.", author: "Werner Heisenberg" },
+  { text: "Every great advance in science has issued from a new audacity of imagination.", author: "John Dewey" },
+  { text: "There is no royal road to science, and only those who do not dread the fatiguing climb of its steep paths have a chance of gaining its luminous summits.", author: "Karl Marx" },
+  { text: "Science without religion is lame, religion without science is blind.", author: "Albert Einstein" },
+  { text: "All truths are easy to understand once they are discovered; the point is to discover them.", author: "Galileo Galilei" },
+  { text: "The only way to have a friend is to be one.", author: "Ralph Waldo Emerson" },
+  { text: "Whatever the mind of man can conceive and believe, it can achieve.", author: "Napoleon Hill" },
+  { text: "Do not go where the path may lead, go instead where there is no path and leave a trail.", author: "Ralph Waldo Emerson" },
+  { text: "The pessimist sees difficulty in every opportunity. The optimist sees opportunity in every difficulty.", author: "Winston Churchill" },
+  { text: "There is only one way to avoid criticism: do nothing, say nothing, and be nothing.", author: "Aristotle" },
+  { text: "Ask not what your country can do for you — ask what you can do for your country.", author: "John F. Kennedy" },
+  { text: "In the middle of every difficulty lies opportunity.", author: "Albert Einstein" },
+  { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
+  { text: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill" },
+  { text: "Our greatest glory is not in never falling, but in rising every time we fall.", author: "Confucius" },
+  { text: "It always seems impossible until it's done.", author: "Nelson Mandela" },
+  { text: "We must believe that we are gifted for something and that this thing must be attained.", author: "Marie Curie" },
+  { text: "A ship is always safe at the shore — but that is NOT what it is built for.", author: "Albert Einstein" },
+  { text: "The only limit to our realization of tomorrow will be our doubts of today.", author: "Franklin D. Roosevelt" },
+  { text: "Tell me and I forget, teach me and I may remember, involve me and I learn.", author: "Benjamin Franklin" },
+  { text: "The cure for boredom is curiosity. There is no cure for curiosity.", author: "Dorothy Parker" },
+  { text: "It is not the strongest of the species that survive, nor the most intelligent, but the one most responsive to change.", author: "Charles Darwin" },
+  { text: "Equipped with his five senses, man explores the universe around him and calls the adventure Science.", author: "Edwin Hubble" },
+  { text: "A man who dares to waste one hour of time has not discovered the value of life.", author: "Charles Darwin" },
+  { text: "All science is either physics or stamp collecting.", author: "Ernest Rutherford" },
+  { text: "The good physician treats the disease; the great physician treats the patient who has the disease.", author: "Sir William Osler" },
+  { text: "Drugs without a target are like bullets without an aim.", author: "Paul Ehrlich" },
+  { text: "If the doors of perception were cleansed, everything would appear to man as it is — infinite.", author: "William Blake" },
+  { text: "No problem can be solved from the same level of consciousness that created it.", author: "Albert Einstein" },
+  { text: "First, do no harm.", author: "Hippocrates" },
+  { text: "Where observation is concerned, chance favours only the prepared mind.", author: "Louis Pasteur" },
+  { text: "The structure of DNA is so elegant, so perfectly suited to its purpose, that it makes me believe that there is something more to reality than mere accident.", author: "Francis Crick" },
+  { text: "Drugs are taken to treat diseases; if a drug has no side effects, it probably has no effect at all.", author: "Unknown" },
+  { text: "In chemistry, everything is about the molecular level.", author: "Linus Pauling" },
+  { text: "Nature is a mutable cloud which is always and never the same.", author: "Ralph Waldo Emerson" },
+  { text: "The double helix shows us that nature is the master of all chemists.", author: "Max Perutz" },
+  { text: "Discovery consists of seeing what everybody has seen and thinking what nobody has thought.", author: "Albert von Szent-Györgyi" },
+  { text: "A clever person solves a problem. A wise person avoids it.", author: "Albert Einstein" },
+  { text: "Logic will get you from A to Z; imagination will get you everywhere.", author: "Albert Einstein" },
+  { text: "The more I learn, the more I realize how much I don't know.", author: "Albert Einstein" },
+  { text: "Science is a wonderful thing if one does not have to earn one's living at it.", author: "Albert Einstein" },
+  { text: "Everything should be made as simple as possible, but not simpler.", author: "Albert Einstein" },
+  { text: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" },
+  { text: "You can never solve a problem on the level on which it was created.", author: "Albert Einstein" },
+  { text: "Small is beautiful.", author: "E.F. Schumacher" },
+  { text: "The brain is wider than the sky.", author: "Emily Dickinson" },
+  { text: "In science, we must be interested in things, not in persons.", author: "Marie Curie" },
+  { text: "The greatest challenge to any thinker is stating the problem in a way that will allow a solution.", author: "Bertrand Russell" },
+  { text: "Somewhere, something incredible is waiting to be known.", author: "Sharon Begley" },
+  { text: "Science is the poetry of reality.", author: "Richard Dawkins" },
+];
+
+function ScienceQuote({ visible }: { visible: boolean }) {
+  const [idx, setIdx] = useState(() => Math.floor(Math.random() * SCIENCE_QUOTES.length));
+  const [fade, setFade] = useState(true);
+
+  useEffect(() => {
+    if (!visible) return;
+    const interval = setInterval(() => {
+      setFade(false);
+      setTimeout(() => {
+        setIdx(i => (i + 1) % SCIENCE_QUOTES.length);
+        setFade(true);
+      }, 500);
+    }, 7000);
+    return () => clearInterval(interval);
+  }, [visible]);
+
+  if (!visible) return null;
+  const q = SCIENCE_QUOTES[idx];
+  return (
+    <div style={{
+      margin: '14px 0 4px',
+      padding: '12px 16px',
+      backgroundColor: '#f0f9ff',
+      borderLeft: '3px solid #0ea5e9',
+      borderRadius: '0 8px 8px 0',
+      opacity: fade ? 1 : 0,
+      transition: 'opacity 0.5s ease',
+    }}>
+      <div style={{ fontSize: '12px', color: '#0369a1', fontStyle: 'italic', lineHeight: 1.5, marginBottom: '5px' }}>
+        "{q.text}"
+      </div>
+      <div style={{ fontSize: '10px', color: '#7dd3fc', fontWeight: 700 }}>
+        — {q.author}
+      </div>
+    </div>
+  );
+}
 
 const defaultSmiles = [
   'CCCCCCCC',
@@ -184,6 +327,7 @@ function PredictWithStopTox({ initialSmiles, onSmilesChange }: { initialSmiles?:
       const a    = document.createElement('a');
       a.href = url; a.download = filename;
       document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
     } catch (err) {
       alert('Erro ao exportar. Verifique o servidor.');
     }
@@ -402,9 +546,12 @@ function PredictWithStopTox({ initialSmiles, onSmilesChange }: { initialSmiles?:
             </div>
 
             {/* Progress bar */}
-            <div style={{ width: '100%', height: '8px', backgroundColor: '#e0e0e0', borderRadius: '4px', overflow: 'hidden', marginBottom: '16px' }}>
+            <div style={{ width: '100%', height: '8px', backgroundColor: '#e0e0e0', borderRadius: '4px', overflow: 'hidden', marginBottom: '0' }}>
               <div style={{ width: `${percentage}%`, height: '100%', backgroundColor: isReady ? '#16a34a' : '#007bff', transition: 'width 0.4s ease', borderRadius: '4px' }} />
             </div>
+
+            {/* Science quote during loading */}
+            <ScienceQuote visible={!isReady} />
 
             {/* Dashboard Overview — only after full analysis */}
             {isReady && (

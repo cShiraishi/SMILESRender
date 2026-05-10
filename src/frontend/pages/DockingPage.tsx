@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import PageShell from '../components/PageShell';
 import MoleculeDrawerModal from '../components/MoleculeDrawerModal';
+import { DISEASE_LIBRARY } from '../components/TargetLibrary';
 import { colors, radius, shadow, font } from '../styles/themes';
 import { parseCSV, autoDetect, detectSmilesColumn } from '../tools/csv';
 
@@ -15,6 +16,15 @@ interface MolEntry {
   props: any;
 }
 
+type ScreeningTarget = {
+  pdbId: string; ligandId: string; chainId?: string;
+  gene: string; name: string; disease: string; color: string;
+};
+type ScreeningMatrix = {
+  targets: string[];
+  rows: { ligand: string; smiles: string; values: (number | null)[] }[];
+};
+
 type InputMode = 'smiles' | 'name' | 'draw' | 'csv';
 
 interface DockingPageProps {
@@ -27,7 +37,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles, onSmil
   const [entries, setEntries] = useState<MolEntry[]>([]);
   const [inputText, setInputText] = useState(initialSmiles || '');
   const [isPreparing, setIsPreparing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'simulation'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'simulation' | 'screening'>('overview');
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [inputMode, setInputMode] = useState<InputMode>('smiles');
   const [nameQuery, setNameQuery] = useState('');
@@ -56,6 +66,16 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles, onSmil
   const [isBatchRunning, setIsBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, name: '' });
   const batchAbortRef = useRef(false);
+  const [selectedDisease, setSelectedDisease] = useState<string | null>(null);
+  const [screeningTargets, setScreeningTargets] = useState<ScreeningTarget[]>([]);
+  const [screeningResults, setScreeningResults] = useState<ScreeningMatrix | null>(null);
+  const [isScreening, setIsScreening] = useState(false);
+  const [screeningProgress, setScreeningProgress] = useState({ current: 0, total: 0, label: '' });
+  const screeningAbortRef = useRef(false);
+  const [batchProps, setBatchProps] = useState<Record<string, any>>({});
+  const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false);
+  const [batchAnalyzedCount, setBatchAnalyzedCount] = useState(0);
+  const batchAnalysisAbortRef = useRef(false);
 
   // Accumulated results for comparison report
   type AccumResult = { name: string; smiles: string; affinity: string; le: number; plipData?: any; isControl: boolean; };
@@ -86,17 +106,17 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles, onSmil
     }
   };
 
-  const handleLoadReceptor = async (id: string) => {
+  const handleLoadReceptor = async (id: string, ligandOverride?: string, chainOverride?: string) => {
     if (!id || id.length !== 4) return;
     setIsLoadingReceptor(true);
     try {
       const res = await fetch('/api/docking/receptor/load-pdb-id', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           pdbId: id,
-          ligandId: targetLigand.trim() || null,
-          chainId: targetChain.trim() || null
+          ligandId: (ligandOverride ?? targetLigand).trim() || null,
+          chainId: (chainOverride ?? targetChain).trim() || null
         })
       });
       const data = await res.json();
@@ -245,6 +265,34 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles, onSmil
     }
   };
 
+  const runBatchAnalysis = async () => {
+    if (entries.length === 0) { alert('Carregue moléculas primeiro.'); return; }
+    setIsBatchAnalyzing(true);
+    setBatchAnalyzedCount(0);
+    batchAnalysisAbortRef.current = false;
+    const results: Record<string, any> = {};
+    for (let i = 0; i < entries.length; i++) {
+      if (batchAnalysisAbortRef.current) break;
+      const entry = entries[i];
+      try {
+        const b64 = btoa(entry.smiles);
+        const [filtersRes, bbbRes] = await Promise.allSettled([
+          fetch(`/predict/rdkit-filters/base64/${b64}`).then(r => r.json()),
+          fetch(`/predict/bbb/base64/${b64}`).then(r => r.json()),
+        ]);
+        results[entry.smiles] = {
+          ...(filtersRes.status === 'fulfilled' ? filtersRes.value : { error: true }),
+          bbb: bbbRes.status === 'fulfilled' ? bbbRes.value : null,
+        };
+      } catch {
+        results[entry.smiles] = { error: true };
+      }
+      setBatchAnalyzedCount(i + 1);
+    }
+    setBatchProps(results);
+    setIsBatchAnalyzing(false);
+  };
+
   const handleDetectBox = async (ligId?: string, chainId?: string) => {
     if (!receptor) return;
     const lig = (ligId ?? targetLigand).trim() || null;
@@ -349,10 +397,68 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles, onSmil
     setBatchProgress({ current: 0, total: 0, name: '' });
   };
 
+  const runScreening = async () => {
+    const validLigands = entries.filter(e => e.status === 'ok' && e.smiles);
+    if (validLigands.length === 0 || screeningTargets.length === 0) return;
+    screeningAbortRef.current = false;
+    setIsScreening(true);
+    setScreeningResults(null);
+    const total = screeningTargets.length * validLigands.length;
+    let done = 0;
+    // matrix[targetIdx][ligandIdx]
+    const matrix: (number | null)[][] = screeningTargets.map(() => validLigands.map(() => null));
+
+    for (let ti = 0; ti < screeningTargets.length; ti++) {
+      if (screeningAbortRef.current) break;
+      const t = screeningTargets[ti];
+      setScreeningProgress({ current: done, total, label: `Loading ${t.pdbId}…` });
+      try {
+        const rRes = await fetch('/api/docking/receptor/load-pdb-id', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pdbId: t.pdbId, ligandId: t.ligandId || null, chainId: t.chainId || null })
+        });
+        const rData = await rRes.json();
+        if (!rData.success) { done += validLigands.length; continue; }
+        const recPath = rData.pdbPath;
+        const pocket = rData.pocket;
+        const center = pocket?.success ? pocket.center : { x: 0, y: 0, z: 0 };
+        const size   = pocket?.success ? pocket.size   : { x: 20, y: 20, z: 20 };
+
+        for (let li = 0; li < validLigands.length; li++) {
+          if (screeningAbortRef.current) break;
+          const ligand = validLigands[li];
+          done++;
+          setScreeningProgress({ current: done, total, label: `${t.pdbId} × ${ligand.name || 'mol_' + (li + 1)}` });
+          try {
+            const dRes = await fetch('/api/docking/run', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ receptorPath: recPath, smiles: ligand.smiles, center, size, exhaustiveness, numModes })
+            });
+            const dData = await dRes.json();
+            if (dData.success && dData.scores?.length > 0) matrix[ti][li] = dData.scores[0].affinity;
+          } catch { /* skip */ }
+        }
+      } catch { done += validLigands.length; /* skip target */ }
+    }
+
+    setScreeningResults({
+      targets: screeningTargets.map(t => t.pdbId),
+      rows: validLigands.map((l, li) => ({
+        ligand: l.name || `mol_${li + 1}`,
+        smiles: l.smiles,
+        values: matrix.map(col => col[li])
+      }))
+    });
+    setIsScreening(false);
+    setScreeningProgress({ current: 0, total: 0, label: '' });
+  };
+
   const handleSetControl = (idx: number) => {
-    setAccumulated(prev => prev.map((r, i) => ({ 
-      ...r, 
-      isControl: i === idx ? !r.isControl : false 
+    setAccumulated(prev => prev.map((r, i) => ({
+      ...r,
+      isControl: i === idx ? !r.isControl : false
     })));
   };
 
@@ -361,7 +467,14 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles, onSmil
     const ctrl = accumulated.find(r => r.isControl);
     const ctrlAff = ctrl ? parseFloat(ctrl.affinity) : null;
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const sorted = [...accumulated].sort((a, b) => parseFloat(a.affinity) - parseFloat(b.affinity));
+    const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const sorted = [...accumulated].sort((a, b) => {
+      const af = parseFloat(a.affinity), bf = parseFloat(b.affinity);
+      if (isNaN(af) && isNaN(bf)) return 0;
+      if (isNaN(af)) return 1;
+      if (isNaN(bf)) return -1;
+      return af - bf;
+    });
     const affinities = accumulated.map(r => parseFloat(r.affinity)).filter(v => !isNaN(v));
     const bestAff = affinities.length > 0 ? Math.min(...affinities) : null;
     const bestMol = bestAff !== null ? accumulated.find(r => parseFloat(r.affinity) === bestAff) : null;
@@ -388,7 +501,9 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles, onSmil
     const rowBg = (r: AccumResult) => {
       if (r.isControl) return '#eff6ff';
       if (!ctrlAff) return '#fff';
-      const d = parseFloat(r.affinity) - ctrlAff;
+      const aff = parseFloat(r.affinity);
+      if (isNaN(aff)) return '#fff';
+      const d = aff - ctrlAff;
       return d < -0.5 ? '#f0fdf4' : d > 0.5 ? '#fff7f7' : '#fffbeb';
     };
 
@@ -396,14 +511,15 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles, onSmil
       const hb = r.plipData?.interactions?.hbonds?.length ?? '—';
       const hp = r.plipData?.interactions?.hydrophobic?.length ?? '—';
       const pi = r.plipData?.interactions?.pi_stacking?.length ?? '—';
-      const delta = ctrlAff !== null && !r.isControl ? (parseFloat(r.affinity) - ctrlAff).toFixed(2) : (r.isControl ? 'REF' : '—');
-      const dColor = !r.isControl && ctrlAff !== null ? (parseFloat(r.affinity)-ctrlAff < -0.1 ? '#16a34a' : parseFloat(r.affinity)-ctrlAff > 0.1 ? '#dc2626' : '#92400e') : '#64748b';
+      const rAff = parseFloat(r.affinity);
+      const delta = ctrlAff !== null && !r.isControl && !isNaN(rAff) ? (rAff - ctrlAff).toFixed(2) : (r.isControl ? 'REF' : '—');
+      const dColor = !r.isControl && ctrlAff !== null && !isNaN(rAff) ? (rAff-ctrlAff < -0.1 ? '#16a34a' : rAff-ctrlAff > 0.1 ? '#dc2626' : '#92400e') : '#64748b';
       const ki = r.plipData?.ki || '—';
       const le = r.le > 0 ? r.le.toFixed(3) : '—';
       const ctrlLabel = r.isControl ? ' <span style="background:#1e3a5f;color:#fff;padding:1px 7px;border-radius:4px;font-size:9px;font-weight:800;vertical-align:middle">REF</span>' : '';
       return `<tr style="background:${rowBg(r)}">
         <td style="padding:10px 10px;text-align:center;font-weight:800;color:#94a3b8;font-size:12px">${r.isControl ? '—' : '#'+(rank+1)}</td>
-        <td style="padding:10px 10px"><div style="font-weight:700;color:#1e293b;font-size:12px">${r.name}${ctrlLabel}</div><div style="font-size:9px;color:#94a3b8;font-family:monospace;word-break:break-all">${r.smiles.length>60?r.smiles.slice(0,60)+'…':r.smiles}</div></td>
+        <td style="padding:10px 10px"><div style="font-weight:700;color:#1e293b;font-size:12px">${esc(r.name)}${ctrlLabel}</div><div style="font-size:9px;color:#94a3b8;font-family:monospace;word-break:break-all">${r.smiles.length>60?r.smiles.slice(0,60)+'…':r.smiles}</div></td>
         <td style="padding:10px;text-align:center;font-weight:800;color:#dc2626;font-size:13px">${r.affinity}</td>
         <td style="padding:10px;text-align:center;font-weight:700;color:#16a34a;font-size:11px">${ki}</td>
         <td style="padding:10px;text-align:center;font-weight:700;color:${dColor};font-size:12px">${delta}</td>
@@ -452,13 +568,14 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles, onSmil
       ].join('') || '<div style="font-size:10px;color:#94a3b8">No significant interactions detected</div>';
       const diag = r.plipData.diagram ? `<div>${r.plipData.diagram}</div>` : '';
       const ctrlLabel = r.isControl ? ' <span style="background:#0ea5e9;color:#fff;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:800">REFERENCE</span>' : '';
-      const delta = ctrlAff !== null && !r.isControl
-        ? `<span style="font-weight:700;color:${parseFloat(r.affinity)-ctrlAff < -0.1 ? '#16a34a' : parseFloat(r.affinity)-ctrlAff > 0.1 ? '#dc2626' : '#92400e'}">ΔΔG: ${(parseFloat(r.affinity)-ctrlAff).toFixed(2)} kcal/mol</span>`
+      const dAff = parseFloat(r.affinity);
+      const delta = ctrlAff !== null && !r.isControl && !isNaN(dAff)
+        ? `<span style="font-weight:700;color:${dAff-ctrlAff < -0.1 ? '#16a34a' : dAff-ctrlAff > 0.1 ? '#dc2626' : '#92400e'}">ΔΔG: ${(dAff-ctrlAff).toFixed(2)} kcal/mol</span>`
         : '';
       return `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;margin-bottom:24px;page-break-inside:avoid">
         <div style="display:flex;justify-content:space-between;border-bottom:1px solid #f1f5f9;padding-bottom:14px;margin-bottom:16px">
           <div>
-            <div style="font-size:16px;font-weight:800;color:#1e3a5f">${r.name}${ctrlLabel}</div>
+            <div style="font-size:16px;font-weight:800;color:#1e3a5f">${esc(r.name)}${ctrlLabel}</div>
             <div style="font-size:11px;color:#64748b;margin-top:2px">${r.affinity} kcal/mol | Ki: ${r.plipData?.ki||'—'} | LE: ${r.le>0?r.le.toFixed(3):'—'}</div>
             ${delta?`<div style="font-size:11px;margin-top:4px">${delta}</div>`:''}
           </div>
@@ -636,14 +753,19 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles, onSmil
         const nameCol = autoDetect(headers, /name|nome|id|label|drug|molecule/i);
         const nameIndex = nameCol ? headers.indexOf(nameCol) : -1;
 
-        const formattedStr = rows.slice(1)
+        const allLines = rows.slice(1)
           .map((r: string[]) => {
             const s = (r[smilesIndex] || '').trim();
             const n = nameIndex !== -1 ? (r[nameIndex] || '').trim().replace(/\n/g, ' ') : '';
             return s ? `${s} ${n}`.trim() : '';
           })
-          .filter((s: string) => s.length > 0)
-          .join('\n');
+          .filter((s: string) => s.length > 0);
+
+        if (allLines.length > 20) {
+          alert(`CSV contém ${allLines.length} moléculas. Apenas as primeiras 20 serão carregadas (limite: 20).`);
+        }
+
+        const formattedStr = allLines.slice(0, 20).join('\n');
 
         setInputText(formattedStr);
         onSmilesChange?.(formattedStr);
@@ -763,7 +885,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles, onSmil
                 }} onClick={() => document.getElementById('csv-upload')?.click()}>
                   <i className="bi bi-cloud-upload" style={{ fontSize: '36px', color: '#14b8a6', display: 'block', marginBottom: '12px' }}></i>
                   <p style={{ fontSize: '13px', fontWeight: 600, margin: 0 }}>Click to Upload CSV</p>
-                  <p style={{ fontSize: '11px', color: colors.textMuted, marginTop: '4px' }}>Supports SMILES and Name columns</p>
+                  <p style={{ fontSize: '11px', color: colors.textMuted, marginTop: '4px' }}>Supports SMILES and Name columns · máx. 20 moléculas</p>
                   <input id="csv-upload" type="file" accept=".csv,.xlsx,.xls" hidden onChange={handleCSVUpload} />
                 </div>
               </div>
@@ -921,84 +1043,243 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles, onSmil
         {/* Main Content Area */}
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-            {['overview', 'simulation'].map(tab => (
+            {([
+              { id: 'overview',   label: 'Overview' },
+              { id: 'simulation', label: 'Simulation' },
+              { id: 'screening',  label: '⚡ Screening' },
+            ] as const).map(({ id, label }) => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab as any)}
+                key={id}
+                onClick={() => setActiveTab(id)}
                 style={{
                   padding: '8px 24px', borderRadius: '100px', border: 'none', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
-                  backgroundColor: activeTab === tab ? colors.navy : 'transparent',
-                  color: activeTab === tab ? '#fff' : colors.textMuted
+                  backgroundColor: activeTab === id
+                    ? (id === 'screening' ? '#7c3aed' : colors.navy)
+                    : 'transparent',
+                  color: activeTab === id ? '#fff' : id === 'screening' ? '#7c3aed' : colors.textMuted
                 }}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {label}
               </button>
             ))}
           </div>
 
           <div style={{ backgroundColor: '#fff', borderRadius: radius.lg, padding: '24px', boxShadow: shadow.sm, border: `1px solid ${colors.border}`, minHeight: '600px' }}>
             {activeTab === 'overview' && (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                  <thead>
-                    <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}` }}>
-                      <th style={{ padding: '12px' }}>Molecule</th>
-                      <th style={{ padding: '12px' }}>SMILES</th>
-                      <th style={{ padding: '12px' }}>Status</th>
-                      <th style={{ padding: '12px', textAlign: 'center' }}>Best Score</th>
-                      <th style={{ padding: '12px', textAlign: 'center' }}>Rel. to Ctrl</th>
-                      <th style={{ padding: '12px' }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {entries.map((m, i) => (
-                      <tr key={i} style={{ borderBottom: `1px solid ${colors.bg}`, backgroundColor: selectedIdx === i ? '#f0f9ff' : 'transparent' }}>
-                        <td style={{ padding: '12px', fontWeight: 600 }}>{m.name || `mol_${i + 1}`}</td>
-                        <td style={{ padding: '12px', color: colors.textMuted, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.smiles}</td>
-                        <td style={{ padding: '12px' }}>
-                          <span style={{ padding: '4px 8px', borderRadius: '100px', fontSize: '11px', fontWeight: 700, backgroundColor: m.status === 'ok' ? colors.successBg : colors.bg, color: m.status === 'ok' ? colors.success : colors.textLight }}>
-                            {m.status.toUpperCase()}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'center', fontWeight: 700 }}>
-                          {(() => {
-                            const res = accumulated.find(r => r.smiles === m.smiles);
-                            return res ? (
-                              <span style={{ color: colors.danger }}>{res.affinity} <small style={{ fontWeight: 400, color: colors.textMuted }}>kcal/mol</small></span>
-                            ) : '—';
-                          })()}
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'center' }}>
-                          {(() => {
-                            const res = accumulated.find(r => r.smiles === m.smiles);
-                            const ctrl = accumulated.find(c => c.isControl);
-                            if (!res || !ctrl || res.isControl) return '—';
-                            const diff = parseFloat(res.affinity) - parseFloat(ctrl.affinity);
-                            const better = diff < -0.1;
-                            const worse = diff > 0.1;
-                            return (
-                              <span style={{ fontWeight: 700, color: better ? '#16a34a' : worse ? '#dc2626' : '#92400e', fontSize: '11px' }}>
-                                {better ? '▲' : worse ? '▼' : '≈'} {diff > 0 ? '+' : ''}{diff.toFixed(2)}
-                              </span>
-                            );
-                          })()}
-                        </td>
-                        <td style={{ padding: '12px' }}>
-                          <button
-                            onClick={() => { setSelectedIdx(i); setActiveTab('simulation'); }}
-                            style={{ padding: '4px 10px', borderRadius: radius.sm, border: `1px solid ${colors.border}`, backgroundColor: '#fff', cursor: 'pointer' }}
-                          >
-                            Docking
-                          </button>
-                        </td>
+              <div>
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h6 style={{ margin: 0, fontWeight: 800, color: '#1e293b' }}>
+                    Library
+                    {entries.length > 0 && <span style={{ marginLeft: '8px', fontSize: '12px', fontWeight: 500, color: colors.textMuted }}>({entries.length} molecules)</span>}
+                  </h6>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {isBatchAnalyzing && (
+                      <span style={{ fontSize: '12px', color: colors.textMuted }}>
+                        {batchAnalyzedCount}/{entries.length}
+                      </span>
+                    )}
+                    {Object.keys(batchProps).length > 0 && !isBatchAnalyzing && (
+                      <button
+                        onClick={() => {
+                          const propArr = entries.map(m => {
+                            const p = batchProps[m.smiles];
+                            if (!p || p.error) return null;
+                            const v = p.values || {};
+                            return [
+                              m.name || m.smiles.slice(0, 20),
+                              m.smiles,
+                              v.mw ?? '', v.logp ?? '', v.hbd ?? '', v.hba ?? '',
+                              v.tpsa ?? '', v.rotb ?? '',
+                              p.esol?.logs ?? '', p.esol?.category ?? '',
+                              p.lipinski?.pass ? 'PASS' : 'FAIL',
+                              p.pains?.pass ? 'PASS' : 'FAIL',
+                              p.bbb?.status ?? '—',
+                            ].join(',');
+                          }).filter(Boolean);
+                          const header = 'Name,SMILES,MW,LogP,HBD,HBA,TPSA,RotB,LogS,Solubility,Lipinski,PAINS,BBB';
+                          const blob = new Blob([[header, ...propArr].join('\n')], { type: 'text/csv' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a'); a.href = url; a.download = 'batch_properties.csv'; a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        style={{ padding: '6px 12px', borderRadius: radius.sm, border: `1px solid ${colors.border}`, fontSize: '12px', fontWeight: 600, cursor: 'pointer', backgroundColor: '#f8fafc', display: 'flex', alignItems: 'center', gap: '5px' }}
+                      >
+                        <i className="bi bi-download"></i> Export CSV
+                      </button>
+                    )}
+                    <button
+                      onClick={isBatchAnalyzing ? () => { batchAnalysisAbortRef.current = true; } : runBatchAnalysis}
+                      disabled={entries.length === 0}
+                      style={{
+                        padding: '7px 16px', borderRadius: radius.sm, border: 'none', fontSize: '12px', fontWeight: 700, cursor: entries.length === 0 ? 'default' : 'pointer',
+                        backgroundColor: isBatchAnalyzing ? '#dc2626' : '#0ea5e9',
+                        color: '#fff', display: 'flex', alignItems: 'center', gap: '6px'
+                      }}
+                    >
+                      {isBatchAnalyzing
+                        ? <><span className="spinner-border spinner-border-sm"></span> Abort</>
+                        : <><i className="bi bi-lightning-charge-fill"></i> Analyze Batch</>}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Molecule list table */}
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}` }}>
+                        <th style={{ padding: '12px' }}>Molecule</th>
+                        <th style={{ padding: '12px' }}>SMILES</th>
+                        <th style={{ padding: '12px' }}>Status</th>
+                        <th style={{ padding: '12px', textAlign: 'center' }}>Best Score</th>
+                        <th style={{ padding: '12px', textAlign: 'center' }}>Rel. to Ctrl</th>
+                        <th style={{ padding: '12px' }}>Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {entries.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '80px 0', color: colors.textLight }}>
-                    <i className="bi bi-inbox" style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}></i>
-                    No molecules loaded. Use the sidebar to start.
+                    </thead>
+                    <tbody>
+                      {entries.map((m, i) => (
+                        <tr key={i} style={{ borderBottom: `1px solid ${colors.bg}`, backgroundColor: selectedIdx === i ? '#f0f9ff' : 'transparent' }}>
+                          <td style={{ padding: '12px', fontWeight: 600 }}>{m.name || `mol_${i + 1}`}</td>
+                          <td style={{ padding: '12px', color: colors.textMuted, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.smiles}</td>
+                          <td style={{ padding: '12px' }}>
+                            <span style={{ padding: '4px 8px', borderRadius: '100px', fontSize: '11px', fontWeight: 700, backgroundColor: m.status === 'ok' ? colors.successBg : colors.bg, color: m.status === 'ok' ? colors.success : colors.textLight }}>
+                              {m.status.toUpperCase()}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'center', fontWeight: 700 }}>
+                            {(() => {
+                              const res = accumulated.find(r => r.smiles === m.smiles);
+                              return res ? (
+                                <span style={{ color: colors.danger }}>{res.affinity} <small style={{ fontWeight: 400, color: colors.textMuted }}>kcal/mol</small></span>
+                              ) : '—';
+                            })()}
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            {(() => {
+                              const res = accumulated.find(r => r.smiles === m.smiles);
+                              const ctrl = accumulated.find(c => c.isControl);
+                              if (!res || !ctrl || res.isControl) return '—';
+                              const diff = parseFloat(res.affinity) - parseFloat(ctrl.affinity);
+                              const better = diff < -0.1;
+                              const worse = diff > 0.1;
+                              return (
+                                <span style={{ fontWeight: 700, color: better ? '#16a34a' : worse ? '#dc2626' : '#92400e', fontSize: '11px' }}>
+                                  {better ? '▲' : worse ? '▼' : '≈'} {diff > 0 ? '+' : ''}{diff.toFixed(2)}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <button
+                              onClick={() => { setSelectedIdx(i); setActiveTab('simulation'); }}
+                              style={{ padding: '4px 10px', borderRadius: radius.sm, border: `1px solid ${colors.border}`, backgroundColor: '#fff', cursor: 'pointer' }}
+                            >
+                              Docking
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {entries.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '80px 0', color: colors.textLight }}>
+                      <i className="bi bi-inbox" style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}></i>
+                      No molecules loaded. Use the sidebar to start.
+                    </div>
+                  )}
+                </div>
+
+                {/* Batch property analysis results */}
+                {Object.keys(batchProps).length > 0 && (
+                  <div style={{ marginTop: '32px' }}>
+                    <h6 style={{ fontWeight: 800, margin: '0 0 14px 0', color: '#1e293b', borderTop: `2px solid ${colors.border}`, paddingTop: '24px' }}>
+                      <i className="bi bi-bar-chart-line-fill me-2" style={{ color: '#0ea5e9' }}></i>
+                      Batch Property Analysis
+                    </h6>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#0f172a', color: '#fff' }}>
+                            <th style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 700, minWidth: '120px' }}>Molecule</th>
+                            <th style={{ padding: '9px 8px', textAlign: 'center' }}>MW</th>
+                            <th style={{ padding: '9px 8px', textAlign: 'center' }}>LogP</th>
+                            <th style={{ padding: '9px 8px', textAlign: 'center' }}>HBD</th>
+                            <th style={{ padding: '9px 8px', textAlign: 'center' }}>HBA</th>
+                            <th style={{ padding: '9px 8px', textAlign: 'center' }}>TPSA</th>
+                            <th style={{ padding: '9px 8px', textAlign: 'center' }}>RotB</th>
+                            <th style={{ padding: '9px 8px', textAlign: 'center' }}>LogS</th>
+                            <th style={{ padding: '9px 8px', textAlign: 'center' }}>Solubility</th>
+                            <th style={{ padding: '9px 8px', textAlign: 'center' }}>Lipinski</th>
+                            <th style={{ padding: '9px 8px', textAlign: 'center' }}>PAINS</th>
+                            <th style={{ padding: '9px 8px', textAlign: 'center' }}>BBB</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {entries.map((m, i) => {
+                            const p = batchProps[m.smiles];
+                            const name = m.name || `mol_${i + 1}`;
+                            if (!p) {
+                              return (
+                                <tr key={i} style={{ borderBottom: `1px solid ${colors.border}`, backgroundColor: '#f8fafc' }}>
+                                  <td style={{ padding: '9px 12px', fontWeight: 600 }}>{name}</td>
+                                  <td colSpan={11} style={{ padding: '9px 8px', textAlign: 'center', color: colors.textMuted, fontSize: '11px' }}>
+                                    {isBatchAnalyzing ? <span className="spinner-border spinner-border-sm"></span> : '—'}
+                                  </td>
+                                </tr>
+                              );
+                            }
+                            if (p.error) {
+                              return (
+                                <tr key={i} style={{ borderBottom: `1px solid ${colors.border}`, backgroundColor: '#fff7f7' }}>
+                                  <td style={{ padding: '9px 12px', fontWeight: 600 }}>{name}</td>
+                                  <td colSpan={11} style={{ padding: '9px 8px', textAlign: 'center', color: '#dc2626', fontSize: '11px' }}>Error</td>
+                                </tr>
+                              );
+                            }
+                            const v = p.values || {};
+                            const lip = p.lipinski;
+                            const pains = p.pains;
+                            const bbbP = p.bbb;
+                            const solCat = p.esol?.category ?? '—';
+                            const solColor = solCat === 'Insoluble' ? '#dc2626' : solCat === 'Poorly' ? '#f59e0b' : solCat === 'Moderately' ? '#3b82f6' : '#16a34a';
+                            return (
+                              <tr key={i} style={{ borderBottom: `1px solid ${colors.border}`, backgroundColor: i % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                                <td style={{ padding: '9px 12px', fontWeight: 700, color: '#1e293b' }}>{name}</td>
+                                <td style={{ padding: '9px 8px', textAlign: 'center', color: (v.mw ?? 0) > 500 ? '#dc2626' : '#1e293b' }}>{v.mw ?? '—'}</td>
+                                <td style={{ padding: '9px 8px', textAlign: 'center', color: (v.logp ?? 0) > 5 ? '#dc2626' : (v.logp ?? 0) < 0 ? '#3b82f6' : '#1e293b' }}>{v.logp ?? '—'}</td>
+                                <td style={{ padding: '9px 8px', textAlign: 'center', color: (v.hbd ?? 0) > 5 ? '#dc2626' : '#1e293b' }}>{v.hbd ?? '—'}</td>
+                                <td style={{ padding: '9px 8px', textAlign: 'center', color: (v.hba ?? 0) > 10 ? '#dc2626' : '#1e293b' }}>{v.hba ?? '—'}</td>
+                                <td style={{ padding: '9px 8px', textAlign: 'center', color: (v.tpsa ?? 0) > 140 ? '#dc2626' : '#1e293b' }}>{v.tpsa ?? '—'}</td>
+                                <td style={{ padding: '9px 8px', textAlign: 'center', color: (v.rotb ?? 0) > 10 ? '#f59e0b' : '#1e293b' }}>{v.rotb ?? '—'}</td>
+                                <td style={{ padding: '9px 8px', textAlign: 'center' }}>{p.esol?.logs ?? '—'}</td>
+                                <td style={{ padding: '9px 8px', textAlign: 'center', color: solColor, fontWeight: 600, fontSize: '11px' }}>{solCat}</td>
+                                <td style={{ padding: '9px 8px', textAlign: 'center' }}>
+                                  <span style={{ padding: '3px 8px', borderRadius: '100px', fontSize: '11px', fontWeight: 700, backgroundColor: lip?.pass ? '#dcfce7' : '#fee2e2', color: lip?.pass ? '#16a34a' : '#dc2626' }}>
+                                    {lip?.pass ? 'PASS' : `FAIL (${lip?.n ?? '?'}v)`}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '9px 8px', textAlign: 'center' }}>
+                                  <span style={{ padding: '3px 8px', borderRadius: '100px', fontSize: '11px', fontWeight: 700, backgroundColor: pains?.pass ? '#dcfce7' : '#fef3c7', color: pains?.pass ? '#16a34a' : '#92400e' }}>
+                                    {pains?.pass ? 'PASS' : 'ALERT'}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '9px 8px', textAlign: 'center' }}>
+                                  {bbbP ? (
+                                    <span style={{ padding: '3px 8px', borderRadius: '100px', fontSize: '11px', fontWeight: 700, backgroundColor: bbbP.permeable ? '#dcfce7' : '#fee2e2', color: bbbP.permeable ? '#16a34a' : '#dc2626' }}>
+                                      {bbbP.status}
+                                    </span>
+                                  ) : '—'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p style={{ fontSize: '10px', color: colors.textMuted, marginTop: '8px' }}>
+                      Lipinski Ro5: MW≤500, LogP≤5, HBD≤5, HBA≤10 · PAINS: structural alerts (Pan Assay Interference) · BBB: GraphB3-inspired model · LogS: ESOL (Delaney 2004)
+                    </p>
                   </div>
                 )}
               </div>
@@ -1006,23 +1287,85 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles, onSmil
 
             {activeTab === 'simulation' && (
               <div>
-                <div style={{ display: 'flex', gap: '20px', marginBottom: '24px', alignItems: 'flex-end' }}>
+                <div style={{ display: 'flex', gap: '20px', marginBottom: '24px', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>Receptor PDB ID</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: colors.textMuted }}>
+                      <i className="bi bi-bullseye me-2" style={{ color: '#14b8a6' }}></i>Select Receptor Target
+                    </label>
+
+                    {/* Disease chips */}
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                      {DISEASE_LIBRARY.map(d => (
+                        <button
+                          key={d.id}
+                          onClick={() => setSelectedDisease(selectedDisease === d.id ? null : d.id)}
+                          style={{
+                            padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 700,
+                            cursor: 'pointer', transition: 'all 0.15s',
+                            backgroundColor: selectedDisease === d.id ? d.color : '#f8fafc',
+                            color: selectedDisease === d.id ? '#fff' : '#64748b',
+                            border: `1.5px solid ${selectedDisease === d.id ? d.color : '#e2e8f0'}`,
+                            display: 'flex', alignItems: 'center', gap: '5px',
+                          }}
+                        >
+                          <i className={`bi ${d.icon}`}></i>{d.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Target rows for selected disease */}
+                    {selectedDisease && (() => {
+                      const disease = DISEASE_LIBRARY.find(d => d.id === selectedDisease)!;
+                      return (
+                        <div style={{ border: `1px solid ${disease.color}40`, borderRadius: radius.md, overflow: 'hidden', marginBottom: '12px', backgroundColor: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                          {disease.targets.map((t, i) => (
+                            <div
+                              key={t.pdbId}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px',
+                                borderBottom: i < disease.targets.length - 1 ? '1px solid #f1f5f9' : 'none',
+                              }}
+                              onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                            >
+                              <span style={{ backgroundColor: disease.color, color: '#fff', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 800, minWidth: '46px', textAlign: 'center', flexShrink: 0 }}>{t.pdbId}</span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.gene} — {t.name}</div>
+                                <div style={{ fontSize: '11px', color: '#64748b' }}>{t.mechanism}</div>
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#94a3b8', textAlign: 'right', flexShrink: 0, lineHeight: 1.6 }}>
+                                <div style={{ fontWeight: 600, color: '#475569' }}>{t.inhibitor}</div>
+                                <div>{t.resolution}</div>
+                              </div>
+                              <button
+                                onClick={() => { setTargetLigand(t.ligandId); setTargetChain(t.chainId ?? ''); handleLoadReceptor(t.pdbId, t.ligandId, t.chainId); }}
+                                disabled={isLoadingReceptor}
+                                style={{ padding: '6px 16px', backgroundColor: disease.color, color: '#fff', border: 'none', borderRadius: radius.sm, fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer' }}
+                              >
+                                {isLoadingReceptor ? '…' : 'Load'}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Manual PDB input */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, flexShrink: 0 }}>or PDB ID:</span>
                       <input
                         id="pdb-id-input"
                         type="text"
-                        placeholder="PDB ID (e.g. 5KIR)"
-                        style={{ flex: '1 1 150px', padding: '10px', borderRadius: radius.md, border: `1px solid ${colors.border}` }}
+                        placeholder="e.g. 5KIR"
+                        style={{ flex: '1 1 120px', padding: '8px 12px', borderRadius: radius.md, border: `1px solid ${colors.border}`, fontSize: '13px' }}
                         onKeyDown={e => e.key === 'Enter' && handleLoadReceptor(e.currentTarget.value)}
                       />
                       <button
                         onClick={() => handleLoadReceptor((document.getElementById('pdb-id-input') as HTMLInputElement).value)}
                         disabled={isLoadingReceptor}
-                        style={{ padding: '10px 20px', backgroundColor: colors.navy, color: '#fff', border: 'none', borderRadius: radius.md, fontWeight: 700, whiteSpace: 'nowrap' }}
+                        style={{ padding: '8px 18px', backgroundColor: colors.navy, color: '#fff', border: 'none', borderRadius: radius.md, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer' }}
                       >
-                        {isLoadingReceptor ? 'Loading...' : 'Fetch Receptor'}
+                        {isLoadingReceptor ? 'Loading...' : 'Fetch'}
                       </button>
                     </div>
                   </div>
@@ -1415,6 +1758,291 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles, onSmil
                 )}
               </div>
             )}
+
+            {activeTab === 'screening' && (
+              <div>
+                <div style={{ marginBottom: '20px' }}>
+                  <h5 style={{ fontWeight: 800, margin: '0 0 4px', color: '#7c3aed', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <i className="bi bi-grid-3x3"></i> Virtual Screening Matrix
+                  </h5>
+                  <p style={{ fontSize: '13px', color: colors.textMuted, margin: 0 }}>
+                    Cross <b>{entries.filter(e => e.status === 'ok').length}</b> ligands × <b>{screeningTargets.length}</b> targets = <b>{entries.filter(e => e.status === 'ok').length * screeningTargets.length}</b> docking runs
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '20px', marginBottom: '24px', alignItems: 'flex-start' }}>
+                  {/* Ligands panel */}
+                  <div style={{ flex: '0 0 240px', backgroundColor: '#f8fafc', borderRadius: radius.md, padding: '14px', border: `1px solid ${colors.border}` }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                      Ligands&nbsp;
+                      <span style={{ backgroundColor: '#e2e8f0', padding: '1px 7px', borderRadius: '8px', fontSize: '11px' }}>{entries.filter(e => e.status === 'ok').length}</span>
+                    </div>
+                    {entries.filter(e => e.status === 'ok').length === 0 ? (
+                      <p style={{ fontSize: '12px', color: '#94a3b8', textAlign: 'center', padding: '16px 0', margin: 0 }}>
+                        Prepare compounds in<br/>the Overview tab first
+                      </p>
+                    ) : (
+                      <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {entries.filter(e => e.status === 'ok').map((e, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
+                            <span style={{ width: '20px', height: '20px', backgroundColor: '#ede9fe', color: '#6d28d9', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 800, flexShrink: 0 }}>{i + 1}</span>
+                            <span style={{ fontSize: '12px', color: '#334155', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name || `mol_${i + 1}`}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Targets panel */}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                      Protein Targets&nbsp;
+                      <span style={{ backgroundColor: '#e2e8f0', padding: '1px 7px', borderRadius: '8px', fontSize: '11px' }}>{screeningTargets.length}</span>
+                    </div>
+
+                    {/* Selected targets chips */}
+                    {screeningTargets.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+                        {screeningTargets.map(t => (
+                          <div key={t.pdbId} style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#fff', border: `1.5px solid ${t.color}`, borderRadius: '10px', padding: '5px 10px' }}>
+                            <span style={{ backgroundColor: t.color, color: '#fff', padding: '1px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 800 }}>{t.pdbId}</span>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>{t.gene}</span>
+                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>{t.disease}</span>
+                            <button onClick={() => setScreeningTargets(prev => prev.filter(x => x.pdbId !== t.pdbId))} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0 2px', lineHeight: 1, fontSize: '15px' }}>×</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Disease browser */}
+                    <div style={{ backgroundColor: '#f8fafc', borderRadius: radius.md, padding: '14px', border: `1px solid ${colors.border}` }}>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, marginBottom: '10px' }}>Add targets from disease library:</div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                        {DISEASE_LIBRARY.map(d => (
+                          <button
+                            key={d.id}
+                            onClick={() => setSelectedDisease(selectedDisease === d.id ? null : d.id)}
+                            style={{
+                              padding: '4px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s',
+                              backgroundColor: selectedDisease === d.id ? d.color : '#fff',
+                              color: selectedDisease === d.id ? '#fff' : '#64748b',
+                              border: `1.5px solid ${selectedDisease === d.id ? d.color : '#e2e8f0'}`,
+                              display: 'flex', alignItems: 'center', gap: '4px',
+                            }}
+                          >
+                            <i className={`bi ${d.icon}`}></i>{d.label}
+                          </button>
+                        ))}
+                      </div>
+                      {selectedDisease && (() => {
+                        const disease = DISEASE_LIBRARY.find(d => d.id === selectedDisease)!;
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            {disease.targets.map(t => {
+                              const added = screeningTargets.some(x => x.pdbId === t.pdbId);
+                              return (
+                                <div
+                                  key={t.pdbId}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 12px', backgroundColor: added ? `${disease.color}10` : '#fff', borderRadius: '8px', border: `1px solid ${added ? disease.color + '40' : '#f1f5f9'}` }}
+                                  onMouseEnter={e => { if (!added) e.currentTarget.style.backgroundColor = '#f8fafc'; }}
+                                  onMouseLeave={e => { if (!added) e.currentTarget.style.backgroundColor = '#fff'; }}
+                                >
+                                  <span style={{ backgroundColor: disease.color, color: '#fff', padding: '1px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>{t.pdbId}</span>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b' }}>{t.gene}</span>
+                                    <span style={{ fontSize: '11px', color: '#64748b', marginLeft: '6px' }}>{t.inhibitor}</span>
+                                  </div>
+                                  <span style={{ fontSize: '10px', color: '#94a3b8', flexShrink: 0 }}>{t.resolution}</span>
+                                  <button
+                                    onClick={() => {
+                                      if (added) setScreeningTargets(prev => prev.filter(x => x.pdbId !== t.pdbId));
+                                      else setScreeningTargets(prev => [...prev, { pdbId: t.pdbId, ligandId: t.ligandId, chainId: t.chainId, gene: t.gene, name: t.name, disease: disease.label, color: disease.color }]);
+                                    }}
+                                    style={{ padding: '3px 12px', backgroundColor: added ? '#fee2e2' : disease.color, color: added ? '#dc2626' : '#fff', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                                  >
+                                    {added ? 'Remove' : '+ Add'}
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Run / Progress */}
+                {!isScreening ? (
+                  <button
+                    onClick={runScreening}
+                    disabled={entries.filter(e => e.status === 'ok').length === 0 || screeningTargets.length === 0}
+                    style={{
+                      width: '100%', padding: '14px', borderRadius: radius.md, border: 'none', fontWeight: 800, fontSize: '14px',
+                      cursor: entries.filter(e => e.status === 'ok').length > 0 && screeningTargets.length > 0 ? 'pointer' : 'not-allowed',
+                      backgroundColor: entries.filter(e => e.status === 'ok').length > 0 && screeningTargets.length > 0 ? '#7c3aed' : '#e2e8f0',
+                      color: entries.filter(e => e.status === 'ok').length > 0 && screeningTargets.length > 0 ? '#fff' : '#94a3b8',
+                      marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
+                    }}
+                  >
+                    <i className="bi bi-grid-3x3"></i>
+                    Run Virtual Screening — {entries.filter(e => e.status === 'ok').length} ligands × {screeningTargets.length} targets
+                  </button>
+                ) : (
+                  <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: radius.md }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#5b21b6' }}>
+                        <i className="bi bi-hourglass-split me-2"></i>{screeningProgress.label}
+                      </span>
+                      <button onClick={() => { screeningAbortRef.current = true; }} style={{ padding: '4px 12px', backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>Abort</button>
+                    </div>
+                    <div style={{ height: '8px', backgroundColor: '#ddd6fe', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', backgroundColor: '#7c3aed', borderRadius: '4px', transition: 'width 0.3s', width: `${screeningProgress.total > 0 ? (screeningProgress.current / screeningProgress.total) * 100 : 0}%` }} />
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#7c3aed', marginTop: '6px', textAlign: 'right' }}>{screeningProgress.current} / {screeningProgress.total}</div>
+                  </div>
+                )}
+
+                {/* Results matrix */}
+                {screeningResults && (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <h6 style={{ fontWeight: 800, margin: 0, color: '#1e293b' }}>
+                        <i className="bi bi-table me-2"></i>Affinity Matrix (kcal/mol)
+                      </h6>
+                      <button
+                        onClick={() => {
+                          const header = ['Ligand', ...screeningResults.targets].join(',');
+                          const rows = screeningResults.rows.map(r => [r.ligand, ...r.values.map(v => v ?? '')].join(','));
+                          const csv = [header, ...rows].join('\n');
+                          const blob = new Blob([csv], { type: 'text/csv' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a'); a.href = url; a.download = 'screening_matrix.csv'; a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        style={{ padding: '6px 14px', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', borderRadius: radius.sm, fontSize: '12px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                      >
+                        <i className="bi bi-download"></i> Export CSV
+                      </button>
+                    </div>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#f8fafc' }}>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, border: `1px solid ${colors.border}`, color: '#475569', minWidth: '140px' }}>Ligand</th>
+                            {screeningResults.targets.map(t => {
+                              const st = screeningTargets.find(x => x.pdbId === t);
+                              return (
+                                <th key={t} style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700, border: `1px solid ${colors.border}`, color: '#fff', backgroundColor: st?.color ?? '#475569', minWidth: '100px' }}>
+                                  <div>{t}</div>
+                                  <div style={{ fontSize: '10px', fontWeight: 600, opacity: 0.85 }}>{st?.gene ?? ''}</div>
+                                </th>
+                              );
+                            })}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {screeningResults.rows.map((row, ri) => {
+                            const valid = row.values.filter((v): v is number => v !== null);
+                            const best = valid.length > 0 ? Math.min(...valid) : Infinity;
+                            return (
+                              <tr key={ri} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                                <td style={{ padding: '10px 14px', fontWeight: 600, color: '#1e293b', border: `1px solid ${colors.border}` }}>{row.ligand}</td>
+                                {row.values.map((v, vi) => {
+                                  const isBest = v !== null && v === best && valid.length > 1;
+                                  return (
+                                    <td key={vi} style={{
+                                      padding: '10px 14px', textAlign: 'center', border: `1px solid ${colors.border}`,
+                                      backgroundColor: v === null ? '#f8fafc' : isBest ? '#fef9c3' : 'transparent',
+                                      fontWeight: isBest ? 800 : 600,
+                                      color: v === null ? '#94a3b8' : v < -8 ? '#15803d' : v < -6 ? '#0369a1' : '#64748b'
+                                    }}>
+                                      {v !== null ? v.toFixed(1) : '—'}{isBest && <span style={{ marginLeft: '4px' }}>★</span>}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '8px' }}>★ best affinity per ligand &nbsp;·&nbsp; green &lt; −8 kcal/mol &nbsp;·&nbsp; blue −6 to −8 kcal/mol</p>
+                    </div>
+
+                    {/* Interactive affinity heatmap */}
+                    {(() => {
+                      const stops: [number, number, number][] = [
+                        [21, 128, 61], [34, 197, 94], [132, 204, 22],
+                        [234, 179, 8], [249, 115, 22], [239, 68, 68],
+                      ];
+                      const lerp = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
+                      const colorAt = (t: number): string => {
+                        const s = Math.max(0, Math.min(1, t)) * (stops.length - 1);
+                        const i = Math.min(Math.floor(s), stops.length - 2);
+                        const f = s - i;
+                        const r = lerp(stops[i][0], stops[i + 1][0], f);
+                        const g = lerp(stops[i][1], stops[i + 1][1], f);
+                        const b = lerp(stops[i][2], stops[i + 1][2], f);
+                        return `rgb(${r},${g},${b})`;
+                      };
+                      const allVals = screeningResults.rows.flatMap(r => r.values).filter((v): v is number => v !== null);
+                      if (allVals.length === 0) return null;
+                      const minAff = Math.min(...allVals);
+                      const maxAff = Math.max(...allVals);
+                      const range = maxAff - minAff || 1;
+                      const getColor = (v: number | null) => v === null ? '#f8fafc' : colorAt((v - minAff) / range);
+                      return (
+                        <div style={{ marginTop: '28px' }}>
+                          <h6 style={{ fontWeight: 800, margin: '0 0 12px 0', color: '#1e293b' }}>
+                            <i className="bi bi-grid-3x3-gap-fill me-2"></i>Affinity Heatmap
+                          </h6>
+                          <div style={{ overflowX: 'auto' }}>
+                            <table style={{ borderCollapse: 'collapse', fontSize: '12px', width: '100%' }}>
+                              <thead>
+                                <tr>
+                                  <th style={{ padding: '8px 12px', textAlign: 'left', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', minWidth: '140px' }}>Ligand</th>
+                                  {screeningResults.targets.map(t => {
+                                    const st = screeningTargets.find(x => x.pdbId === t);
+                                    return (
+                                      <th key={t} style={{ padding: '8px 12px', textAlign: 'center', border: '1px solid #e2e8f0', color: '#fff', backgroundColor: st?.color ?? '#475569', minWidth: '90px' }}>
+                                        <div style={{ fontWeight: 700 }}>{t}</div>
+                                        <div style={{ fontSize: '10px', opacity: 0.85 }}>{st?.gene ?? ''}</div>
+                                      </th>
+                                    );
+                                  })}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {screeningResults.rows.map((row, ri) => (
+                                  <tr key={ri}>
+                                    <td style={{ padding: '8px 12px', fontWeight: 600, color: '#1e293b', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>{row.ligand}</td>
+                                    {row.values.map((v, vi) => (
+                                      <td key={vi} style={{
+                                        padding: '8px 12px', textAlign: 'center', border: '1px solid #e2e8f0',
+                                        backgroundColor: getColor(v),
+                                        color: v !== null ? '#fff' : '#94a3b8',
+                                        fontWeight: v !== null ? 700 : 400,
+                                      }}>
+                                        {v !== null ? `${v.toFixed(1)}` : '—'}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '11px', color: '#64748b' }}>
+                            <span style={{ whiteSpace: 'nowrap' }}>Strong ({minAff.toFixed(1)} kcal/mol)</span>
+                            <div style={{ flex: 1, height: '10px', borderRadius: '5px', background: 'linear-gradient(to right, rgb(21,128,61), rgb(34,197,94), rgb(132,204,22), rgb(234,179,8), rgb(249,115,22), rgb(239,68,68))' }} />
+                            <span style={{ whiteSpace: 'nowrap' }}>Weak ({maxAff.toFixed(1)} kcal/mol)</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1427,6 +2055,7 @@ const DockingPage: React.FC<DockingPageProps> = ({ onBack, initialSmiles, onSmil
           setIsDrawerOpen(false);
         }}
       />
+
     </PageShell>
   );
 };

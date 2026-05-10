@@ -227,6 +227,16 @@ function RDKitFilters(props: { smiles: string; onDataLoaded?: (data: any[]) => v
           </div>
         </div>
       )}
+
+      {/* citation notice */}
+      <div style={{ marginTop: '14px', padding: '10px 12px', backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '8px', fontSize: '10px', color: '#92400e', lineHeight: 1.6 }}>
+        <strong style={{ display: 'block', marginBottom: '3px' }}><i className="bi bi-book" style={{ marginRight: '4px' }} />Ao utilizar estes resultados, cite:</strong>
+        <span>RDKit: Landrum G. RDKit: Open-source cheminformatics. <em>rdkit.org</em>, 2006.</span><br />
+        <span>ESOL: Delaney JS. ESOL: Estimating aqueous solubility directly from molecular structure. <em>J Chem Inf Comput Sci</em>. 2004.</span><br />
+        <span>Lipinski Ro5: Lipinski CA et al. Experimental and computational approaches to estimate solubility and permeability. <em>Adv Drug Deliv Rev</em>. 1997.</span><br />
+        <span>PAINS: Baell JB, Holloway GA. New substructure filters for removal of pan assay interference compounds. <em>J Med Chem</em>. 2010.</span><br />
+        <span>BRENK: Brenk R et al. Lessons learnt from assembling screening libraries for drug discovery. <em>ChemMedChem</em>. 2008.</span>
+      </div>
     </div>
   );
 }

@@ -1,18 +1,107 @@
 import os
+import math
 import shutil
 import hashlib
 import json
 import subprocess
 import threading
+import itertools
+import multiprocessing
+import heapq
+from contextlib import contextmanager
 from flask import request, jsonify, send_file
 
-# Limit concurrent docking simulations to prevent RAM/CPU exhaustion on VPS
-DOCKING_LOCK = threading.Semaphore(1)
+# ── Docking scheduler ─────────────────────────────────────────────────────────
+# Priority levels (lower = higher priority)
+PRIORITY_INTERACTIVE = 0   # single manual docking — user is watching
+PRIORITY_QUEUE       = 1   # single-target queue entries
+PRIORITY_SCREENING   = 2   # multi-target batch screening
+PRIORITY_BACKGROUND  = 3   # redocking reference (auto background)
+
+_CPU_COUNT            = multiprocessing.cpu_count() or 4
+N_CONCURRENT_DOCKING  = max(1, _CPU_COUNT // 4)   # 4 on 16-core
+CPUS_PER_DOCKING_JOB  = max(1, _CPU_COUNT // N_CONCURRENT_DOCKING)  # 4 each
+MAX_QUEUED_JOBS       = 60  # reject if more pending than this
+
+class _DockingScheduler:
+    """
+    Priority-ordered, bounded concurrency gate for Vina jobs.
+    High-priority jobs (interactive) jump ahead of batch/screening jobs.
+    Rejects new work when the queue is full to prevent server overload.
+    """
+
+    def __init__(self, n_workers: int, max_total: int):
+        self._n_workers = n_workers
+        self._max_total = max_total
+        self._cond      = threading.Condition(threading.Lock())
+        self._heap: list = []          # (priority, seq, unique_id)
+        self._active     = 0
+        self._seq        = itertools.count()
+
+    @contextmanager
+    def slot(self, priority: int = PRIORITY_SCREENING):
+        uid = object()  # unique per-call identity marker
+        with self._cond:
+            pending = len(self._heap) + self._active
+            if pending >= self._max_total:
+                raise RuntimeError(
+                    f"Servidor sobrecarregado: {pending} jobs em fila. "
+                    "Aguarde alguns instantes e tente novamente."
+                )
+            seq = next(self._seq)
+            heapq.heappush(self._heap, (priority, seq, id(uid)))
+
+            # Block until we're at the front AND a worker slot is free
+            while not (
+                self._heap
+                and self._heap[0][2] == id(uid)
+                and self._active < self._n_workers
+            ):
+                self._cond.wait()
+            heapq.heappop(self._heap)
+            self._active += 1
+
+        try:
+            yield
+        finally:
+            with self._cond:
+                self._active -= 1
+                self._cond.notify_all()
+
+    @property
+    def status(self) -> dict:
+        with self._cond:
+            return {
+                "workers":     self._n_workers,
+                "active":      self._active,
+                "queued":      len(self._heap),
+                "cpusPerJob":  CPUS_PER_DOCKING_JOB,
+                "totalCpus":   _CPU_COUNT,
+            }
+
+
+DOCKING_SCHEDULER = _DockingScheduler(N_CONCURRENT_DOCKING, MAX_QUEUED_JOBS)
 
 # Use a session-based workspace for docking files
 DOCKING_WORKSPACE = os.path.join(os.getcwd(), "tmp", "docking_sessions")
 if not os.path.exists(DOCKING_WORKSPACE):
     os.makedirs(DOCKING_WORKSPACE)
+
+# Persistent redocking cache — computed once per target, reused forever
+REDOCKING_CACHE_PATH = os.path.join(os.getcwd(), "tmp", "redocking_cache.json")
+_redocking_cache_lock = threading.Lock()
+
+def _load_redocking_cache():
+    with _redocking_cache_lock:
+        if os.path.exists(REDOCKING_CACHE_PATH):
+            with open(REDOCKING_CACHE_PATH, "r") as f:
+                return json.load(f)
+        return {}
+
+def _save_redocking_cache(cache):
+    with _redocking_cache_lock:
+        with open(REDOCKING_CACHE_PATH, "w") as f:
+            json.dump(cache, f, indent=2)
 
 _VINA_CANDIDATES = [
     "vina",
@@ -21,6 +110,56 @@ _VINA_CANDIDATES = [
     "/usr/bin/vina",
     "/usr/local/bin/vina",
 ]
+
+def _prepare_receptor_pdbqt(pdb_path: str, out_prefix: str) -> tuple[str, str | None]:
+    """
+    Converts a cleaned receptor PDB to PDBQT.
+    - Tries mk_prepare_receptor with -p (partial charges); tolerates non-zero exit if PDBQT produced
+    - Retries without -p for metal-containing structures (zinc, etc.) where -p fails
+    - Falls back to obabel if both attempts fail to produce a file
+    Returns (pdbqt_path, error_message_or_None).
+    """
+    pdbqt_path = out_prefix + ".pdbqt"
+
+    # ── attempt 1: mk_prepare_receptor with partial charges ───────────────────
+    proc = subprocess.run(
+        ["mk_prepare_receptor", "--read_pdb", pdb_path,
+         "-o", out_prefix, "--default_altloc", "A", "--allow_bad_res", "-p"],
+        capture_output=True, text=True, timeout=120,
+    )
+    if os.path.exists(pdbqt_path) and os.path.getsize(pdbqt_path) > 50:
+        return pdbqt_path, None
+
+    mk_stderr_p = (proc.stderr or "").strip()[:600]
+
+    # ── attempt 2: mk_prepare_receptor without -p (for zinc/metalloproteins) ──
+    # Remove stale empty file so we can detect fresh output
+    if os.path.exists(pdbqt_path):
+        os.remove(pdbqt_path)
+    proc2 = subprocess.run(
+        ["mk_prepare_receptor", "--read_pdb", pdb_path,
+         "-o", out_prefix, "--default_altloc", "A", "--allow_bad_res"],
+        capture_output=True, text=True, timeout=120,
+    )
+    if os.path.exists(pdbqt_path) and os.path.getsize(pdbqt_path) > 50:
+        return pdbqt_path, None
+
+    # ── attempt 3: obabel fallback ────────────────────────────────────────────
+    try:
+        subprocess.run(
+            ["obabel", pdb_path, "-O", pdbqt_path, "-xr"],
+            capture_output=True, text=True, timeout=60, check=False,
+        )
+        if os.path.exists(pdbqt_path) and os.path.getsize(pdbqt_path) > 50:
+            return pdbqt_path, None
+    except FileNotFoundError:
+        pass  # obabel not installed
+
+    mk_stderr = mk_stderr_p or (proc2.stderr or "").strip()[:600]
+    return "", (
+        f"Falha ao converter receptor para PDBQT.\n"
+        f"mk_prepare_receptor (exit {proc.returncode}/{proc2.returncode}): {mk_stderr or '(sem saída)'}"
+    )
 
 def _find_vina():
     for candidate in _VINA_CANDIDATES:
@@ -151,12 +290,145 @@ def init_docking_routes(app):
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/api/docking/redocking/reference", methods=["POST"])
+    def redocking_reference():
+        """
+        Returns the native-inhibitor redocking affinity for a given PDB target.
+        Result is cached in tmp/redocking_cache.json — computed only once per target.
+        """
+        try:
+            from docking_utils import (get_pdb_from_rcsb, auto_detect_pocket_from_inhibitor,
+                                       extract_inhibitor_smiles, clean_pdb_for_docking, prepare_ligand_pdbqt)
+            data = request.get_json()
+            pdb_id   = (data.get("pdbId") or "").strip().upper()
+            lig_id   = (data.get("ligandId") or "").strip().upper() or None
+            chain_id = (data.get("chainId") or "").strip().upper() or None
+
+            if not pdb_id or len(pdb_id) != 4:
+                return jsonify({"error": "Invalid pdbId"}), 400
+
+            cache_key = f"{pdb_id}_{lig_id}_{chain_id}"
+            cache = _load_redocking_cache()
+            if cache_key in cache:
+                return jsonify({**cache[cache_key], "cached": True})
+
+            # --- not cached: compute now ---
+            with DOCKING_SCHEDULER.slot(PRIORITY_BACKGROUND):
+                session_id  = hashlib.md5(pdb_id.encode()).hexdigest()
+                session_dir = os.path.join(DOCKING_WORKSPACE, session_id)
+                os.makedirs(session_dir, exist_ok=True)
+
+                orig_path    = os.path.join(session_dir, f"{pdb_id}_original.pdb")
+                cleaned_path = os.path.join(session_dir, f"{pdb_id}_cleaned.pdb")
+
+                if os.path.exists(orig_path):
+                    with open(orig_path) as f:
+                        pdb_content = f.read()
+                else:
+                    pdb_content = get_pdb_from_rcsb(pdb_id)
+                    if not pdb_content:
+                        return jsonify({"error": f"PDB {pdb_id} not found on RCSB"}), 404
+                    with open(orig_path, "w") as f:
+                        f.write(pdb_content)
+
+                pocket = auto_detect_pocket_from_inhibitor(pdb_content, pdb_id, lig_id, chain_id)
+                if not pocket.get("success"):
+                    return jsonify({"error": "Pocket detection failed", "details": pocket}), 400
+
+                real_inhibitor = pocket.get("inhibitor") or lig_id
+                real_chain     = pocket.get("chain") or chain_id
+
+                smiles = extract_inhibitor_smiles(pdb_content, pdb_id, real_inhibitor, real_chain)
+                if not smiles:
+                    return jsonify({"error": f"Could not extract SMILES for {real_inhibitor}"}), 500
+
+                # Prepare receptor PDBQT (reuse if already present)
+                if not os.path.exists(cleaned_path):
+                    with open(cleaned_path, "w") as f:
+                        f.write(clean_pdb_for_docking(pdb_content))
+
+                receptor_pdbqt = cleaned_path.replace(".pdb", ".pdbqt")
+                if not os.path.exists(receptor_pdbqt) or os.path.getsize(receptor_pdbqt) < 50:
+                    receptor_pdbqt, prep_err = _prepare_receptor_pdbqt(
+                        cleaned_path, cleaned_path.replace(".pdb", "")
+                    )
+                    if prep_err:
+                        return jsonify({"error": prep_err}), 500
+
+                # Prepare native ligand PDBQT
+                pdbqt_content, err = prepare_ligand_pdbqt(smiles)
+                if err:
+                    return jsonify({"error": f"Ligand prep failed: {err}"}), 500
+                native_lig_path = os.path.join(session_dir, "native_ref_ligand.pdbqt")
+                with open(native_lig_path, "w") as f:
+                    f.write(pdbqt_content)
+
+                if not VINA_EXE:
+                    return jsonify({"error": "AutoDock Vina not found"}), 500
+
+                center = pocket["center"]
+                size   = pocket["size"]
+                out_path = os.path.join(session_dir, "native_ref_out.pdbqt")
+
+                vina_proc = subprocess.run(
+                    [VINA_EXE,
+                     "--receptor", receptor_pdbqt,
+                     "--ligand", native_lig_path,
+                     "--center_x", str(center["x"]),
+                     "--center_y", str(center["y"]),
+                     "--center_z", str(center["z"]),
+                     "--size_x", str(size["x"]),
+                     "--size_y", str(size["y"]),
+                     "--size_z", str(size["z"]),
+                     "--exhaustiveness", "4",
+                     "--num_modes", "3",
+                     "--cpu", str(CPUS_PER_DOCKING_JOB),
+                     "--out", out_path],
+                    capture_output=True, text=True, timeout=180
+                )
+
+                # Parse Vina score table
+                scores = []
+                capture = False
+                for line in vina_proc.stdout.splitlines():
+                    if "mode |   affinity" in line: capture = True; continue
+                    if capture and line.startswith("-----"): continue
+                    if capture and line.strip() == "" and scores: break
+                    if capture:
+                        parts = line.split()
+                        if len(parts) >= 2 and parts[0].isdigit():
+                            scores.append({"mode": parts[0], "affinity": float(parts[1])})
+
+                if not scores:
+                    return jsonify({"error": "Vina produced no output",
+                                    "stdout": vina_proc.stdout, "stderr": vina_proc.stderr}), 500
+
+                result = {
+                    "pdbId": pdb_id,
+                    "inhibitor": real_inhibitor,
+                    "smiles": smiles,
+                    "affinity": scores[0]["affinity"],
+                }
+                cache[cache_key] = result
+                _save_redocking_cache(cache)
+
+                return jsonify({**result, "cached": False})
+        except Exception as e:
+            import traceback
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/api/docking/status", methods=["GET"])
+    def docking_status():
+        return jsonify(DOCKING_SCHEDULER.status)
+
     @app.route("/api/docking/run", methods=["POST"])
     def run_docking():
         try:
             from docking_utils import prepare_ligand_pdbqt, merge_receptor_ligand, calculate_ligand_efficiency
-            with DOCKING_LOCK:
-                data = request.get_json()
+            data = request.get_json()
+            # Priority: screening jobs send priority=2; single/queue send 0 or 1
+            _priority = int(data.get("priority", PRIORITY_SCREENING)) if data else PRIORITY_SCREENING
+            with DOCKING_SCHEDULER.slot(_priority):
                 receptor_path = data.get("receptorPath")
                 ligand_smiles = data.get("smiles")
                 center = data.get("center")
@@ -168,14 +440,11 @@ def init_docking_routes(app):
                 session_dir = os.path.dirname(receptor_path)
                 receptor_pdbqt_path = receptor_path.replace(".pdb", ".pdbqt")
                 out_prefix = receptor_path.replace(".pdb", "")
-                try:
-                    subprocess.run(
-                        ["mk_prepare_receptor", "--read_pdb", receptor_path,
-                         "-o", out_prefix, "--default_altloc", "A", "--allow_bad_res", "-p"],
-                        check=True, capture_output=True, text=True
-                    )
-                except Exception as e:
-                    return jsonify({"error": "Failed to convert receptor to PDBQT: " + str(e)}), 500
+                # Reuse cached PDBQT if already prepared (avoids re-running on every call)
+                if not os.path.exists(receptor_pdbqt_path) or os.path.getsize(receptor_pdbqt_path) < 50:
+                    receptor_pdbqt_path, prep_err = _prepare_receptor_pdbqt(receptor_path, out_prefix)
+                    if prep_err:
+                        return jsonify({"error": prep_err}), 500
                 
                 exhaustiveness = data.get("exhaustiveness", 8)
                 num_modes = data.get("numModes", 9)
@@ -194,7 +463,8 @@ def init_docking_routes(app):
                     "--center_x", str(center['x']), "--center_y", str(center['y']), "--center_z", str(center['z']),
                     "--size_x", str(size['x']), "--size_y", str(size['y']), "--size_z", str(size['z']),
                     "--out", output_path, "--exhaustiveness", str(exhaustiveness),
-                    "--num_modes", str(num_modes)
+                    "--num_modes", str(num_modes),
+                    "--cpu", str(CPUS_PER_DOCKING_JOB),
                 ]
 
                 result_vina = subprocess.run(vina_cmd, check=True, capture_output=True, text=True)

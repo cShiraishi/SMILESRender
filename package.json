@@ -18,6 +18,8 @@
   },
   "dependencies": {
     "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-select": "^5.10.0"

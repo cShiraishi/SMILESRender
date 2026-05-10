@@ -38,12 +38,18 @@ function SimContent({ initialSmiles, onSmilesChange }: { initialSmiles?: string;
     const list = [...new Set(input.split('\n').map(s => s.trim()).filter(Boolean))];
     if (!ref.trim() || !list.length) return;
     setLoading(true);
-    const res = await fetch('/similarity', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reference: ref.trim(), smiles: list, radius: radius2 }),
-    });
-    setResults(await res.json());
-    setLoading(false);
+    try {
+      const res = await fetch('/similarity', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reference: ref.trim(), smiles: list, radius: radius2 }),
+      });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      setResults(await res.json());
+    } catch {
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

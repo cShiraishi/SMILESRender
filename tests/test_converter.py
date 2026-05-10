@@ -35,9 +35,10 @@ class TestSmilesValidation:
         mol = Chem.MolFromSmiles(INVALID_SMILES)
         assert mol is None
 
-    def test_empty_smiles_returns_none(self):
+    def test_empty_smiles_returns_none_or_empty_mol(self):
+        # RDKit >= 2022 returns an empty Mol (0 atoms) for "" instead of None
         mol = Chem.MolFromSmiles("")
-        assert mol is None
+        assert mol is None or mol.GetNumAtoms() == 0
 
 
 class TestMolecularProperties:

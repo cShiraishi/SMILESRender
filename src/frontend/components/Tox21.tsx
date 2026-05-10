@@ -106,6 +106,12 @@ function Tox21(props: { smiles: string; onDataLoaded?: (data: any[]) => void }) 
           </div>
         ))}
       </div>
+
+      <div style={{ marginTop: '14px', padding: '10px 12px', backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '8px', fontSize: '10px', color: '#92400e', lineHeight: 1.6 }}>
+        <strong style={{ display: 'block', marginBottom: '3px' }}><i className="bi bi-book" style={{ marginRight: '4px' }} />Ao utilizar estes resultados, cite:</strong>
+        <span>Dataset: Huang R et al. Tox21Challenge to build predictive models of nuclear receptor and stress response pathways as mediated by environmental chemicals and drugs. <em>Front Environ Sci</em>. 2016.</span><br />
+        <span>Model: Wu Z et al. MoleculeNet: a benchmark for molecular machine learning. <em>Chem Sci</em>. 2018.</span>
+      </div>
     </div>
   );
 }

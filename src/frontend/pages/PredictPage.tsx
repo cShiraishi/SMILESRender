@@ -7,7 +7,7 @@ function PredictPage({ onBack, initialSmiles, onSmilesChange }: { onBack: () => 
   return (
     <PageShell
       icon="bi-activity"
-      title="ADMET Profiling"
+      title="ADMET Profiling Lab"
       subtitle="Multi-tool prediction: StopTox · StopLight · ADMETlab 3.0 · RDKit"
       accentColor={colors.teal}
       onBack={onBack}

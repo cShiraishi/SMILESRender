@@ -25,7 +25,8 @@ function ReactionContent({ initialSmiles }: { initialSmiles?: string }) {
 
   const run = async () => {
     if (!smarts.trim()) return;
-    setLoading(true); setError(''); setImgUrl(null);
+    setLoading(true); setError('');
+    setImgUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
     try {
       const res = await fetch('/render/reaction', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
